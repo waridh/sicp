@@ -1,0 +1,116 @@
+#+title: Chapter 1 Exercises
+* Exercise 1.2
+#+begin_src racket :exports both
+#lang sicp
+
+; Exercise 1.2
+( /
+  ( + 5 4 ( - 2 ( - 3 ( + 6 ( / 4 5)))))
+  ( * 3 ( - 6 2) ( - 2 7)))
+#+end_src
+
+#+RESULTS:
+: -37/150
+* Exercise 1.3
+#+begin_src racket :exports
+#lang sicp
+; Planning:
+; If less than or equal to, we will cover the case where they are all equal,
+; and the case where there are two smallest
+(define (sum-of-square x y) (+ (* x x) (* y y)))
+(define (<= x y) (or (< x y) (= x y)))
+(define (less-than-others a b c) (and ( <= a b) ( <= a c)))
+(define (exercise-1-3 x y z)
+  (cond ((less-than-others x y z) (sum-of-square y z))
+        ((less-than-others y x z) (sum-of-square x z))
+        ((less-than-others z x y) (sum-of-square x y))
+        ))
+
+(= (exercise-1-3 1 2 3) 13)
+(= (exercise-1-3 3 2 1) 13)
+(= (exercise-1-3 3 1 2) 13)
+(= (exercise-1-3 2 3 1) 13)
+(= (exercise-1-3 3 2 2) 13)
+(= (exercise-1-3 2 2 2) 8)
+#+end_src
+
+#+RESULTS:
+: #t
+: #t
+: #t
+: #t
+: #t
+: #t
+* Exercise 1.4
+If b is greater than 0, add a and b, else subtract a and b
+* Exercise 1.6
+Using the re-implementation of the if special method will cause the operator to be evaluated, increasing total evaluations to increase by around 25%.
+
+* Exercise 1.7
+
+#+begin_src racket :exports both
+#lang sicp
+
+(define
+  (average x y)
+  (/ (+ x y) 2))
+
+(define (abs x) (if (< x 0) (- x) x))
+
+;; Returns a guess that is closer to the sqrt of the value
+(define (improve guess value)
+  (average guess (/ value guess)))
+
+;; Predicate that returns true if the guess was close enough to the sqrt of
+;; the value
+(define (close-enough? guess value)
+  (< (abs (- value (* guess guess))) 0.001))
+
+(define (sqrt-iter guess value)
+  (if (close-enough? guess value)
+      guess
+      (sqrt-iter (improve guess value) value)))
+
+;; This is the user interface for the function
+(define (sqrt value) (sqrt-iter 1.0 value))
+
+(sqrt 9)
+
+;; Here is the edge case that would break the previous version
+;; This should be 0.01, but it will evaluate to around 0.03
+(sqrt 0.0001)
+
+;; With this many zeros, the line below actually just does not evaluate
+;; (sqrt 1000000000000000)
+
+(define (new-close-enough? guess prev-guess)
+  (< (abs (- guess prev-guess)) 0.001))
+
+(define (new-sqrt-iter guess prev-guess value)
+  (if (new-close-enough? guess prev-guess)
+      guess
+      (new-sqrt-iter (improve guess value) guess value)))
+
+(define (new-sqrt value) (new-sqrt-iter 1.0 0 value))
+
+;; The following calls will return the correct values
+(new-sqrt 9)
+(new-sqrt 0.0001)
+(new-sqrt 1000000000000000)
+
+;; This is the test for very large and very small values
+(new-sqrt 0.00000000000001)
+(new-sqrt 10000000000000000000000000)
+
+;; Conclusion from running this procedure on a very small and a very large
+;; value is that the new method works better on very large values
+#+end_src
+
+#+RESULTS:
+: 3.00009155413138
+: 0.03230844833048122
+: 3.000000001396984
+: 0.010000714038711746
+: 31622776.601683795
+: 0.00097656250341333
+: 3162277660168.3794
