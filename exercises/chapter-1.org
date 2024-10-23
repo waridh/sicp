@@ -218,7 +218,7 @@ We are not going to evaluate this procedure yet. Let's answer some questions fir
 1024
 ;; When x is 1, the function acts like 2 to the power of y
 #+end_src
-When ~x~ is 1, we see that the function is \(2^{y}\).
+When ~x~ is 1, we see that the function is $2^{y}$.
 
 ~(A 2 4)~ will do the following
 #+begin_src racket :exports code
@@ -259,12 +259,12 @@ $$f \left( n \right) = 2 \times n$$
 (define (g n) (A 1 n))
 #+end_src
 
-\[g \left( n \right) = 2 ^{n} \]
+$$g \left( n \right) = 2 ^{n} $$
 
 #+begin_src racket :exports code
 (define (h n) (A 2 n))
 #+end_src
 
-\[h \left( n \right) = {^{n}2} \]
+$$h \left( n \right) = {^{n}2} $$
 
 Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetration]]
