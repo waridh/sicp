@@ -218,7 +218,9 @@ We are not going to evaluate this procedure yet. Let's answer some questions fir
 1024
 ;; When x is 1, the function acts like 2 to the power of y
 #+end_src
-When ~x~ is 1, we see that the function is $2^{y}$.
+When ~x~ is 1, we see that the function is
+
+$$2^{y}$$
 
 ~(A 2 4)~ will do the following
 #+begin_src racket :exports code
