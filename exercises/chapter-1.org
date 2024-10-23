@@ -268,7 +268,7 @@ When ~x~ is 2, we see that the function is 2 pow 2 (y - 1) times
 \[h \left( n \right) = {^{n}2} \]
 
 Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetration]]
-* Exercise 1.1
+* Exercise 1.11
 ** Definition
 \[f \left( n \right) = \begin{cases} n ~ \text{if} ~ n < 3 \\ f \left( n - 1 \right) + 2 f \left( n -2  \right) + 3 f \left( n - 3 \right) ~ \text{if} ~ n \geq 3 \end{cases}
 \]
