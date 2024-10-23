@@ -268,3 +268,70 @@ When ~x~ is 2, we see that the function is 2 pow 2 (y - 1) times
 \[h \left( n \right) = {^{n}2} \]
 
 Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetration]]
+* Exercise 1.1
+** Definition
+\[f \left( n \right) = \begin{cases} n ~ \text{if} ~ n < 3 \\ f \left( n - 1 \right) + 2 f \left( n -2  \right) + 3 f \left( n - 3 \right) ~ \text{if} ~ n \geq 3 \end{cases}
+\]
+** Recursive process
+#+begin_src racket
+#lang sicp
+(define (f n) (if (< n 3) n
+                     (+ (f (- n 1))
+                        (* 2 (f (- n 2)))
+                        (* 3 (f (- n 3))))))
+(f 0)
+(f 1)
+(f 2)
+(f 3)
+(f 4)
+(f 5)
+(f 6)
+(f 7)
+(f 8)
+#+end_src
+
+#+RESULTS:
+: 0
+: 1
+: 2
+: 4
+: 11
+: 25
+: 59
+: 142
+: 335
+** Iterative process
+#+begin_src racket
+#lang sicp
+(define (f n)
+  (define (f-aux f-1-aux f-2-aux f-3-aux) (+ f-1-aux (* 2 f-2-aux) (* 3 f-3-aux)))
+  (define (f-iter cnt f-1 f-2 f-3)
+    (if (= n cnt)
+        (f-aux f-1 f-2 f-3)
+        (f-iter (inc cnt) (f-aux f-1 f-2 f-3) f-1 f-2)))
+  (if (< n 3) n (f-iter 3 2 1 0)))
+(f 0)
+(f 1)
+(f 2)
+(f 3)
+(f 4)
+(f 5)
+(f 6)
+(f 7)
+(f 8)
+(f 100)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+0
+1
+2
+4
+11
+25
+59
+142
+335
+11937765839880230562825561449279733086
+#+end_example
