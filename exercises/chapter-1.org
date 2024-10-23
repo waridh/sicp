@@ -143,3 +143,128 @@ Create a procedure for cube root using the Newton method
 
 #+RESULTS:
 : 3.0000000000000977
+* Exercise 1.9
+** Program 1
+#+begin_src racket :exports both
+#lang sicp
+(+ 4 5)
+(inc (+ 3 5))
+(inc (inc (+ 2 5)))
+(inc (inc (inc (+ 1 5))))
+(inc (inc (inc (inc (+ 0 5)))))
+(inc (inc (inc (inc  5))))
+(inc (inc (inc 6)))
+(inc (inc 7))
+(inc 8)
+9
+#+end_src
+
+#+RESULTS:
+#+begin_example
+9
+9
+9
+9
+9
+9
+9
+9
+9
+9
+#+end_example
+- In this version of the program, we can see that the previous "call stack" is waiting for the result of the next step of the process, therefore, this is as recursive process.
+** Program 2
+#+begin_src racket :exports both
+#lang sicp
+(+ 4 5)
+(+ 3 6)
+(+ 2 7)
+(+ 1 8)
+(+ 0 9)
+9
+#+end_src
+
+#+RESULTS:
+: 9
+: 9
+: 9
+: 9
+: 9
+: 9
+
+- In this version of the program, all the relevant states are passed into the next iteration of the process, therefore, this a iterative process
+* Exercise 1.10
+We are working with Ackermann's function, which has the following form
+#+begin_src racket :exports both
+#lang sicp
+(define (A x y)
+  (cond ((= y 0) 0)
+        ((= x 0) (* 2 y))
+        ((= y 1) 2)
+        (else (A (- x 1) (A x (- y 1))))))
+#+end_src
+** Finding the values for the expressions
+We are not going to evaluate this procedure yet. Let's answer some questions first.
+
+~(A 1 10)~ will do the following.
+#+begin_src racket :exports code
+(A 1 10)
+(A 0 (A 1 9))
+(A 0 (A 0 (A 1 8)))
+;; Expansion as we reduce the value of y
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 1 1))))))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 2)))))))))
+;; Expansion is now done, it can reduce down by multiplying by 2
+1024
+;; When x is 1, the function acts like 2 to the power of y
+#+end_src
+When ~x~ is 1, we see that the function is \(2^{y}\).
+
+~(A 2 4)~ will do the following
+#+begin_src racket :exports code
+(A 2 4)
+(A 1 (A 2 3))
+;; Expansion as we reduce the value of y
+(A 1 (A 1 (A 1 (A 2 1))))
+(A 1 (A 1 (A 1 2)))
+(A 1 (A 1 (A 0 (A 1 1))))
+(A 1 (A 1 (A 0 2)))
+(A 1 (A 1 4))
+;; (A 1 4) is 2 to the power of 4
+(A 1 16)
+;; Expansion is now done,
+65536
+#+end_src
+
+When ~x~ is 2, we see that the function is 2 pow 2 (y - 1) times
+
+~(A 3 3)~ will do the following
+#+begin_src racket :exports code
+(A 2 (A 3 2))
+(A 2 (A 2 (A 3 1)))
+(A 2 (A 2 2))
+;; Now we already know what is function is when x is 2, so we can just solve mathematically
+(A 2 4)
+;; This is a similar value
+65536
+#+end_src
+** Mathematical definition
+#+begin_src racket :exports code
+(define (f n) (A 0 n))
+#+end_src
+
+\[f \left( n \right) = 2 \times n\]
+
+#+begin_src racket :exports code
+(define (g n) (A 1 n))
+#+end_src
+
+\[g \left( n \right) = 2 ^{n} \]
+
+#+begin_src racket :exports code
+(define (h n) (A 2 n))
+#+end_src
+
+\[h \left( n \right) = {^{n}2} \]
+
+Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetration]]
