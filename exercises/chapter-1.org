@@ -273,7 +273,7 @@ Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetr
 \[f \left( n \right) = \begin{cases} n ~ \text{if} ~ n < 3 \\ f \left( n - 1 \right) + 2 f \left( n -2  \right) + 3 f \left( n - 3 \right) ~ \text{if} ~ n \geq 3 \end{cases}
 \]
 ** Recursive process
-#+begin_src racket
+#+begin_src racket :exports both
 #lang sicp
 (define (f n) (if (< n 3) n
                      (+ (f (- n 1))
@@ -300,8 +300,9 @@ Looks like this is a concept for [[https://en.wikipedia.org/wiki/Tetration][tetr
 : 59
 : 142
 : 335
+
 ** Iterative process
-#+begin_src racket
+#+begin_src racket :exports both
 #lang sicp
 (define (f n)
   (define (f-aux f-1-aux f-2-aux f-3-aux) (+ f-1-aux (* 2 f-2-aux) (* 3 f-3-aux)))
