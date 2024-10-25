@@ -381,3 +381,83 @@ Make pascal's triangle using a recursive process. Question does not define the p
 : #t
 : #t
 : #t
+: #t
+: #t
+: #t
+
+* Exercise 1.13
+Prove that \(\text{fib} \left( n \right)\) is the closest integer to \(\varphi^{n} / \sqrt{5} \), where
+
+\[ \varphi = \frac{1 + \sqrt{5}}{2} \approx 1.6180
+\]
+
+is the golden ratio that satisfies the following equation
+
+\[\varphi^{2} = \varphi + 1
+\]
+
+** Solution
+
+I don't have a very rigorous mathematical background, so my proof will end up being strange looking.
+
+Let \(\psi = (1 - \sqrt{5} ) / 2\)
+
+Prove that \(\text{fib} \left( n \right) = \left( \varphi^{n} - \psi^{n} \right) / \sqrt{5}\) using induction and the definition of \(\text{fib} \left( n \right)\).
+
+\begin{equation}
+\text{fib} \left( n \right) = \begin{cases}0 & \text{if}~n=0\\
+1 & \text{if} ~ n=1 \\ \text{fib} \left( n - 1 \right) +
+\text{fib} \left( n -2 \right) & \text{otherwise}\end{cases}
+\end{equation}
+
+base cases:
+
+\begin{align*}
+\frac{\varphi^{0} - \psi^{0}}{\sqrt{5}} &= 0 \\
+\therefore \frac{\varphi^{0} - \psi^{0}}{\sqrt{5}} &= \text{fib} \left( 0 \right) \\
+\frac{\varphi^{1} - \psi^{1}}{\sqrt{5}} &= \frac{\frac{1 + \sqrt{5}}{2} - \frac{1 - \sqrt{5}}{2}}{ \sqrt{5}} \\
+&= \frac{\frac{1 + \sqrt{5} - 1 + \sqrt{5}}{2}}{\sqrt{5}} \\
+&= \frac{2 \sqrt{5}}{2\sqrt{5}} \\
+&= 1 \\
+\therefore \frac{\varphi^{1} - \psi^{1}}{\sqrt{5}} &= \text{fib} \left( 1 \right) \\
+\end{align*}
+
+Inductive case:
+- We need to prove the following
+
+\begin{equation*}
+\frac{\varphi^{n-1} - \psi^{n -1}}{\sqrt{5}} + \frac{\varphi^{n-2} - \psi^{n -2}}{\sqrt{5}} = \frac{\varphi^{n} - \psi^{n}}{\sqrt{5}}
+\end{equation*}
+
+\begin{align*}
+\frac{\varphi^{n-1} - \psi^{n -1}+ \varphi^{n-2} - \psi^{n -2}}{\sqrt{5}} &= \frac{\varphi^{n-1}+ \varphi^{n-2} - \psi^{n -1} - \psi^{n -2}}{\sqrt{5}} \\
+&= \frac{ \varphi^{n} \left( \varphi^{-1}+ \varphi^{-2} \right)  - \psi^{n}\left(  \psi^{ -1} + \psi^{ -2}\right) }{\sqrt{5}}
+\end{align*}
+
+Like the good programmer we are, we will solve the sub problem separately.
+\begin{align*}
+\varphi^{-1} + \varphi^{-2} &= \frac{2}{1 + \sqrt{5}} + \frac{4}{\left( 1 + \sqrt{5} \right)^{2}} \\
+&= \frac{2 \left( 1 + \sqrt{5} \right) + 4}{\left( 1 + \sqrt{5} \right)^{2}} \\
+&= \frac{ \left( 2 + 2\sqrt{5} \right) + 4}{\left( 1 + 2\sqrt{5} + 5 \right)} \\
+&= \frac{  6 + 2\sqrt{5} }{ 6 + 2\sqrt{5}   } \\
+&= 1 \\
+\end{align*}
+
+\begin{align*}
+\psi^{-1} + \psi^{-2} &= \frac{2}{1 - \sqrt{5}} + \frac{4}{\left( 1 - \sqrt{5} \right)^{2}} \\
+&= \frac{2 \left( 1 - \sqrt{5} \right) + 4}{\left( 1 - \sqrt{5} \right)^{2}} \\
+&= \frac{ \left( 2 - 2\sqrt{5} \right) + 4}{\left( 1 - 2\sqrt{5} + 5 \right)} \\
+&= \frac{  6 - 2\sqrt{5} }{ 6 - 2\sqrt{5}   } \\
+&= 1 \\
+\end{align*}
+
+Substituting this back
+
+\begin{align*}
+\frac{\varphi^{n-1} - \psi^{n -1}+ \varphi^{n-2} - \psi^{n -2}}{\sqrt{5}} &= \frac{ \varphi^{n}  - \psi^{n} }{\sqrt{5}} \\
+\therefore \frac{ \varphi^{n}  - \psi^{n} }{\sqrt{5}} &= \text{fib} \left( n \right)
+\end{align*}
+
+The distance between \(\varphi^{2}/\sqrt{5}\) and \(\text{fib} \left( n \right)\) is therefore \(\psi^{2}/\sqrt{5}\), which when calculated is around 0.4472 at \(n=0\). Since this value at \(n=0\) is less than 0.5, \(\text{fib} \left( 0 \right)\) is the closest integer to \(\varphi^{2}/2\). Since the term is exponentiated, the distance between \(\text{fib} \left( n \right)\) and \(\varphi^{2}/2\) will only shrink, making \(\text{fib} \left( n \right)\) the closest integer to \(\varphi^{2} / \sqrt{5}\)
+
+* Exercise 1.14
