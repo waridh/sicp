@@ -461,3 +461,59 @@ Substituting this back
 The distance between \(\varphi^{2}/\sqrt{5}\) and \(\text{fib} \left( n \right)\) is therefore \(\psi^{2}/\sqrt{5}\), which when calculated is around 0.4472 at \(n=0\). Since this value at \(n=0\) is less than 0.5, \(\text{fib} \left( 0 \right)\) is the closest integer to \(\varphi^{2}/2\). Since the term is exponentiated, the distance between \(\text{fib} \left( n \right)\) and \(\varphi^{2}/2\) will only shrink, making \(\text{fib} \left( n \right)\) the closest integer to \(\varphi^{2} / \sqrt{5}\)
 
 * Exercise 1.14
+Draw the process tree for the count-change program, defined below, and define the order of growth of the process.
+#+begin_src racket :exports both
+#lang sicp
+(define (value-of-kind x)
+  (cond ((= x 5) 50)
+        ((= x 4) 25)
+        ((= x 3) 10)
+        ((= x 2) 5)
+        ((= x 1) 1)))
+(define (cc amount kinds-of-coins)
+  (cond ((= amount 0) 1)
+        ((or (< amount 0) (= kinds-of-coins 0)) 0)
+        (else (+ (cc amount (- kinds-of-coins 1))
+                 (cc (- amount (value-of-kind kinds-of-coins)) kinds-of-coins)
+                 ))
+        ))
+(define (count-change amount) (cc amount 5))
+(count-change 11)
+#+end_src
+
+#+RESULTS:
+: 4
+
+
+Evaluation tree was drawn off screen. This is a \(\Theta(n^{2})\) step algorithm with a \(\Theta(n)\) space complexity.
+* Exercise 1.15
+Approximating sine using software. We have the following identity.
+
+\[
+\sin (x) = 3 \sin \left(\frac{x}{3}\right) - 4 \sin^{3} \left( \frac{x}{3} \right)
+\]
+
+This definition leaverages the fact that at small enough x, \(\sin(x) \approx x\).
+
+We are provided the following procedure.
+#+begin_src racket :exports both
+#lang sicp
+(define (cube x) (* x x x))
+(define (p x) (- (* 3 x) (* 4 (cube x))))
+(define (sine x) (if (not (> (abs x) 0.1))
+                     x
+                     (p (sine (/ x 3.0)))))
+#+end_src
+** Question a
+*** Question
+How many times does the procedure p get applied when calling ~(sine 12.15)~.
+
+*** Answer
+This question is really asking how many times do we have to call sine before it recursively gets to a value below 0.1. I manually pressed the divide by 3 button on my calculator 5 times before getting to 0.05, which would be our target value to would prevent the p procedure from being called.
+** Question b
+*** Question
+What is the order of growth of this procedure in both steps and space.
+*** Answer
+This procedure is a linear recursive function, meaning that there is not tail call strategy, but evaluation does not navigate a tree. Getting to the approximation case is logarithmic, as a division by 3 is used to get there. Nature of this program is that space grows exactly as the steps do, therefore space order of growth is also logarithmic. \(\Theta(\log(n))\).
+* Exercise 1.16
+Make an iterative version of the fast exponential process.
