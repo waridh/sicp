@@ -517,3 +517,19 @@ What is the order of growth of this procedure in both steps and space.
 This procedure is a linear recursive function, meaning that there is not tail call strategy, but evaluation does not navigate a tree. Getting to the approximation case is logarithmic, as a division by 3 is used to get there. Nature of this program is that space grows exactly as the steps do, therefore space order of growth is also logarithmic. \(\Theta(\log(n))\).
 * Exercise 1.16
 Make an iterative version of the fast exponential process.
+#+begin_src racket :exports both
+#lang sicp
+(define (fast-expt b n)
+  (define (square x) (* x x))
+  (define (even? x) (= (remainder x 2) 0))
+  (define (fast-expt-iter b n a)
+    (if (= n 0) a (if (even? n)
+                      (fast-expt-iter (square b) (/ n 2) a)
+                      (fast-expt-iter b (- n 1) (* a b)))))
+  (fast-expt-iter b n 1))
+
+(fast-expt 2 100)
+#+end_src
+
+#+RESULTS:
+: 10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376
