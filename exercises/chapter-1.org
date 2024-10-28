@@ -535,7 +535,6 @@ Make an iterative version of the fast exponential process.
 : 1267650600228229401496703205376
 * Exercise 1.17
 Make an analogous version of ~fast-expt~, but using addition to achieve multiplication.
-** Recursive implementation
 
 #+begin_src racket :exports both
 #lang sicp
@@ -553,7 +552,7 @@ Make an analogous version of ~fast-expt~, but using addition to achieve multipli
 #+RESULTS:
 : 2000000000000
 
-** Iterative Implementation
+* Exercise 1.18
 #+begin_src racket :exports both
 #lang sicp
 (define (double x) (+ x x))
@@ -571,4 +570,4 @@ Make an analogous version of ~fast-expt~, but using addition to achieve multipli
 #+end_src
 
 #+RESULTS:
-: 56
+: 1000000000000000
