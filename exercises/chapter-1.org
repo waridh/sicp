@@ -532,4 +532,43 @@ Make an iterative version of the fast exponential process.
 #+end_src
 
 #+RESULTS:
-: 10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376
+: 1267650600228229401496703205376
+* Exercise 1.17
+Make an analogous version of ~fast-expt~, but using addition to achieve multiplication.
+** Recursive implementation
+
+#+begin_src racket :exports both
+#lang sicp
+(define (double x) (+ x x))
+(define (halve x) (/ x 2))
+(define (even? x) (= (remainder x 2) 0))
+(define (fast-multi x y)
+  (cond ((or (= y 0) (= x 0)) 0)
+        ((even? y) (double (fast-multi x (halve y))))
+        (else (+ x (fast-multi x (- y 1))))))
+
+(fast-multi 2 1000000000000)
+#+end_src
+
+#+RESULTS:
+: 2000000000000
+
+** Iterative Implementation
+#+begin_src racket :exports both
+#lang sicp
+(define (double x) (+ x x))
+(define (halve x) (/ x 2))
+(define (even? x) (= (remainder x 2) 0))
+(define (fast-multi x y)
+  (define (fast-multi-iter x y a)
+    (if (= y 0) a
+        (if (even? y)
+            (fast-multi-iter (double x) (halve y) a)
+            (fast-multi-iter x (- y 1) (+ x a)))))
+  (fast-multi-iter x y 0))
+
+(fast-multi 10 100000000000000)
+#+end_src
+
+#+RESULTS:
+: 56
