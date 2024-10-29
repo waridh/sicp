@@ -571,3 +571,72 @@ Make an analogous version of ~fast-expt~, but using addition to achieve multipli
 
 #+RESULTS:
 : 1000000000000000
+* Exercise 1.19
+Make logarithmic order of growth Fibonacci implementation.
+** Find the transformation equivalent to applying fib twice
+We can just try applying the generic transformation case twice, and finding what ~p'~ and ~q'~ is.
+
+#+begin_example
+a_1 = bq + aq + ap, b_1 = aq + bp
+a_2 = b_1 q + a_1 q + a_1 p, b_2 = a_1 q + b_1 p
+a_2 = (aq + bp)q + (bq + aq + ap)q + (bq+ aq + ap) p, b_2 = (bq + aq + ap)q + (aq + bp)p
+a_2 = aq^2 + bpq + bq^2 + aq^2 + apq + bqp + aqp + ap^2, b_2 = bq^2 + aq^2 + apq + aqp + bp^2
+a_2 = 2aq^2 + 2bpq + + bq^2 + 2apq + ap^2, b_2 = bq^2 + aq^2 + 2apq + bp^2
+b_2 = a q' + b p' = a(q^2 + 2pq) + b (q^2 + p^2)
+
+Check with a_2
+
+a_2 = a(q^2 + 2pq) + b(q^2 + 2pq) + a(p^2 + q^2)
+
+therefore p'=(q^2 + p^2), and q'=(q^2 + 2pq)
+#+end_example
+
+** Completing logarithmic fib iter
+
+Here is the implementation.
+#+begin_src racket :exports both
+#lang sicp
+(define (fib n)
+  (fib-iter 1 0 0 1 n))
+(define (fib-iter a b p q counter)
+  (cond ((= counter 0) b)
+        ((even? counter) (fib-iter a b (+ (square q) (square p)) (+ (square q) (* 2 p q)) (/ counter 2)))
+        (else (fib-iter (+ (* b q) (* a q) (* a p)) (+ (* a q) (* b p)) p q (- counter 1)))))
+(define (square x) (* x x))
+
+(fib 10)
+#+end_src
+
+#+RESULTS:
+: 55
+* Exercise 1.20
+How many remainder operation actually runs using both normal order and applicative order evaluation on ~( gcd 206 40 )~?
+
+#+begin_src racket
+#lang sicp
+(define (gcd a b)
+  (if (= b 0) a
+      (gcd b (remainder a b))))
+#+end_src
+** Normal order evaluation
+#+begin_src racket :exports code
+(gcd 206 40)
+(gcd 40 (remainder 206 40)) ; 1 remainder evaluated: 6
+(gcd (remainder 206 40) (remainder 40 (remainder 206 40))) ; 3 remainder evaluated: 4
+(gcd (remainder 40 (remainder 206 40)) (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))) ; 7 remainder evaluated: 2
+(gcd (remainder (remainder 206 40) (remainder 40 (remainder 206 40)))
+     (remainder (remainder 40 (remainder 206 40))
+                (remainder (remainder 206 40) (remainder 40 (remainder 206 40))))) ; 14 remainder evaluated: 0
+(remainder (remainder 206 40) (remainder 40 (remainder 206 40))) ; 18 remainders evaluated -> output 2
+#+end_src
+
+** Applicative order evaluation
+#+begin_src racket :exports code
+(gcd 206 40) ; 1 remainder evaluated
+(gcd 40 6) ; 2 remainder evaluated
+(gcd 6 4) ; 3 remainder evaluated
+(gcd 4 2) ; 4 remainder evaluated
+(gcd 2 0) ; -> output 2
+#+end_src
+
+Only three remainders are evaluated in applicative order evaluation.
