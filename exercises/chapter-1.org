@@ -853,3 +853,189 @@ Search complete
 #+end_example
 
 Result is as we expect, the runtime does halves.
+* Exercise 1.24
+Now we are testing the algorithm using ~fast-prime?~ using the code from exercise 1.22. Also analyze the runtime complexity of the program.
+
+Since the ~fast-prime?~ algorithm is \(\Theta \left( \log \left( n \right) \right)\), we expect the growths of the steps to slow down when \(n\) is large, and the number of steps to increase rapidly when \(n\) is small. We can see that this does indeed happen in the implementation below, with 100 retries.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+;; importing fast-prime?
+(define (fast-prime? n times)
+  (cond ((= times 0) true)
+        ((fermat-test n) (fast-prime? n (- times 1)))
+        (else false)))
+
+(define (fermat-test n)
+  (define (try-it a) (= (expmod a n n) a))
+  (try-it (+ 1 (random (- n 1)))))
+(define (expmod base expo m)
+  (cond ((= expo 0) 1)
+        ((even? expo) (remainder (square (expmod base (/ expo 2) m)) m))
+        (else (remainder (* base (expmod base (- expo 1) m)) m))))
+
+(define (timed-prime-test n)
+  (newline)
+  (display n)
+  (start-prime-test n (runtime)))
+(define (start-prime-test n start-time)
+  (if (fast-prime? n 100)
+      (report-prime (- (runtime) start-time))))
+(define (report-prime elapsed-time)
+  (display " *** ")
+  (display elapsed-time))
+
+;; Where lower is the start location, and n is the number of prime numbers
+;; being searched for.
+
+;; Here is what can be done. Iterate n down to 0
+(define (search-for-primes lower n)
+  (if (even? lower) (search-for-primes-aux (+ lower 1) n) (search-for-primes-aux lower n)))
+
+;; Invariant: Lower will always be a positive odd integer
+(define (search-for-primes-aux lower n)
+  (define (print-completion) (newline) (display "Search complete"))
+  (cond ((= n 0) (print-completion))
+        ((fast-prime? lower 100) (timed-prime-test lower) (search-for-primes-aux (+ lower 2) (- n 1)))
+        (else (search-for-primes-aux (+ lower 2) n))
+        ))
+
+(search-for-primes 1000 3)
+(search-for-primes 10000 3)
+(search-for-primes 100000 3)
+(search-for-primes 1000000 3)
+(search-for-primes 10000000 3)
+(search-for-primes 100000000 3)
+(search-for-primes 1000000000 3)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+1009 *** 21
+1013 *** 21
+1019 *** 27
+Search complete
+10007 *** 25
+10009 *** 24
+10037 *** 26
+Search complete
+100003 *** 34
+100019 *** 29
+100043 *** 30
+Search complete
+1000003 *** 33
+1000033 *** 33
+1000037 *** 34
+Search complete
+10000019 *** 39
+10000079 *** 40
+10000103 *** 40
+Search complete
+100000007 *** 45
+100000037 *** 45
+100000039 *** 45
+Search complete
+1000000007 *** 50
+1000000009 *** 48
+1000000021 *** 49
+Search complete
+#+end_example
+* Exercise 1.25
+Alyssa P. Hacker is correct, we could leverage the ~fast-expt~ procedure. This would make our program reuse code. The main question is how this could affect the performance. One would think that one modulus operation would be cheaper than doing a modulus operation every iteration. We can test this now.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (fast-expt b n)
+  (define (square x) (* x x))
+  (define (even? x) (= (remainder x 2) 0))
+  (define (fast-expt-iter b n a)
+    (if (= n 0) a (if (even? n)
+                      (fast-expt-iter (square b) (/ n 2) a)
+                      (fast-expt-iter b (- n 1) (* a b)))))
+  (fast-expt-iter b n 1))
+
+(fast-expt 2 100)
+(define (square x) (* x x))
+;; importing fast-prime?
+(define (fast-prime? n times)
+  (cond ((= times 0) true)
+        ((fermat-test n) (fast-prime? n (- times 1)))
+        (else false)))
+
+(define (fermat-test n)
+  (define (try-it a) (= (expmod a n n) a))
+  (try-it (+ 1 (random (- n 1)))))
+(define (expmod base expo m)
+  (remainder (fast-expt base expo) m))
+
+(define (timed-prime-test n)
+  (newline)
+  (display n)
+  (start-prime-test n (runtime)))
+(define (start-prime-test n start-time)
+  (if (fast-prime? n 100)
+      (report-prime (- (runtime) start-time))))
+(define (report-prime elapsed-time)
+  (display " *** ")
+  (display elapsed-time))
+
+;; Where lower is the start location, and n is the number of prime numbers
+;; being searched for.
+
+;; Here is what can be done. Iterate n down to 0
+(define (search-for-primes lower n)
+  (if (even? lower) (search-for-primes-aux (+ lower 1) n) (search-for-primes-aux lower n)))
+
+;; Invariant: Lower will always be a positive odd integer
+(define (search-for-primes-aux lower n)
+  (define (print-completion) (newline) (display "Search complete"))
+  (cond ((= n 0) (print-completion))
+        ((fast-prime? lower 100) (timed-prime-test lower) (search-for-primes-aux (+ lower 2) (- n 1)))
+        (else (search-for-primes-aux (+ lower 2) n))
+        ))
+
+(search-for-primes 1000 3)
+(search-for-primes 10000 3)
+(search-for-primes 100000 3)
+(search-for-primes 1000000 3)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+1267650600228229401496703205376
+
+1009 *** 3317
+1013 *** 3100
+1019 *** 3135
+Search complete
+10007 *** 265895
+10009 *** 259676
+10037 *** 281835
+Search complete
+100003 *** 8611319
+100019 *** 8332395
+100043 *** 9391137
+Search complete
+1000003 *** 274889154
+1000033
+#+end_example
+
+We can see that re-using ~fast-exp~ actually decreases performance by an obscene amount. Why is this? Unfortunately, I spoiled myself by googling, but it has to do with how we are testing with very large value of n. If we fully evaluate the entire exponential before finding the remainder, we will end up calculating values that have over hundreds of zeros. After passing 2^64, we change value types from fixed length integers to dynamic integers. This breaks the operations from being constant time, which will slow down our runtime significantly. Therefore, for this type of extremely large problems, it is faster to break the result down.
+
+* Exercise 1.26
+The following procedure is \( \Theta \left( n \right)\) instead of \( \Theta \left( \log \left( n \right) \right)\). Why is this?
+
+#+begin_src racket :exports code
+(define (expmod base expo m)
+  (cond ((= expo 0) 1)
+        ((even? expo)
+         (remainder (* (expmod base (/ expo 2) m)
+                       (expmod base (/ expo 2) m))))
+        (else (remainder (*
+                          base
+                          (expmod base (- expo 1) m)))))))
+#+end_src
+
+We can see that in the even branch, where we could use square property to cut the current exponent in half, our friend accidentally made the interpreter evaluate the half exponent case twice, exactly negating the number of steps that would have been reduced.
