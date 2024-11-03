@@ -913,31 +913,31 @@ Since the ~fast-prime?~ algorithm is \(\Theta \left( \log \left( n \right) \righ
 #+RESULTS:
 #+begin_example
 
-1009 *** 21
+1009 *** 22
 1013 *** 21
 1019 *** 27
 Search complete
 10007 *** 25
-10009 *** 24
+10009 *** 25
 10037 *** 26
 Search complete
-100003 *** 34
-100019 *** 29
-100043 *** 30
+100003 *** 29
+100019 *** 30
+100043 *** 29
 Search complete
 1000003 *** 33
 1000033 *** 33
-1000037 *** 34
+1000037 *** 33
 Search complete
-10000019 *** 39
+10000019 *** 38
 10000079 *** 40
 10000103 *** 40
 Search complete
-100000007 *** 45
-100000037 *** 45
-100000039 *** 45
+100000007 *** 46
+100000037 *** 46
+100000039 *** 46
 Search complete
-1000000007 *** 50
+1000000007 *** 49
 1000000009 *** 48
 1000000021 *** 49
 Search complete
@@ -1080,3 +1080,67 @@ Show that Carmichael numbers fools the fermat test. Do this by writing a procedu
 : #t
 : #t
 : #f
+* Exercise 1.28
+Miller-Rabin test. A prime test that is based off the Fermat test, but it will catch all the prime values. We're going to follow the steps of the exercise, and modify expmod.
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+
+;; importing fast-prime?
+(define (fast-prime? n times)
+  (cond ((= times 0) true)
+        ((miller-rabin-test n) (fast-prime? n (- times 1)))
+        (else false)))
+
+;; expmod condition changed
+(define (miller-rabin-test n)
+  (define (try-it a) (= (expmod a (- n 1) n) 1))
+  (try-it (+ 1 (random (- n 1)))))
+
+;; remainder square is now testing for nontrivial square root of 1 mod n
+(define (expmod base expo m)
+  (cond ((= expo 0) 1)
+        ((even? expo) (remainder-square (expmod base (/ expo 2) m) m))
+        (else (remainder (* base (expmod base (- expo 1) m)) m))))
+
+(define (remainder-square v n)
+  (if (and
+       (not (or (= v 1) (= v (- n 1))))
+       (= (remainder (square v) n) 1))
+      0
+      (remainder (square v) n)))
+
+(define (assert-eq test-name value expected)
+  (display (if (eq? value expected) "pass: " "fail: "))
+  (display test-name)
+  (newline))
+
+(assert-eq "561 is not prime" (fast-prime? 561 10) #f)
+(assert-eq "1105 is not prime" (fast-prime? 1105 10) #f)
+(assert-eq "1729 is not prime" (fast-prime? 1729 10) #f)
+(assert-eq "2465 is not prime" (fast-prime? 2465 10) #f)
+(assert-eq "2821 is not prime" (fast-prime? 2821 10) #f)
+(assert-eq "6601 is not prime" (fast-prime? 6601 10) #f)
+(assert-eq "6 is not prime" (fast-prime? 6 10) #f)
+(assert-eq "7 is prime" (fast-prime? 7 10) #t)
+(assert-eq "5 is prime" (fast-prime? 5 10) #t)
+(assert-eq "2 is prime" (fast-prime? 2 10) #t)
+(assert-eq "17 is prime" (fast-prime? 17 10) #t)
+(assert-eq "1000000021 is prime" (fast-prime? 1000000021 10) #t)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+pass: 561 is not prime
+pass: 1105 is not prime
+pass: 1729 is not prime
+pass: 2465 is not prime
+pass: 2821 is not prime
+pass: 6601 is not prime
+pass: 6 is not prime
+pass: 7 is prime
+pass: 5 is prime
+pass: 2 is prime
+pass: 17 is prime
+pass: 1000000021 is prime
+#+end_example
