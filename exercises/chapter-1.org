@@ -1039,3 +1039,44 @@ The following procedure is \( \Theta \left( n \right)\) instead of \( \Theta \le
 #+end_src
 
 We can see that in the even branch, where we could use square property to cut the current exponent in half, our friend accidentally made the interpreter evaluate the half exponent case twice, exactly negating the number of steps that would have been reduced.
+* Exercise 1.27
+Show that Carmichael numbers fools the fermat test. Do this by writing a procedure that checks that the number n is congruent to a modulo n for all a < n. You can find the code below.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+
+;; importing fast-prime?
+(define (fast-prime? n times)
+  (cond ((= times 0) true)
+        ((fermat-test n) (fast-prime? n (- times 1)))
+        (else false)))
+
+(define (fermat-test n)
+  (define (fermat-test-iter n a)
+    (cond ((= a 0) true)
+          ((= (expmod a n n) a) (fermat-test-iter n (- a 1)))
+          (else false)))
+  (fermat-test-iter n (- n 1)))
+(define (expmod base expo m)
+  (cond ((= expo 0) 1)
+        ((even? expo) (remainder (square (expmod base (/ expo 2) m)) m))
+        (else (remainder (* base (expmod base (- expo 1) m)) m))))
+
+(fermat-test 561)
+(fermat-test 1105)
+(fermat-test 1729)
+(fermat-test 2465)
+(fermat-test 2821)
+(fermat-test 6601)
+(fermat-test 6)
+#+end_src
+
+#+RESULTS:
+: #t
+: #t
+: #t
+: #t
+: #t
+: #t
+: #f
