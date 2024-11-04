@@ -1144,3 +1144,45 @@ pass: 2 is prime
 pass: 17 is prime
 pass: 1000000021 is prime
 #+end_example
+* Exercise 1.29
+We have just unlocked higher-order functions. Now we are going to use Simpson's rule for numerical integration.
+
+Simpson's rule is as follows:
+
+\[\frac{h}{3} \left( y_{0} + 4 y_{1} + 2y_{2} + 4 y_{3} + 2 y_{4} + \dots + 2 y_{n-2} + 4 y_{n-1} + y_{n} \right)
+\]
+
+where \(h = \left( b - a \right) / n\) for some even integer \(n\) and \(y_{k} = f \left( a + k h \right)\).
+
+To do this, we should leverage sum.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (sum term a next b)
+  (if (> a b)
+      0
+      (+ (term a)
+         (sum term (next a) next b))))
+
+(define (integrate f a b n)
+  (define h (/ (- b a) n))
+  (define (fn-odd x) (* 4 (f (+ a (* x h)))))
+  (define (fn-even x) (* 2 (f (+ a (* x h)))))
+  (define (next x) (+ x 2))
+  (* (/ h 3) (+
+              (f a)
+              (f (+ a (* n h)))
+              (sum fn-odd 1 next (- n 1))
+              (sum fn-even 2 next (- n 1))))
+  )
+
+(define (cube x) (* x x x))
+(integrate cube 0.0 1.0 100)
+(integrate cube 0.0 1.0 1000)
+#+end_src
+
+#+RESULTS:
+: 0.25000000000000006
+: 0.2500000000000002
+
+Doing this, we were able to achieve better accuracy than the ~integral~ procedure.
