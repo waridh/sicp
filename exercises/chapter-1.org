@@ -1186,3 +1186,39 @@ To do this, we should leverage sum.
 : 0.2500000000000002
 
 Doing this, we were able to achieve better accuracy than the ~integral~ procedure.
+* Exercise 1.30
+
+Make the ~sum~ procedure an iterative process.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (sum term a next b)
+  (define (iter a acc)
+    (if (> a b)
+        acc
+        (iter (next a) (+ acc (term a)))
+        ))
+  (iter a 0))
+
+(define (integrate f a b n)
+  (define h (/ (- b a) n))
+  (define (fn-odd x) (* 4 (f (+ a (* x h)))))
+  (define (fn-even x) (* 2 (f (+ a (* x h)))))
+  (define (next x) (+ x 2))
+  (* (/ h 3) (+
+              (f a)
+              (f (+ a (* n h)))
+              (sum fn-odd 1 next (- n 1))
+              (sum fn-even 2 next (- n 1))))
+  )
+
+(define (cube x) (* x x x))
+(integrate cube 0.0 1.0 100)
+(integrate cube 0.0 1.0 1000)
+#+end_src
+
+#+RESULTS:
+: 0.25
+: 0.25
+
+We confirmed that this implementation of sum works by using it as a drop in replacement for the previous implementation for the integration procedure.
