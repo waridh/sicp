@@ -1318,3 +1318,128 @@ Reimplement the product process as a recursive process. We can test the code by 
 : pass: 3! = 6
 : pass: 10! = 3628800
 : 0.7854020902409781
+
+* Exercise 1.32
+** Exercise 1.32a
+Make the generalization of both sum and product called ~accumulate~ that has the following signature. ~(accumulate combiner null-value term a next b)~.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (accumulate combiner null-value term a next b)
+  (if (> a b)
+      null-value
+      (combiner (term a) (accumulate combiner null-value term (next a) next b))))
+
+(define (sum term a next b)
+  (accumulate + 0 term a next b))
+
+(define (product term a next b)
+  (accumulate * 1 term a next b))
+
+(define (assert-eq! test-name left right)
+  (display (if (= left right) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(define (assert-almost-eq! test-name left right)
+  (display (if (< (abs (- left right)) 0.00001) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(define (inc x) (+ x 1))
+(define (factorial x)
+  (if (= x 0) 1 (product identity 1 inc x)))
+
+
+(assert-eq! "0! = 1" (factorial 0) 1)
+(assert-eq! "1! = 1" (factorial 1) 1)
+(assert-eq! "2! = 2" (factorial 2) 2)
+(assert-eq! "3! = 6" (factorial 3) 6)
+(assert-eq! "10! = 3628800" (factorial 10) 3628800)
+
+(define (integrate f a b n)
+  (define h (/ (- b a) n))
+  (define (fn-odd x) (* 4 (f (+ a (* x h)))))
+  (define (fn-even x) (* 2 (f (+ a (* x h)))))
+  (define (next x) (+ x 2))
+  (* (/ h 3) (+
+              (f a)
+              (f (+ a (* n h)))
+              (sum fn-odd 1 next (- n 1))
+              (sum fn-even 2 next (- n 1))))
+  )
+
+(define (cube x) (* x x x))
+(assert-almost-eq! "(integrate cube 0 1.0 100)~0.25" (integrate cube 0.0 1.0 100) 0.25)
+(assert-almost-eq! "(integrate cube 0 1.0 1000)~0.25" (integrate cube 0.0 1.0 1000) 0.25)
+#+end_src
+
+#+RESULTS:
+: pass: 0! = 1
+: pass: 1! = 1
+: pass: 2! = 2
+: pass: 3! = 6
+: pass: 10! = 3628800
+: pass: (integrate cube 0 1.0 100)~0.25
+: pass: (integrate cube 0 1.0 100)~0.25
+
+** Exercise 1.32b
+Iterative process implementation of the ~accumulate~ procedure.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (accumulate combiner null-value term a next b)
+  (define (iter a acc)
+    (if (> a b)
+        acc
+        (iter (next a) (combiner acc (term a)))
+        ))
+  (iter a null-value))
+
+(define (sum term a next b)
+  (accumulate + 0 term a next b))
+
+(define (product term a next b)
+  (accumulate * 1 term a next b))
+
+(define (assert-eq! test-name left right)
+  (display (if (= left right) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(define (assert-almost-eq! test-name left right)
+  (display (if (< (abs (- left right)) 0.00001) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(define (inc x) (+ x 1))
+(define (factorial x)
+  (if (= x 0) 1 (product identity 1 inc x)))
+
+
+(assert-eq! "0! = 1" (factorial 0) 1)
+(assert-eq! "1! = 1" (factorial 1) 1)
+(assert-eq! "2! = 2" (factorial 2) 2)
+(assert-eq! "3! = 6" (factorial 3) 6)
+(assert-eq! "10! = 3628800" (factorial 10) 3628800)
+
+(define (integrate f a b n)
+  (define h (/ (- b a) n))
+  (define (fn-odd x) (* 4 (f (+ a (* x h)))))
+  (define (fn-even x) (* 2 (f (+ a (* x h)))))
+  (define (next x) (+ x 2))
+  (* (/ h 3) (+
+              (f a)
+              (f (+ a (* n h)))
+              (sum fn-odd 1 next (- n 1))
+              (sum fn-even 2 next (- n 1))))
+  )
+
+(define (cube x) (* x x x))
+(assert-almost-eq! "(integrate cube 0 1.0 100)~0.25" (integrate cube 0.0 1.0 100) 0.25)
+(assert-almost-eq! "(integrate cube 0 1.0 1000)~0.25" (integrate cube 0.0 1.0 1000) 0.25)
+#+end_src
