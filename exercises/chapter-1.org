@@ -1222,3 +1222,99 @@ Make the ~sum~ procedure an iterative process.
 : 0.25
 
 We confirmed that this implementation of sum works by using it as a drop in replacement for the previous implementation for the integration procedure.
+* Exercise 1.31
+** 1.31a
+We have ~sum~, now design ~product~. After designing product, write a procedure that calculates factorials, and the approximation of \(\pi/4\).
+#+begin_src racket :exports both
+#lang sicp
+(define (product term a next b)
+  (define (iter a acc)
+    (if (> a b)
+        acc
+        (iter (next a) (* acc (term a)))
+        ))
+  (iter a 1.0))
+
+(define (inc x) (+ x 1))
+(define (factorial x)
+  (if (= x 0) 1 (product identity 1 inc x)))
+
+(define (assert-eq! test-name left right)
+  (display (if (= left right) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(assert-eq! "0! = 1" (factorial 0) 1)
+(assert-eq! "1! = 1" (factorial 1) 1)
+(assert-eq! "2! = 2" (factorial 2) 2)
+(assert-eq! "3! = 6" (factorial 3) 6)
+(assert-eq! "10! = 3628800" (factorial 10) 3628800)
+
+(define (square x) (* x x))
+;; For pi / 4, we could say that it is actually the following.
+;; 2 * (4/3) ^2 * (6/5)^2 * (8/7) ^2
+(define (fourth-pi n)
+  (define (term x)
+    (/ (* (+ x 2) (+ x 4)) (square (+ x 3))))
+  (define (next x) (+ x 2))
+  (product term 0. next n))
+
+;; Should be around 0.785398163
+(fourth-pi 100000)
+#+end_src
+
+#+RESULTS:
+: pass: 0! = 1
+: pass: 1! = 1
+: pass: 2! = 2
+: pass: 3! = 6
+: pass: 10! = 3628800
+: 0.7854020902410065
+
+** 1.31b
+
+Reimplement the product process as a recursive process. We can test the code by making it a drop in replacement for part a.
+#+begin_src racket :exports both
+#lang sicp
+(define (product term a next b)
+  (if (> a b)
+      1
+      (* (term a) (product term (next a) next b))))
+
+(define (inc x) (+ x 1))
+(define (factorial x)
+  (if (= x 0) 1 (product identity 1 inc x)))
+
+(define (assert-eq! test-name left right)
+  (display (if (= left right) "pass: " "fail: "))
+  (display test-name)
+  (newline)
+  )
+
+(assert-eq! "0! = 1" (factorial 0) 1)
+(assert-eq! "1! = 1" (factorial 1) 1)
+(assert-eq! "2! = 2" (factorial 2) 2)
+(assert-eq! "3! = 6" (factorial 3) 6)
+(assert-eq! "10! = 3628800" (factorial 10) 3628800)
+
+(define (square x) (* x x))
+;; For pi / 4, we could say that it is actually the following.
+;; 2 * (4/3) ^2 * (6/5)^2 * (8/7) ^2
+(define (fourth-pi n)
+  (define (term x)
+    (/ (* (+ x 2) (+ x 4)) (square (+ x 3))))
+  (define (next x) (+ x 2))
+  (product term 0. next n))
+
+;; Should be around 0.785398163
+(fourth-pi 100000)
+#+end_src
+
+#+RESULTS:
+: pass: 0! = 1
+: pass: 1! = 1
+: pass: 2! = 2
+: pass: 3! = 6
+: pass: 10! = 3628800
+: 0.7854020902409781
