@@ -1949,3 +1949,140 @@ There is a continued fraction representation for the tangent function. It looks 
 : pass: tan(0) = 0 value: 0 expected: 0
 : pass: tan(3.14) = -0.001592655 value: -0.0015926549364072742 expected: -0.001592655
 : pass: tan(3.14/2) = 1255.765591 value: 1255.7655915008268 expected: 1255.765591
+* Exercise 1.40
+Define a version of the cubic method that can be used with the newton method to approximate the zeros of a cubic \(x^{3} + a x^{2} + b x + c\).
+
+#+begin_src racket :exports both
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (define (almost-eq? left right)
+    (< (abs (- left right)) 0.0001)
+    )
+  (assert-predicate almost-eq? test-name value expected))
+(define tolerance 0.001)
+(define (close-enough? a b)
+  (< (abs (- a b))
+     tolerance))
+
+(define (fixed-point f init-guess)
+  (define (try guess)
+    (let ((next (f guess)))
+      (if (close-enough? next guess)
+          next
+          (try next))))
+  (try init-guess))
+(define dx 0.00001)
+(define (derive g)
+  (lambda (x) (/ (- (g (+ x dx)) (g x)) dx)))
+(define (newtons-transform g)
+  (lambda (x) (- x (/ (g x) ((derive g) x)))))
+(define (fixed-point-of-transform g transform guess)
+  (fixed-point (transform g) guess))
+(define (newtons-method g guess)
+  (fixed-point-of-transform g newtons-transform guess))
+
+(define (cubic a b c)
+  (lambda (x) (let ((x2 (* x x)))
+                (+ (* x x2) (* a x2) (* b x) c))))
+
+(assert-almost-eq "x=5 for x^3 - x^2 = 100" (newtons-method (cubic -1 0 -100) 1) 5)
+#+end_src
+
+#+RESULTS:
+: pass: x=5 for x^3 - x^2 = 100 value: 5.000000027907595 expected: 5
+* Exercise 1.41
+Define double, and tell us what the following snippet would return.
+#+begin_src racket :exports code
+#lang sicp
+(((double (double double)) inc) 5)
+#+end_src
+
+Double is being applied on the doubles before being applied on inc. The three double application is a little tricky, it will actually lead to the following scenario.
+
+#+begin_example
+(double (double double))
+(double (lambda (x) (double (double x))))
+(lambda (x) ((lambda (x) double (double x)) ((lambda (x) double (double x)) x))
+#+end_example
+
+The expansion actually leads to four double application, which translates to creating a closure that applies the input function 16 times. Therefore, ~(((double (double double)) inc) 5)~ will generate a value of ~21~.
+
+#+begin_src racket :exports code
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (define (almost-eq? left right)
+    (< (abs (- left right)) 0.0001)
+    )
+  (assert-predicate almost-eq? test-name value expected))
+
+(define (double f)
+  (lambda (x) (f (f x))))
+
+(assert-eq "((double inc) 1) == 3" ((double inc) 1) 3)
+(assert-eq "(((double (double double)) inc) 5) == 13" (((double (double double)) inc) 5) 21)
+#+end_src
+
+#+RESULTS:
+: pass: ((double inc) 1) == 3 value: 3 expected: 3
+: pass: (((double (double double)) inc) 5) == 13 value: 21 expected: 21
+* Exercise 1.42
+Define the ~compose~ procedure.
+
+#+begin_src racket :exports code
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (define (almost-eq? left right)
+    (< (abs (- left right)) 0.0001)
+    )
+  (assert-predicate almost-eq? test-name value expected))
+(define (square x) (* x x))
+
+(define (compose f g)
+  (lambda (x) (f (g x))))
+
+(define (double f)
+  (compose f f))
+
+(assert-eq "((double inc) 1) == 3" ((double inc) 1) 3)
+(assert-eq "(((double (double double)) inc) 5) == 13" (((double (double double)) inc) 5) 21)
+(assert-eq "((compose square inc) 1) == 4" ((compose square inc) 1) 4)
+(assert-eq "((compose square inc) 6) == 49" ((compose square inc) 6) 49)
+#+end_src
+
+#+RESULTS:
+: pass: ((double inc) 1) == 3 value: 3 expected: 3
+: pass: (((double (double double)) inc) 5) == 13 value: 21 expected: 21
+: pass: ((compose square inc) 1) == 4 value: 4 expected: 4
