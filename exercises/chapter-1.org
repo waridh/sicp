@@ -1948,3 +1948,4 @@ There is a continued fraction representation for the tangent function. It looks 
 #+RESULTS:
 : pass: tan(0) = 0 value: 0 expected: 0
 : pass: tan(3.14) = -0.001592655 value: -0.0015926549364072742 expected: -0.001592655
+: pass: tan(3.14/2) = 1255.765591 value: 1255.7655915008268 expected: 1255.765591
