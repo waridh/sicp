@@ -1733,3 +1733,159 @@ with average dampening
 #+end_example
 
 There are 24 steps without average dampening, and only 8 steps with average dampening. Convergence just happened much faster, and there was less oscillation around the correct value.
+* Exercise 1.37
+** Exercise 1.37a
+Define a procedure called ~cont-frac~ with the signature of ~(cont-frac n d k)~ that will compute the ~k~ term finite continued fraction. Then, call this procedure with the following parameters. ~(cont-frac (lamba (i) 1.0) (lambda (i) 1.0) k)~
+
+#+begin_src racket :exports both
+#lang sicp
+(define (cont-frac n d k)
+  (define (cont-frac-aux i)
+        (let ((n-k (n k))
+              (d-k (d k)))
+          (if (= i k)
+              (/ n-k d-k)
+              (/ n-k (+ d-k (cont-frac-aux (+ i 1)))))))
+  (cont-frac-aux 1))
+
+(cont-frac (lambda (i) 1.0)
+           (lambda (i) 1.0)
+           100)
+
+;; now we test the approximation
+(define psi
+  (/ (+ 1.0 (sqrt 5)) 2.0))
+(define ( close-enough? left right tolerance)
+  (< (abs (- left right)) tolerance))
+
+;; This procedure takes in a function that takes in a single value and will
+;; converge, and returns the value k that brings it to the specified
+;; accuracy.
+;; f: function
+;; t: tolerance
+(define (find-acc-k f t)
+  (define (iter x)
+    (let ((curr (f x)))
+      (if (close-enough? (/ 1.0 psi ) curr t)
+          x
+          (iter (+ x 1)))))
+  (iter 1))
+
+;; This is the experiment that checks how many iterations it takes to get to
+;; four decimal places accuracy.
+(find-acc-k (lambda (k) (cont-frac (lambda (i) 1.0)
+                                   (lambda (i) 1.0)
+                                   k))
+            0.0001)
+#+end_src
+
+#+RESULTS:
+: 0.6180339887498948
+: 10
+** Exercise 1.37b
+Make an iterative process version of the ~cont-frac~ procedure from the previous section.
+#+begin_src racket :exports both
+#lang sicp
+(define (cont-frac n d k)
+  (define (iter acc i)
+    (if (< i 1)
+        acc
+        (iter (/ (n i) (+ (d i) acc)) (- i 1))))
+  (iter (/ (n k) (d k)) (- k 1)))
+
+(cont-frac (lambda (i) 1.0)
+           (lambda (i) 1.0)
+           100)
+
+;; now we test the approximation
+(define psi
+  (/ (+ 1.0 (sqrt 5)) 2.0))
+(define ( close-enough? left right tolerance)
+  (< (abs (- left right)) tolerance))
+
+;; This procedure takes in a function that takes in a single value and will
+;; converge, and returns the value k that brings it to the specified
+;; accuracy.
+;; f: function
+;; t: tolerance
+(define (find-acc-k f t)
+  (define (iter x)
+    (let ((curr (f x)))
+      (if (close-enough? (/ 1.0 psi ) curr t)
+          x
+          (iter (+ x 1)))))
+  (iter 1))
+
+;; This is the experiment that checks how many iterations it takes to get to
+;; four decimal places accuracy.
+(find-acc-k (lambda (k) (cont-frac (lambda (i) 1.0)
+                                   (lambda (i) 1.0)
+                                   k))
+            0.0001)
+#+end_src
+
+#+RESULTS:
+: 0.6180339887498948
+: 10
+
+We know that this version of equivalent to recursive process version because the result of the computation match. Unit testing was not as rigorous here, but it should be sufficient.
+* Exercise 1.38
+Continued fraction expansion of \(e - 2\). \(N_{i}\) is all 1, but \(D_{i}\) is successively 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8.
+
+We can see that designing \(D_{i}\) is bulk of the work here.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (cont-frac n d k)
+  (define (iter acc i)
+    (if (< i 1)
+        acc
+        (iter (/ (n i) (+ (d i) acc)) (- i 1))))
+  (iter (/ (n k) (d k)) (- k 1)))
+
+
+;; Calculates the denomenator. Input must be an integer
+(define (denom k)
+  (define (div-3? x)
+    (= (remainder x 3) 0))
+  (let ((k++ (+ k 1)))
+    (if (div-3? k++)
+        (* 2 (/ k++ 3))
+        1)))
+
+(define (assert-eq test-name value expected)
+  (display (if (eq? value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(assert-eq "d(1) = 1" (denom 1) 1)
+(assert-eq "d(2) = 2" (denom 2) 2)
+(assert-eq "d(3) = 1" (denom 3) 1)
+(assert-eq "d(4) = 1" (denom 4) 1)
+(assert-eq "d(5) = 4" (denom 5) 4)
+
+(cont-frac (lambda (i) 1.0)
+           denom
+           1000000)
+
+(define eular (+ (cont-frac (lambda (i) 1.0)
+           denom
+           100000) 2))
+
+eular
+#+end_src
+
+#+RESULTS:
+: pass: d(1) = 1 value: 1 expected: 1
+: pass: d(2) = 2 value: 2 expected: 2
+: pass: d(3) = 1 value: 1 expected: 1
+: pass: d(4) = 1 value: 1 expected: 1
+: pass: d(5) = 4 value: 4 expected: 4
+: 0.7182818284590453
+: 2.7182818284590455
+
+Yep, we have found eular's number using this method.
