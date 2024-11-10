@@ -1658,3 +1658,78 @@ From this derivation, we can now use the fixed point algorithm to find the value
 
 #+RESULTS:
 : 1.6181818181818182
+* Exercise 1.36
+Modify ~fixed-point~ to print the sequence of approximation that is being generated. Test this procedure against \(x^{x} = 1000\) by using \(x \rightarrow \log \left( 1000 \right) / \log \left( x \right)\). Then test this with and without average damping.
+
+#+begin_src racket :exports both
+#lang sicp
+
+(define tolerance 0.001)
+(define (close-enough? a b)
+  (< (abs (- a b))
+     tolerance))
+
+(define (fixed-point f init-guess)
+  (define (try guess)
+    (let ((next (f guess)))
+      (display next)
+      (newline)
+      (if (close-enough? next guess)
+          next
+          (try next))))
+  (try init-guess))
+
+;; Setting up for experiment
+(define (fixed-point-version x) (/ (log 1000) (log x)))
+(define (average x y) (/ (+ x y) 2))
+
+;; Without average dampening
+(display "without average dampening")
+(newline)
+(fixed-point fixed-point-version 2.0)
+(newline)
+(display "with average dampening")
+(newline)
+(fixed-point (lambda (x) (average x (fixed-point-version x))) 2.0)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+without average dampening
+9.965784284662087
+3.004472209841214
+6.279195757507157
+3.759850702401539
+5.215843784925895
+4.182207192401397
+4.8277650983445906
+4.387593384662677
+4.671250085763899
+4.481403616895052
+4.6053657460929
+4.5230849678718865
+4.577114682047341
+4.541382480151454
+4.564903245230833
+4.549372679303342
+4.559606491913287
+4.552853875788271
+4.557305529748263
+4.554369064436181
+4.556305311532999
+4.555028263573554
+4.555870396702851
+4.555870396702851
+
+with average dampening
+5.9828921423310435
+4.922168721308343
+4.628224318195455
+4.568346513136242
+4.5577305909237005
+4.555909809045131
+4.555599411610624
+4.555599411610624
+#+end_example
+
+There are 24 steps without average dampening, and only 8 steps with average dampening. Convergence just happened much faster, and there was less oscillation around the correct value.
