@@ -1627,7 +1627,17 @@ and at this final evaluation, the interpreter will yell at us for trying to appl
 * Exercise 1.35
 Show that the golden ratio is the fixed point transformation of \(x \rightarrow 1 + 1/x\). Then write the scheme implementation of the fixed point algorithm to find this value.
 
-#+begin_src racket :exports code
+We can start by stating the definition for \(\psi\).
+
+\[\begin{align}
+\psi\(^{2}\) = \psi + 1 \\
+\left( \psi^2 \right) \frac{1}{\psi} = \left( \psi + 1 \right) \frac{1}{\psi} \\
+\psi = 1 + \frac{1}{\psi}
+\end{align}\]
+
+From this derivation, we can now use the fixed point algorithm to find the value of \(\psi\)
+
+#+begin_src racket :exports both
 #lang sicp
 
 (define tolerance 0.001)
