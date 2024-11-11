@@ -2087,3 +2087,350 @@ Define the ~compose~ procedure.
 : pass: (((double (double double)) inc) 5) == 13 value: 21 expected: 21
 : pass: ((compose square inc) 1) == 4 value: 4 expected: 4
 : pass: ((compose square inc) 6) == 49 value: 49 expected: 49
+* Exercise 1.43
+
+Make ~n~ repeated application of a given procedure.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (compose f g)
+  (lambda (x) (f (g x))))
+(define (repeated f n)
+  (define (iter acc-f i)
+    (if (>= i n)
+        acc-f
+        (iter (compose f acc-f) (+ i 1))))
+  (iter f 1))
+
+(define (square x) (* x x))
+((repeated square 2) 5)
+#+end_src
+
+#+RESULTS:
+: 625
+* Exercise 1.44
+
+Make a smooth function that takes in a function, and take the average of \(f(x-dx)\), \(f(x)\), and \(f(x + dx)\).
+#+begin_src racket :exports both
+#lang sicp
+(define dx 0.000001)
+(define (average a b c) (/ (+ a b c) 3))
+(define (smooth f)
+  (lambda (x)
+    (average (f (- x dx)) (f x) (f (+ x dx)))))
+
+(define (compose f g)
+  (lambda (x) (f (g x))))
+(define (repeated f n)
+  (define (iter acc-f i)
+    (if (>= i n)
+        acc-f
+        (iter (compose f acc-f) (+ i 1))))
+  (iter f 1))
+
+(define (n-fold-smooth f n)
+  ((repeated smooth n) f))
+#+end_src
+
+#+RESULTS:
+
+This exercise is a little harder to test without having plotting yet.
+* Exercise 1.45
+
+Built a more generic fixed point implementation of the root procedure. Part of the exercise is doing the experiment to find the relationship between the number of average damps and the root being calculated.
+
+Starting with the experiment, we do the following.
+#+begin_src racket :exports both
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (assert-predicate close-enough? test-name value expected))
+(define tolerance 0.000001)
+(define (close-enough? a b)
+  (< (abs (- a b))
+     tolerance))
+(define (compose f g)
+  (lambda (x) (f (g x))))
+(define (repeated f n)
+  (define (iter acc-f i)
+    (if (>= i n)
+        acc-f
+        (iter (compose f acc-f) (+ i 1))))
+  (iter f 1))
+
+(define (fixed-point f init-guess)
+  (define (try guess)
+    (let ((next (f guess)))
+      (if (close-enough? next guess)
+          next
+          (try next))))
+  (try init-guess))
+
+(define (average-damp f)
+  (define (average x y)
+    (/ (+ x y) 2))
+  (lambda (x) (average x (f x))))
+
+(define (fixed-point-of-transform g transform guess)
+  (fixed-point (transform g) guess))
+
+(define (pow b a)
+  (if (= a 0)
+      1
+      (* b (pow b (- a 1)))))
+;; Slower implementation, but meets functional requirements
+(define (fixed-point-pow-root x n)
+  (lambda (y) (/
+               x
+               (pow y (- n 1)))))
+
+(fixed-point-of-transform (fixed-point-pow-root 4 2) (repeated average-damp 1) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root (pow 2 3) 3) (repeated average-damp 1) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 4)
+                           4)
+                          (repeated average-damp 2) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 5)
+                           5)
+                          (repeated average-damp 2) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 6)
+                           6)
+                          (repeated average-damp 2) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 7)
+                           7)
+                          (repeated average-damp 2) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 8)
+                           8)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 9)
+                           9)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 10)
+                           10)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 11)
+                           11)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 12)
+                           12)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 13)
+                           13)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 14)
+                           14)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 15)
+                           15)
+                          (repeated average-damp 3) 1.0)
+(fixed-point-of-transform (fixed-point-pow-root
+                           (pow 2 16)
+                           16)
+                          (repeated average-damp 4) 1.0)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+2.000000000000002
+2.0000002271906077
+2.0
+2.0000000945616985
+2.0000001833403775
+2.0000003557852426
+2.0
+2.0000000361646872
+2.0000000739374078
+2.0000001265301037
+2.000000288570333
+1.9999997226217825
+1.9999996322344147
+1.9999995769425756
+2.0
+#+end_example
+
+From this short little experiment of hand testing when the number of repeated average needed to increment, we can see that the incremented repeated averages lasts for double of what the previous value lasted for. There is actually more to this. Numerically, we can find the number of repeated average by flooring the square root of the value of ~n~ when finding the nth root.
+
+With this knowledge, we can now implement the nth root procedure.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (assert-predicate close-enough? test-name value expected))
+(define tolerance 0.000001)
+(define (close-enough? a b)
+  (< (abs (- a b))
+     tolerance))
+(define (compose f g)
+  (lambda (x) (f (g x))))
+(define (repeated f n)
+  (define (iter acc-f i)
+    (if (>= i n)
+        acc-f
+        (iter (compose f acc-f) (+ i 1))))
+  (iter f 1))
+
+(define (fixed-point f init-guess)
+  (define (try guess)
+    (let ((next (f guess)))
+      (if (close-enough? next guess)
+          next
+          (try next))))
+  (try init-guess))
+
+(define (average-damp f)
+  (define (average x y)
+    (/ (+ x y) 2))
+  (lambda (x) (average x (f x))))
+
+(define (fixed-point-of-transform g transform guess)
+  (fixed-point (transform g) guess))
+
+(define (pow b a)
+  (if (= a 0)
+      1
+      (* b (pow b (- a 1)))))
+;; Slower implementation, but meets functional requirements
+(define (fixed-point-pow-root x n)
+  (lambda (y) (/
+               x
+               (pow y (- n 1)))))
+
+(define (sqrt x)
+  (fixed-point-of-transform (fixed-point-pow-root x 2) average-damp 1))
+(define (n-root n x)
+  (fixed-point-of-transform (fixed-point-pow-root x n)
+                            (repeated average-damp
+                                      (floor (sqrt n)))
+                            1.0))
+
+(n-root 100 (pow 2 100))
+#+end_src
+
+#+RESULTS:
+: 2.0000088342738436
+
+We know that this system works because we were able to evaluate it on n == 100.
+* Exercise 1.46
+Abstract the numerical system that is being used to approximate fixed-point, and sqrt one more time, and make a new procedure called ~iterative-improve~ that will take a predicate method, an improvement method and return a new procedure that will take the initial guess. After doing this, rewrite the ~sqrt~ and the ~fixed-point~ procedure.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (assert-predicate almost-eq? test-name value expected))
+
+(define (iterative-improve good-enough? improve-fn)
+  (define (try guess)
+    (let ((next (improve-fn guess)))
+      (if (good-enough? guess next)
+          next
+          (try next))))
+  (lambda (first-guess) (try first-guess)))
+
+(define dx 0.000001)
+
+;; Now rewrite both sqrt and fixed-point
+(define (almost-eq? left right)
+  (< (abs (- left right)) dx))
+
+(define (average-2 a b)
+  (/ (+ a b) 2))
+(define (square x) (* x x))
+
+(define (sqrt x)
+  (define (improve guess)
+    (average-2 guess (/ x guess)))
+  ((iterative-improve almost-eq? improve) 1.0))
+
+(assert-almost-eq "(sqrt 4) == 2" (sqrt 4) 2)
+(assert-almost-eq "(sqrt 9) == 3" (sqrt 9) 3)
+(assert-almost-eq "(sqrt 16) == 4" (sqrt 16) 4)
+
+(define (fixed-point f first-guess)
+  ((iterative-improve almost-eq? f) first-guess))
+
+;; Testing fixed-point by running a previous exercise
+(define (fixed-point-of-transform g transform guess)
+  (fixed-point (transform g) guess))
+
+(define (average-damp f)
+  (define (average x y)
+    (/ (+ x y) 2))
+  (lambda (x) (average x (f x))))
+(define (pow b a)
+  (if (= a 0)
+      1
+      (* b (pow b (- a 1)))))
+;; Slower implementation, but meets functional requirements
+(define (fixed-point-pow-root x n)
+  (lambda (y) (/
+               x
+               (pow y (- n 1)))))
+(define (compose f g)
+  (lambda (x) (f (g x))))
+
+(define (repeated f n)
+  (define (iter acc-f i)
+    (if (>= i n)
+        acc-f
+        (iter (compose f acc-f) (+ i 1))))
+  (iter f 1))
+
+(define (n-root n x)
+  (fixed-point-of-transform (fixed-point-pow-root x n)
+                            (repeated average-damp
+                                      (floor (sqrt n)))
+                            1.0))
+
+(assert-almost-eq "100th root of 2^100 should equal to 2" (n-root 40 (pow 2 80)) 4.0)
+#+end_src
+
+#+RESULTS:
+: pass: (sqrt 4) == 2 value: 2.000000000000002 expected: 2
+: pass: (sqrt 9) == 3 value: 3.0 expected: 3
+: pass: (sqrt 16) == 4 value: 4.000000000000051 expected: 4
+: pass: 100th root of 2^100 should equal to 2 value: 4.000000346253644 expected: 4.0
+
+With this, we have abstracted the iterative improve algorithm out of the systems that we have been working with.
