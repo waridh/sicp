@@ -1,4 +1,5 @@
 #+title: Chapter 1 Exercises
+#+author: Bach
 * Exercise 1.2
 #+begin_src racket :exports both
 #lang sicp

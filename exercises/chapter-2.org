@@ -1,0 +1,138 @@
+#+title: Chapter 2
+#+author: Bach
+* Snippets
+#+name: assertion-suite
+#+begin_src racket :exports code
+(define (assert-predicate pred-fn test-name value expected)
+  (newline)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected))
+
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (define dx 0.000001)
+  (define (almost-eq? left right)
+    (< (abs (- left right)) dx))
+  (assert-predicate almost-eq? test-name value expected))
+#+end_src
+* Exercise 2.1
+Make an improved ~make-rat~ that will normalize the signage of the rational number.
+#+begin_src racket :exports code
+#lang sicp
+(define (make-rat n d)
+  (define (neg? nu de)
+    (or (and (> nu 0) (< de 0))
+        (and (< nu 0) (> de 0))))
+  (define (make-rat-aux nu de)
+    (let ((g (gcd nu de)))
+      (cons (/ nu g) (/ de g))))
+    (if (neg? n d)
+        (make-rat-aux
+         (- 0 (abs n))
+         (abs d))
+        (make-rat-aux (abs n) (abs d))))
+
+(make-rat -4 -12)
+(make-rat 4 -12)
+(make-rat -4 12)
+(make-rat 4 12)
+#+end_src
+
+#+RESULTS:
+: (1 . 3)
+: (-1 . 3)
+: (-1 . 3)
+: (1 . 3)
+
+* Exercise 2.2
+Design a segment, a concept where two points make up a segment. While at it, also design points, a pair of numbers. Here are the required interface:
+
+For segment:
+- Constructor
+  - ~make-segment~
+- Selector
+  - ~start-segment~
+  - ~end-segment~
+
+For points:
+- Constructor
+  - ~make-point~
+- Selector
+  - ~x-point~
+  - ~y-point~
+
+Domain procedure:
+- ~midpoint-segment~
+
+We're provided with a print function
+
+#+name: exercise-2.2
+#+begin_src racket :exports code
+;; Point printing
+(define (print-point p)
+  (newline)
+  (display "(")
+  (display (x-point p))
+  (display ",")
+  (display (y-point p))
+  (display ")"))
+;; Point interface
+(define (make-point x y)
+  (cons x y))
+(define (x-point p) (car p))
+(define (y-point p) (cdr p))
+
+;; Segment interface
+;; make-segment is the segment constructor that takes in a start point and an
+;; end point as parameters
+(define (make-segment start end)
+  (cons start end))
+;; start-segment takes a segment as a parameter and returns the start of the
+;; segment
+(define (start-segment s)
+  (car s))
+;; end-segment takes in a segment as parameter and returns the end point of the
+;; segment
+(define (end-segment s)
+  (cdr s))
+
+;; midpoint-segment takes in a segment and returns the point that represents the
+;; midpoint of that segment
+(define (midpoint-segment s)
+  (define (average a b) (/ (+ a b) 2))
+  (let ((start (start-segment s))
+        (end (end-segment s)))
+    (make-point (average (x-point start)
+                         (x-point end))
+                (average (y-point start)
+                         (y-point end)))))
+#+end_src
+
+Testing the written values now
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<assertion-suite>>
+<<exercise-2.2>>
+
+;; Integration test
+(define test-segment-1 (make-segment (make-point -1 -2)
+                                     (make-point 3 4)))
+(define test-mp-1 (midpoint-segment test-segment-1))
+(print-point test-mp-1)
+(assert-eq "test-mp-1-x=1" (x-point test-mp-1) 1)
+(assert-eq "test-mp-1-y=1" (y-point test-mp-1) 1)
+#+end_src
+
+#+RESULTS:
+:
+: (1,1)
+: pass: test-mp-1-x=1 value: 1 expected: 1
+: pass: test-mp-1-y=1 value: 1 expected: 1
+* Exercise 2.3
+Implement a rectangle in a plane. Write a procedure that calculates the perimeter and area of the rectangle. Then implement a different representation for a rectangle. The goal of the exercise is to abstract properly such that the perimeter and area method does not need to change.
