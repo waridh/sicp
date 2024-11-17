@@ -287,9 +287,11 @@ Show how we can hold a pair of non-negative integers using just numbers and arit
 ;; We should move to using an iterative process instead of a recursive process
 ;; We should do the optimization using the sqaure property.
 (define (count-div base val)
-  (if (= (remainder val base) 0)
-      (+ 1 (count-div base (/ val base)))
-      0))
+  (define (iter v acc)
+    (if (= (remainder v base) 0)
+        (iter (/ v base) (+ acc 1))
+        acc))
+  (iter val 0))
 
 (define (pcar x)
   (count-div 2 x))
