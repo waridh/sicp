@@ -311,5 +311,4 @@ Show how we can hold a pair of non-negative integers using just numbers and arit
 #+RESULTS:
 :
 : pass: pcar (2, 4) = 2 value: 2 expected: 2
-: pass: pcdr (2, 4) = 4 value: 4 expected: 41
-: 8
+: pass: pcdr (2, 4) = 4 value: 4 expected: 4
