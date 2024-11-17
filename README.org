@@ -1,3 +1,7 @@
-#+title: sicp
+#+title: Structures and Interpretations of Computer Programs
 
-Repository for structure and interpretation of computer programs exercises
+* Overview
+Repository for structure and interpretation of computer programs exercises. Exercises are explored through literate programming using Org-mode and Racket in ~#lang sicp~. Evaluation is accomplished through ~org-babel~, and the relevant results are stored.
+* Links
+- [[./exercises/chapter-1.org][Chapter 1]]
+- [[./exercises/chapter-2.org][Chapter 2]]

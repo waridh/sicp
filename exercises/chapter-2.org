@@ -26,16 +26,12 @@ Make an improved ~make-rat~ that will normalize the signage of the rational numb
 #lang sicp
 (define (make-rat n d)
   (define (neg? nu de)
-    (or (and (> nu 0) (< de 0))
-        (and (< nu 0) (> de 0))))
+    (or (and (> nu 0) (< de 0)) (and (< nu 0) (> de 0))))
   (define (make-rat-aux nu de)
-    (let ((g (gcd nu de)))
-      (cons (/ nu g) (/ de g))))
-    (if (neg? n d)
-        (make-rat-aux
-         (- 0 (abs n))
-         (abs d))
-        (make-rat-aux (abs n) (abs d))))
+    (let ([g (gcd nu de)]) (cons (/ nu g) (/ de g))))
+  (if (neg? n d)
+      (make-rat-aux (- 0 (abs n)) (abs d))
+      (make-rat-aux (abs n) (abs d))))
 
 (make-rat -4 -12)
 (make-rat 4 -12)
@@ -84,8 +80,10 @@ We're provided with a print function
 ;; Point interface
 (define (make-point x y)
   (cons x y))
-(define (x-point p) (car p))
-(define (y-point p) (cdr p))
+(define (x-point p)
+  (car p))
+(define (y-point p)
+  (cdr p))
 
 ;; Segment interface
 ;; make-segment is the segment constructor that takes in a start point and an
@@ -104,13 +102,11 @@ We're provided with a print function
 ;; midpoint-segment takes in a segment and returns the point that represents the
 ;; midpoint of that segment
 (define (midpoint-segment s)
-  (define (average a b) (/ (+ a b) 2))
-  (let ((start (start-segment s))
-        (end (end-segment s)))
-    (make-point (average (x-point start)
-                         (x-point end))
-                (average (y-point start)
-                         (y-point end)))))
+  (define (average a b)
+    (/ (+ a b) 2))
+  (let ([start (start-segment s)]
+        [end (end-segment s)])
+    (make-point (average (x-point start) (x-point end)) (average (y-point start) (y-point end)))))
 #+end_src
 
 Testing the written values now
@@ -121,8 +117,7 @@ Testing the written values now
 <<exercise-2.2>>
 
 ;; Integration test
-(define test-segment-1 (make-segment (make-point -1 -2)
-                                     (make-point 3 4)))
+(define test-segment-1 (make-segment (make-point -1 -2) (make-point 3 4)))
 (define test-mp-1 (midpoint-segment test-segment-1))
 (print-point test-mp-1)
 (assert-eq "test-mp-1-x=1" (x-point test-mp-1) 1)
@@ -136,3 +131,13 @@ Testing the written values now
 : pass: test-mp-1-y=1 value: 1 expected: 1
 * Exercise 2.3
 Implement a rectangle in a plane. Write a procedure that calculates the perimeter and area of the rectangle. Then implement a different representation for a rectangle. The goal of the exercise is to abstract properly such that the perimeter and area method does not need to change.
+
+Assuming that we are designing this datastructure to follow the rules of a two dimensional rectangle, and that we really only care about the perimeter and the area of the rectange, we really just need to be able to retrieve the height and width of the rectangle. This will be our selectors. As for conforming to the rule of the rectangle, we could make the constructor always take in less parameters, and generate the other values to follow the rules of the rectangle.
+** Implementation 1
+We're not doing anything fancy in this first version. Constructor will take in bottom left corner and top right corner of the rectangle, and we will use that to represent a retangular object that has it's sides parallel to the two axis of the plane. Our selectors will just be for height and length.
+
+#+begin_src racket :exports both :noweb yes
+;; Begin by importing exercise 2.2
+<<exercise-2.2>>
+
+#+end_src
