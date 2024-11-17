@@ -278,3 +278,38 @@ With the new implementation of ~cons~ and ~car~ below, implement ~cdr~.
 Show how we can hold a pair of non-negative integers using just numbers and arithmetic operations if we represent the pair ~a~ and ~b~ as \(2^{a}3^{b}\). Make the constructor and two selectors.
 ** Solution
 2 and 3 have non-colliding powers. We could get ~a~ just by diving the representation by 2 until the remainder is no longer 0 and count the number of applications required to get there. As for the second element, we could do the same thing as the first element, but using 3 is the target value. This just means that we need to allow the accumulation procedure to take a mod parameter.
+
+#+name: power-integer-pairs
+#+begin_src racket :exports code
+(define (pcons a b)
+  (* (expt 2 a) (expt 3 b)))
+
+;; We should move to using an iterative process instead of a recursive process
+;; We should do the optimization using the sqaure property.
+(define (count-div base val)
+  (if (= (remainder val base) 0)
+      (+ 1 (count-div base (/ val base)))
+      0))
+
+(define (pcar x)
+  (count-div 2 x))
+(define (pcdr x)
+  (count-div 3 x))
+#+end_src
+
+
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<power-integer-pairs>>
+<<assertion-suite>>
+
+(assert-eq "pcar (2, 4) = 2" (pcar (pcons 2 4)) 2)
+(assert-eq "pcdr (2, 4) = 4" (pcdr (pcons 2 4)) 4)
+#+end_src
+
+#+RESULTS:
+:
+: pass: pcar (2, 4) = 2 value: 2 expected: 2
+: pass: pcdr (2, 4) = 4 value: 4 expected: 41
+: 8
