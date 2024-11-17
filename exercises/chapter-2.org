@@ -314,3 +314,58 @@ Show how we can hold a pair of non-negative integers using just numbers and arit
 :
 : pass: pcar (2, 4) = 2 value: 2 expected: 2
 : pass: pcdr (2, 4) = 4 value: 4 expected: 4
+* Exercise 2.6
+We're doing Church encoding, but instead of the lamda calculus representation, it is scheme. I think this is one of the few cases where scheme is less readable. Luckily, this question only ask that we show the representation of one, two, and the actual definition of the addition procedure.
+
+#+begin_src racket :exports code
+(define zero (lambda (f) (lambda (x) x)))
+(define (add-1 n)
+  (lambda (f) (lambda (x) (f ((n f) x)))))
+#+end_src
+
+Let's find one using ~add-1~ on ~zero~.
+
+#+begin_src racket :exports code
+(add-1 zero)
+(add-1 (lambda (f) (lambda (x) x)))
+(lambda (f) (lambda (x) (f ((lambda (f) (lambda (x) x))) f) x))
+(lambda (f) (lambda (x) (f ((lambda (x) x) x) )))
+(lambda (f) (lambda (x) (f x)))
+
+(define one (lambda (f) (lambda (x) (f x))))
+#+end_src
+
+From doing this, we see that ~one~ is represented as a function that takes in a function ~f~ and create a new function that applies ~f~ once on the parameter.
+
+#+begin_src racket :exports code
+(add-1 one)
+(add-1 (lambda (f) (lambda (x) (f x))))
+(lambda (f) (lambda (x) (f (((lambda (f) (lambda (x) (f x))) f) x))))
+(lambda (f) (lambda (x) (f ((lambda (x) (f x)) x))))
+(lambda (f) (lambda (x) (f (f x))))
+
+(define two (lambda (f) (lambda (x) (f (f x)))))
+#+end_src
+
+Encoding for two is a higher order procedure that takes in a procedure ~f~ and produces a procedure that applies ~f~ twice on a parameter.
+
+We can continue this line of reasoning to say that Church encoding of a non-negative integer ~n~ is a higher order procedure that takes in a procedure ~f~ and produces a procedure that applies ~f~ ~n~ times. Now to define addition in Scheme.
+
+#+begin_src racket :exports code
+(define (add a b)
+  (lambda (f) (lambda (x) ((a f) ((b f) x)))))
+#+end_src
+
+To prove that this addition procedure works, we'll evaluate this with ~a~ as ~one~ and ~b~ as ~two~, and we should see that it evaluates to ~(lambda (f) (lambda (x) (f (f (f x)))))~.
+
+#+begin_src racket :exports code
+(add one two)
+(add (lambda (f) (lambda (x) (f x))) (lambda (f) (lambda (x) (f (f x)))))
+(lambda (f)
+  (lambda (x) (((lambda (f) (lambda (x) (f x))) f) (((lambda (f) (lambda (x) (f (f x)))) f) x))))
+(lambda (f) (lambda (x) ((lambda (x) (f x)) ((lambda (x) (f (f x))) x))))
+(lambda (f) (lambda (x) ((lambda (x) (f x)) (f (f x)))))
+(lambda (f) (lambda (x) (f (f (f x)))))
+#+end_src
+
+And as we expected, adding one and two gets us three.
