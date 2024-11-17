@@ -133,11 +133,148 @@ Testing the written values now
 Implement a rectangle in a plane. Write a procedure that calculates the perimeter and area of the rectangle. Then implement a different representation for a rectangle. The goal of the exercise is to abstract properly such that the perimeter and area method does not need to change.
 
 Assuming that we are designing this datastructure to follow the rules of a two dimensional rectangle, and that we really only care about the perimeter and the area of the rectange, we really just need to be able to retrieve the height and width of the rectangle. This will be our selectors. As for conforming to the rule of the rectangle, we could make the constructor always take in less parameters, and generate the other values to follow the rules of the rectangle.
+
+#+name: rectangle-functions
+#+begin_src racket :exports code
+;; We are building the rectangle for this exercise such that the interface is
+;; height and width
+(define (area rectangle)
+  (* (width rectangle) (height rectangle)))
+(define (perimeter rectangle)
+  (+ (* 2 (height rectangle)) (* 2 (width rectangle))))
+#+end_src
+
+#+RESULTS: rectangle-functions
+
 ** Implementation 1
 We're not doing anything fancy in this first version. Constructor will take in bottom left corner and top right corner of the rectangle, and we will use that to represent a retangular object that has it's sides parallel to the two axis of the plane. Our selectors will just be for height and length.
 
-#+begin_src racket :exports both :noweb yes
-;; Begin by importing exercise 2.2
-<<exercise-2.2>>
 
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+;; Begin by importing exercise 2.2 and the interface
+<<exercise-2.2>>
+<<rectangle-functions>>
+<<assertion-suite>>
+;; Takes two points as arguments. bottom-left is the bottom left point of a
+;; rectange that is parallel to the plane axis. top-right is the top right
+;; point of the same rectangle
+(define (make-rectangle bottom-left top-right)
+  (cons bottom-left top-right))
+(define (width rectangle)
+  (let ([left (x-point (car rectangle))]
+        [right (x-point (cdr rectangle))])
+    (abs (- left right))))
+(define (height rectangle)
+  (let ([top (y-point (cdr rectangle))]
+        [bottom (y-point (car rectangle))])
+    (abs (- top bottom))))
+
+(assert-eq "area of (0,0) (2,2) is 4" (area (make-rectangle (make-point 0 0) (make-point 2 2))) 4)
+(assert-eq "perimiter of (-1, -1) (1, 1) is 8"
+           (perimeter (make-rectangle (make-point -1 -1) (make-point 1 1)))
+           8)
 #+end_src
+
+#+RESULTS:
+:
+: pass: area of (0,0) (2,2) is 4 value: 4 expected: 4
+: pass: perimiter of (-1, -1) (1, 1) is 8 value: 8 expected: 8
+** Implementation 2
+Let's allow orientation. This second version takes a segment representing the base of the rectangle and an integer representing the height of the rectangle
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+;; Begin by importing exercise 2.2 and the interface
+<<exercise-2.2>>
+<<rectangle-functions>>
+<<assertion-suite>>
+;; Takes a segment representing the base and the height as arguments
+(define (make-rectangle base height)
+  (cons base height))
+(define (width rectangle)
+  (define (position-vector segment)
+    (make-segment (make-point 0 0)
+                  (make-point (- (x-point (end-segment segment)) (x-point (start-segment segment)))
+                              (- (y-point (end-segment segment)) (y-point (start-segment segment))))))
+  (define (square x)
+    (* x x))
+  (define (mag x y)
+    (sqrt (+ (square x) (square y))))
+  (let ([pos-tip (end-segment (position-vector (car rectangle)))])
+    (mag (x-point pos-tip) (y-point pos-tip))))
+(define (height rectangle)
+  (cdr rectangle))
+
+(assert-eq "area of (0,0) (2,2) is 4"
+           (area (make-rectangle (make-segment (make-point 0 0) (make-point 0 2)) 2))
+           4)
+(assert-eq "perimeter of (-1, -1) (1, 1) is 8"
+           (perimeter (make-rectangle (make-segment (make-point -1 -1) (make-point 1 -1)) 2))
+           8)
+#+end_src
+
+#+RESULTS:
+:
+: pass: area of (0,0) (2,2) is 4 value: 4 expected: 4
+: pass: perimeter of (-1, -1) (1, 1) is 8 value: 8 expected: 8
+
+
+We can see that this second implementation is importing the same rectangle functions ~area~ and ~perimeter~, and we were able to achieve the same result.
+* Exercise 2.4
+
+With the new implementation of ~cons~ and ~car~ below, implement ~cdr~.
+
+#+name: cons-override-1
+#+begin_src racket :exports code
+;; Makes a lambda that accepts a procedure and applies it on both members of
+;; the pairs
+(define (cons x y)
+  (lambda (m) (m x y)))
+
+;; Feeds a procedure that returns the first parameter
+(define (car z)
+  (z (lambda (p q) p)))
+
+;; Our implementation just needs to return the second parameter
+(define (cdr z)
+  (z (lambda (p q) q)))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+;; Begin by importing exercise 2.2 and the interface
+<<exercise-2.2>>
+<<rectangle-functions>>
+<<assertion-suite>>
+<<cons-override-1>>
+;; Takes two points as arguments. bottom-left is the bottom left point of a
+;; rectange that is parallel to the plane axis. top-right is the top right
+;; point of the same rectangle
+(define (make-rectangle bottom-left top-right)
+  (cons bottom-left top-right))
+(define (width rectangle)
+  (let ([left (x-point (car rectangle))]
+        [right (x-point (cdr rectangle))])
+    (abs (- left right))))
+(define (height rectangle)
+  (let ([top (y-point (cdr rectangle))]
+        [bottom (y-point (car rectangle))])
+    (abs (- top bottom))))
+
+(assert-eq "area of (0,0) (2,2) is 4" (area (make-rectangle (make-point 0 0) (make-point 2 2))) 4)
+(assert-eq "perimiter of (-1, -1) (1, 1) is 8"
+           (perimeter (make-rectangle (make-point -1 -1) (make-point 1 1)))
+           8)
+#+end_src
+
+#+RESULTS:
+:
+: pass: area of (0,0) (2,2) is 4 value: 4 expected: 4
+: pass: perimiter of (-1, -1) (1, 1) is 8 value: 8 expected: 8
+
+* Exercise 2.5
+** Prompt
+Show how we can hold a pair of non-negative integers using just numbers and arithmetic operations if we represent the pair ~a~ and ~b~ as \(2^{a}3^{b}\). Make the constructor and two selectors.
+** Solution
+2 and 3 have non-colliding powers. We could get ~a~ just by diving the representation by 2 until the remainder is no longer 0 and count the number of applications required to get there. As for the second element, we could do the same thing as the first element, but using 3 is the target value. This just means that we need to allow the accumulation procedure to take a mod parameter.
