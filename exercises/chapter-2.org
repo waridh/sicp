@@ -369,3 +369,169 @@ To prove that this addition procedure works, we'll evaluate this with ~a~ as ~on
 #+end_src
 
 And as we expected, adding one and two gets us three.
+* Exercise 2.7
+Implement Alyssa P. Hacker's datastructure for interval operations.
+
+#+name: interval-data-struct
+#+begin_src racket :exports code
+(define (make-interval a b) (cons a b))
+(define (upper-bound z)
+  (max (car z) (cdr z)))
+(define (lower-bound z)
+  (min (car z) (cdr z)))
+#+end_src
+* Exercise 2.8
+** Prompt
+Make a subtraction analogous for the interval datastructure.
+** Solution
+#+name: exercise-2.8
+#+begin_src racket :exports code
+(define (sub-interval a b)
+  (make-interval (- (upper-bound a) (lower-bound b))
+                 (- (lower-bound a) (upper-bound b))))
+#+end_src
+** Testing
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<assertion-suite>>
+<<interval-data-struct>>
+<<exercise-2.8>>
+
+(assert-eq "upper bound of [-2, 2] - [-8, 4] is 10"
+           (upper-bound (sub-interval (make-interval 2 -2) (make-interval 4 -8)))
+           10)
+(assert-eq "upper bound of [-8, 4] - [-2, 2] is 6"
+           (upper-bound (sub-interval (make-interval 4 -8) (make-interval 2 -2)))
+           6)
+#+end_src
+
+#+RESULTS:
+:
+: pass: upper bound of [-2, 2] - [-8, 4] is 10 value: 10 expected: 10
+: pass: upper bound of [-8, 4] - [-2, 2] is 6 value: 6 expected: 6
+* Exercise 2.9
+** Prompt
+The width of an interval is half the difference of the upper and lower bound. For some arithmetic functions, the width of combining two variables is a function of only the width of the argument intervals while for some other arithmetic operations, this is not the case.
+
+Show that for addition, the sum's interval is a function of only the widths of the argument intervals. After showing this, show that this is not the case for multiplication or division.
+** Solution
+Let's have a look at an example problem using addition.
+
+\[\begin{aligned}
+\text{let}~w = f_{w}(i) = \frac{u - l}{2},~ \text{where}~[l, u] = i \\
+i_{3} = i_{1} + i_{2} = [l_{1} + l_{2}, u_{1} + u_{2} ] = [l_{3}, u_{3}] ~ \text{where}~ l_{3} = l_{1} + l_{2}, u_{3} = u_{1} + u_{2} \\
+  \text{We will show that } w_{3} = w_{1} + w_{2} = f_{w}(i_{3}) \\
+  f_{w}(i_{3}) = \frac{l_{3} + u_{3}}{2} = \frac{(l_{1} + u_{1}) + (l_{2} + u_{2}) }{2} \\
+  \text{Knowing that}~ w_{1} = \frac{l_{1} + u_{1}}{2}, w_{2} = \frac{l_{2} + u_{2}}{2} \\
+  f_{w}(i_{3}) = w_{1} + w_{2}
+\end{aligned}\]
+
+Now we will show that this is not the case for multiplication.
+
+\[\begin{aligned}
+		\text{We just need to show one case where the result width is not a function of the input width} \\
+		i_{1} = \left[ 8, 10 \right], i_{2} = \left[ 2, 5 \right]                                        \\
+		w_{1} = 1, w_{2} = 1.5; w_{1} \times w_{2} = 1.5                                                 \\
+		i_{3} = i_{1} * i_{2} = \left[ 16, 50 \right]                                                    \\
+		w_{3} = 17 != w_{1} \times w_{2}
+	\end{aligned}\]
+
+Did not think that it was necessary to show the same property for division since division is just a multiplication against a reciprocal.
+* Exercise 2.10
+** Prompt
+Thanks to Ben Bitdiddle, we realize that we should be treating a division against an interval that spans zero as an error. Modify the procedure the Alyssa P. Hacker wrote to do this error handling.
+** Solution
+#+name: alyssa-multiplication
+#+begin_src racket :exports code
+(define (mul-interval x y)
+  (let ([p1 (* (lower-bound x) (lower-bound y))]
+        [p2 (* (lower-bound x) (upper-bound y))]
+        [p3 (* (upper-bound x) (lower-bound y))]
+        [p4 (* (upper-bound x) (upper-bound y))])
+    (make-interval (min p1 p2 p3 p4) (max p1 p2 p3 p4))))
+#+end_src
+
+#+name: exercise-2.10
+#+begin_src racket :exports code
+(define (div-interval x y)
+  (define (zero-interval? a)
+    (and (< (lower-bound a) 0) (> (upper-bound a) 0)))
+  (let ([reciprocal-y (make-interval (/ 1.0 (upper-bound y)) (/ 1.0 (lower-bound y)))])
+    (if (zero-interval? reciprocal-y)
+        (error "cannot divide by zero")
+        (mul-interval x reciprocal-y))))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<assertion-suite>>
+<<interval-data-struct>>
+<<alyssa-multiplication>>
+<<exercise-2.10>>
+
+(assert-almost-eq "lower [8, 10] / [2, 4] is 2" (lower-bound (div-interval (make-interval 8 10) (make-interval 2 4))) 2.0)
+(assert-almost-eq "upper [8, 10] / [2, 4] is 5" (upper-bound (div-interval (make-interval 8 10) (make-interval 2 4))) 5.0)
+
+;; The following line should throw an error
+(div-interval (make-interval 8 9) (make-interval -1 0.1))
+#+end_src
+
+#+RESULTS:
+:
+: pass: lower [8, 10] / [2, 4] is 2 value: 2.0 expected: 2.0
+: pass: upper [8, 10] / [2, 4] is 5 value: 5.0 expected: 5.0
+
+We see that the procedure will operate normally when not dividing by zero, and thrown an error if it does divide by an interval that covers zero.
+* Exercise 2.11
+** Prompt
+We can make the ~mul-interval~ procedure use less multiplication operations by breaking it down into 9 cases. Only one of these cases will require more than two multiplication. Implementate this improved version of ~mul-interval~.
+
+** Solution
+#+name: exercise-2.11
+#+begin_src racket :exports code
+(define (mul-interval x y)
+  (let ([a (lower-bound x)]
+        [b (upper-bound x)]
+        [c (lower-bound y)]
+        [d (upper-bound y)])
+    (cond
+      [(and (>= a 0) (>= b 0) (>= c 0) (>= d 0)) (make-interval (* a c) (* b d))]
+      [(and (< a 0) (>= b 0) (>= c 0) (>= d 0)) (make-interval (* a d) (* b d))]
+      [(and (>= a 0) (>= b 0) (< c 0) (>= d 0)) (make-interval (* c b) (* b d))]
+      [(and (< a 0) (< b 0) (>= c 0) (>= d 0)) (make-interval (* a d) (* b c))]
+      [(and (>= a 0) (>= b 0) (< c 0) (< d 0)) (make-interval (* b c) (* a d))]
+      [(and (< a 0) (>= b 0) (< c 0) (>= d 0))
+       (make-interval (min (* a d) (* c b)) (max (* a c) (* b d)))]
+      [(and (< a 0) (>= b 0) (< c 0) (< d 0)) (make-interval (* b c) (* a c))]
+      [(and (< a 0) (< b 0) (< c 0) (>= d 0)) (make-interval (* a d) (* a c))]
+      [(and (< a 0) (< b 0) (< c 0) (< d 0)) (make-interval (* b d) (* a c))])))
+#+end_src
+** Testing
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<exercise-2.11>>
+<<assertion-suite>>
+<<interval-data-struct>>
+<<exercise-2.10>>
+
+(assert-almost-eq "lower [8, 10] / [2, 4] is 2" (lower-bound (div-interval (make-interval 8 10) (make-interval 2 4))) 2.0)
+(assert-almost-eq "upper [8, 10] / [2, 4] is 5" (upper-bound (div-interval (make-interval 8 10) (make-interval 2 4))) 5.0)
+(assert-almost-eq "lower [-10, 10] / [2, 4] is -5" (lower-bound (div-interval (make-interval -10 10) (make-interval 2 4))) -5)
+(assert-almost-eq "upper [-10, 10] / [2, 4] is 5" (upper-bound (div-interval (make-interval -10 10) (make-interval 2 4))) 5)
+(assert-almost-eq "lower [-10, 10] * [-20, 14] is -200" (lower-bound (mul-interval (make-interval -10 10) (make-interval -20 14))) -200)
+(assert-almost-eq "upper [-10, 10] * [-20, 14] is 200" (upper-bound (mul-interval (make-interval -10 10) (make-interval -20 14))) 200)
+
+;; The following line should throw an error
+(div-interval (make-interval 8 9) (make-interval -1 0.1))
+#+end_src
+
+#+RESULTS:
+:
+: pass: lower [8, 10] / [2, 4] is 2 value: 2.0 expected: 2.0
+: pass: upper [8, 10] / [2, 4] is 5 value: 5.0 expected: 5.0
+: pass: lower [-10, 10] / [2, 4] is -5 value: -5.0 expected: -5
+: pass: upper [-10, 10] / [2, 4] is 5 value: 5.0 expected: 5
+: pass: lower [-10, 10] / [2, 4] is -5 value: -200 expected: -200
+: pass: upper [-10, 10] / [2, 4] is 5 value: 200 expected: 200
