@@ -15,7 +15,7 @@
 (define (assert-eq test-name value expected)
   (assert-predicate eq? test-name value expected))
 (define (assert-almost-eq test-name value expected)
-  (define dx 0.000001)
+  (define dx 0.0001)
   (define (almost-eq? left right)
     (< (abs (- left right)) dx))
   (assert-predicate almost-eq? test-name value expected))
@@ -389,6 +389,10 @@ Make a subtraction analogous for the interval datastructure.
 (define (sub-interval a b)
   (make-interval (- (upper-bound a) (lower-bound b))
                  (- (lower-bound a) (upper-bound b))))
+(define (add-interval a b)
+  (make-interval (+ (upper-bound a) (upper-bound b))
+                 (+ (lower-bound a) (lower-bound b))))
+
 #+end_src
 ** Testing
 
@@ -533,5 +537,156 @@ We can make the ~mul-interval~ procedure use less multiplication operations by b
 : pass: upper [8, 10] / [2, 4] is 5 value: 5.0 expected: 5.0
 : pass: lower [-10, 10] / [2, 4] is -5 value: -5.0 expected: -5
 : pass: upper [-10, 10] / [2, 4] is 5 value: 5.0 expected: 5
-: pass: lower [-10, 10] / [2, 4] is -5 value: -200 expected: -200
-: pass: upper [-10, 10] / [2, 4] is 5 value: 200 expected: 200
+: pass: lower [-10, 10] * [-20, 14] is -200 value: -200 expected: -200
+: pass: upper [-10, 10] * [-20, 14] is 200 value: 200 expected: 200
+* Exercise 2.12
+** Prompt
+Alyssa made an alternate constructor and selectors that represents the following \(c \pm w\). Now make a version that does percentage tolerance in the following form. \(c \pm p \%\). Also provide the percent selector.
+** Solution
+#+name: center-width-rep
+#+begin_src racket :exports code
+(define (make-center-width c w)
+  (make-interval (- c w) (+ c w)))
+
+(define (center x)
+  (/ (+ (upper-bound x) (lower-bound x)) 2))
+(define (width x)
+  (/ (- (upper-bound x) (lower-bound x)) 2))
+#+end_src
+
+#+name: exercise-2.12
+#+begin_src racket :exports code
+(define (percent i)
+  (* 100 (/ (width i) (abs (center i)))))
+
+(define (make-center-percent c p)
+  (let ([width (* (abs c) (/ p 100))]) (make-center-width c width)))
+#+end_src
+** Testing
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<interval-data-struct>>
+<<center-width-rep>>
+<<exercise-2.12>>
+<<assertion-suite>>
+
+(assert-eq "construct and then assert" (percent (make-center-percent 10 10)) 10)
+#+end_src
+
+#+RESULTS:
+:
+: pass: construct and then assert value: 10 expected: 10
+* Exercise 2.13
+** Prompt
+Show that under small percentage tolerance, there is a simple formula for the approximate percentage tolerance of the product of two intervals in terms of the tolerances of the factors.
+** Solution
+By working on exercise 2.14, we know exactly what this approximation is. At small percentage, the percentage tolerance of the product is equal to the sum of the percentage tolerance of the operands. At larger values, this breaks down.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<interval-data-struct>>
+<<center-width-rep>>
+<<exercise-2.12>>
+<<exercise-2.11>>
+<<exercise-2.10>>
+<<exercise-2.8>>
+<<assertion-suite>>
+(define a (make-center-percent 80 0.5))
+(define b (make-center-percent 210 0.8))
+
+(assert-almost-eq "the percentage tolerance of a * b should be very close to percent tolerance a + percent tolerance b" (percent (mul-interval a b)) (+ (percent a) (percent b)))
+#+end_src
+
+#+RESULTS:
+:
+: pass: the percentage tolerance of a * b should be very close to percent tolerance a + percent tolerance b value: 1.2999480020799254 expected: 1.3000000000000105
+
+* Exercise 2.14
+** Prompt
+The previous implementation of interval was flawed in that it was unable to give the same answer in two equivalent but different equation for the parallel resistor. Run some experiment and investigate why this issue is occurring.
+** Investigation
+#+begin_src racket :exports code
+(define (par1 r1 r2)
+  (div-interval (mul-interval r1 r2) (add-interval r1 r2)))
+
+(define (par2 r1 r2)
+  (let ([one (make-interval 1 1)])
+    (div-interva
+#+end_src
+*** Experiments
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<interval-data-struct>>
+<<center-width-rep>>
+<<exercise-2.12>>
+<<exercise-2.11>>
+<<exercise-2.10>>
+<<exercise-2.8>>
+(define a (make-center-percent 80 0.5))
+(define b (make-center-percent 210 0.8))
+(define a-prime (make-center-percent 80 40))
+(define b-prime (make-center-percent 210 60))
+(define c (make-center-percent 80 0.7))
+
+(center (div-interval a a))
+(percent (div-interval a a))
+(center (div-interval a b))
+(percent (div-interval a b))
+(newline)
+(display "210 +- 8% / 80 +- 5%")
+(newline)
+(center (div-interval a-prime b-prime))
+(percent (div-interval a-prime b-prime))
+
+(center (div-interval b a))
+(percent (div-interval b a))
+(center (div-interval c c))
+(percent (div-interval c c))
+(center (add-interval c c))
+(percent (add-interval c c))
+(center (add-interval c a))
+(percent (add-interval c a))
+(center (add-interval b a))
+(percent (add-interval b a))
+(center (sub-interval b a))
+(percent (sub-interval b a))
+(newline)
+(display "210 +- 0.8% - 80 +- 0.7%")
+(newline)
+(center (sub-interval b c))
+(percent (sub-interval b c))
+(center (mul-interval c c))
+(percent (mul-interval c c))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+1.000050001250031
+0.9999750006249956
+0.38099200253578136
+1.2999480020799312
+
+210 +- 8% / 80 +- 5%
+0.738095238095238
+80.64516129032259
+2.6251706292657317
+1.299948002079925
+1.0000980048022352
+1.3999314033612358
+160.0
+0.7000000000000028
+160.0
+0.600000000000005
+290.0
+0.7172413793103589
+130.0
+1.6000000000000099
+
+210 +- 0.8% - 80 +- 0.7%
+130.0
+1.7230769230769298
+6400.3136
+1.399931403361241
+#+end_example
+
+Interesting. In the previous implementation of the interval class, addition will cause the sum's percent to be the weighted average of the two operands. Multiplication and division will cause the product and quotient to have a percent tolerance that is the sum of the operands. Subtraction will see the tolerance increase due to multiple factors.
