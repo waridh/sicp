@@ -690,3 +690,123 @@ The previous implementation of interval was flawed in that it was unable to give
 #+end_example
 
 Interesting. In the previous implementation of the interval class, addition will cause the sum's percent to be the weighted average of the two operands. Multiplication and division will cause the product and quotient to have a percent tolerance that is the sum of the operands. Subtraction will see the tolerance increase due to multiple factors.
+* Exercise 2.15
+** Prompt
+Eva Lu Ator says that since different intervals are calculated when using different but algebraically equivalent expressions. Eva then claims that using forms that do not repeat the same uncertain variable would produce a tighter output uncertainty, and that therefore, this is the better method. Is she correct? Why?
+** Solution
+Problem was that the implementation is not consistent between different equivalent algebraic problems. There should not be a better method, but Eva is correct, using this implementation, we should operate on the unique variables with uncertainty once. Specifically, what seems to be happening is that repeated operations seem to assume that there are more than one uncertain variables.
+* Exercise 2.16
+** Prompt
+Explain why different equivalent algebraic expressions will result in different result interval. Can we devise a package that can solve this problem? Given with warning that this is a difficult task.
+** Solution
+I will not be attempting to build my own library for intervals, as I have things to be and placed to do. As stated in the 2.15 solution, if the same interval object is used in multiple placed, it eventually propagates its uncertainty back on itself as if they are not the same value. I am choosing to not continue to dwell on this topic, as I have places to do, and things to be.
+* Exercise 2.17
+** Prompt
+Implement a procedure called ~last-pair~ that will return the last element of a list.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+(define (last-pair items)
+  (cond ((null? items) items)
+        ((null? (cdr items)) (car items))
+        (else (last-pair (cdr items)))))
+(last-pair (list 1 2 43 5 12 90 58))
+#+end_src
+
+#+RESULTS:
+: 58
+* Exercise 2.18
+** Prompt
+Define reverse that will reverse a list
+** Solution
+Will be solving this problem using an iterative process
+#+begin_src racket :exports both
+#lang sicp
+(define (reverse items)
+  (define (iter acc nav)
+    (if (null? nav)
+        acc
+        (iter (cons (car nav) acc) (cdr nav))))
+  (iter nil items)
+  )
+
+(reverse (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: (4 3 2 1)
+* Exercise 2.19
+** Prompt
+Upgrade change counting algorithm to take the coin value as parameter as well.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+(define (cc amount coin-values)
+  (define (except-first-denomination items)
+    (cdr items))
+  (define (first-denomination items)
+    (car items))
+  (define (no-more? items)
+    (null? items))
+  (cond
+    [(= amount 0) 1]
+    [(or (< amount 0) (no-more? coin-values)) 0]
+    [else
+     (+ (cc amount (except-first-denomination coin-values))
+        (cc (- amount (first-denomination coin-values)) coin-values))]))
+
+(define us-coin (list 25 10 50 5 1))
+(define uk-coin (list 100 50 20 10 5 2 1 0.5))
+
+(cc 100 us-coin)
+#+end_src
+
+#+RESULTS:
+: 292
+
+Here is the learning from doing this exercise. Yes we could have just done the low level list access procedures in the cc procedure, but by defining these external access methods, we are abstracting out the lower level implementation. It is up to us to think about whether our data structure would need an abstraction layer or not.
+
+This is a combination problem, the order of the elements in the list do not matter. If this is incorrect, and you are looking at my github, please create an issue to address this.
+* Exercise 2.20
+** Prompt
+We can see that there are procedures in scheme that can take in a dynamic number of arguments. Well, we're going to learn how to do that here.
+
+We can achieve this by using ~define~ with a /dotted-tail/ notation.
+
+#+begin_src racket :exports code
+(define (f a b c . z) (<body>))
+(define (g . x) (<body>))
+#+end_src
+
+Semantically, this is the same as doing the following in Python. Excuse me for not just explaining it in plain English.
+
+#+begin_src python :exports code
+def f(a, b, c, *z):
+    ...
+
+def g(*x):
+    ...
+#+end_src
+
+Now build a procedure called same parity that takes in a dynamic number of input and then only return the content of the input that matches the parity of the input.
+
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+(define (same-parity x . y)
+  (define (choose-predicate a)
+    (if (even? a) even? odd?))
+  (define (choose predicate items)
+    (cond ((null? items) nil)
+          ((predicate (car items))
+           (cons (car items) (choose predicate (cdr items))))
+          (else (choose predicate (cdr items)))))
+  (choose (choose-predicate x) (cons x y)))
+
+(same-parity 1 2 3 4 5 6 7)
+(same-parity 2 3 4 5 6 7)
+#+end_src
+
+#+RESULTS:
+: (1 3 5 7)
+: (2 4 6)
