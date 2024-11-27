@@ -917,7 +917,7 @@ For the first part, I will just let the interpreter do the printing for me.
 Second and third part will be done using uml.
 
 #+caption: Box and pointer diagram of the given structure.
-#+begin_src plantuml :exports result :file ./images/exercise-2.24-1.png
+#+begin_src plantuml :exports results :file ./images/exercise-2.24-1.png
 @startuml
 rectangle p00
 rectangle p01
@@ -941,10 +941,11 @@ p21 --> 4
 @enduml
 #+end_src
 
+#+caption: Box and pointer diagram of the given structure.
 #+RESULTS:
 [[file:./images/exercise-2.24-1.png]]
 
-[[./images/exercise-2.24-1.png]]
+Box and pointer representation does hide the fact that the hierarchical structure is built on top of the Scheme pairs.
 
 #+caption: Tree representation of the given structure.
 #+begin_src plantuml :exports results :file ./images/exercise-2.24-2.png
@@ -965,5 +966,6 @@ p2 --> 4
 @enduml
 #+end_src
 
+#+caption: Tree representation of the given structure.
 #+RESULTS:
 [[file:./images/exercise-2.24-2.png]]
