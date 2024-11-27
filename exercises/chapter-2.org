@@ -796,6 +796,7 @@ Now build a procedure called same parity that takes in a dynamic number of input
 (define (same-parity x . y)
   (define (choose-predicate a)
     (if (even? a) even? odd?))
+  ;; I suppose that I really just made filter. Whoops.
   (define (choose predicate items)
     (cond ((null? items) nil)
           ((predicate (car items))
@@ -810,3 +811,157 @@ Now build a procedure called same parity that takes in a dynamic number of input
 #+RESULTS:
 : (1 3 5 7)
 : (2 4 6)
+* Exercise 2.21
+** Prompt
+Make the two implementation of ~square-list~ that will take a list of numbers and return a list of the square of those numbers.
+** Solution
+*** First solution
+First implementation without using ~map~.
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+(define (square-list items)
+  (if (null? items)
+      nil
+      (cons (square (car items)) (square-list (cdr items)))))
+(square-list (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: (1 4 9 16)
+*** Map solution
+Yes, the map solution is cleaner, why wouldn't it be?
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+(define (square-list items)
+  (map square items))
+(square-list (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: (1 4 9 16)
+* Exercise 2.22
+** Prompt
+Louis Reasoner tried to make the ~square-list~ function and his implementation produces a list in reverse order. Why is this the case? Then he made a second version of the code that does not work. Listings available below.
+#+caption: Reversed list output
+#+begin_src racket :exports code
+#lang sicp
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons (square (car things))
+                    answer))))
+  (iter items nil))
+#+end_src
+
+#+caption: Just does not work
+#+begin_src racket :exports both
+#lang sicp
+(define (square x) (* x x))
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things) (cons answer (square (car things))))))
+  (iter items nil))
+
+(square-list (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: ((((() . 1) . 4) . 9) . 16)
+
+** Solution
+The first listing is reversed because our Scheme list implementation only allows for appending from one direction. This means the iterative algorithms that builds a list as it is traversing another one will build a reversed list.
+
+The second listing does not work because we are no longer following the semantics of a Scheme list. The list is being built in reverse order.
+* Exercise 2.23
+** Prompt
+We learn what a ~for-each~ is, which is just ~map~ but no return. Good for just doing side effects. Make an implementation of ~for-each~
+** Solution
+We have an implementation of ~for-each~ using the ~let~ procedure.
+#+begin_src racket :exports both
+#lang sicp
+(define (for-each f items)
+  (if (not (null? items))
+      (let ([app (f (car items))]) (for-each f (cdr items)))))
+
+(for-each (lambda (x)
+            (newline)
+            (display x))
+          (list 57 321 88))
+#+end_src
+
+#+RESULTS:
+:
+: 57
+: 321
+: 88
+* Exercise 2.24
+** Prompt
+Show the result of ~(list 1 (list 2 (list 3 4)))~ from the interpreter, followed by the box and pointer diagram and the tree diagram of the structure.
+** Solution
+For the first part, I will just let the interpreter do the printing for me.
+
+#+begin_src racket :exports both
+#lang sicp
+(list 1 (list 2 (list 3 4)))
+#+end_src
+
+#+RESULTS:
+: (1 (2 (3 4)))
+
+Second and third part will be done using uml.
+
+#+caption: Box and pointer diagram of the given structure.
+#+begin_src plantuml :exports file :file ./images/exercise-2.24-1.png
+@startuml
+rectangle p00
+rectangle p01
+rectangle p10
+rectangle p11
+rectangle p20
+rectangle p21
+
+p00 --> 1
+p00 -> p01
+p01 --> p10
+
+p10 --> 2
+p10 -> p11
+p11 --> p20
+
+p20 --> 3
+p20 -> p21
+p21 --> 4
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/exercise-2.24-1.png]]
+
+#+caption: Tree representation of the given structure.
+#+begin_src plantuml :exports file :file ./images/exercise-2.24-2.png
+@startuml
+rectangle "(list 1 (list 2 (list 3 4)))" as p0
+rectangle "(list 2 (list 3 4))" as p1
+rectangle "(list 3 4)" as p2
+
+p0 --> 1
+p0 --> p1
+
+p1 --> 2
+p1 --> p2
+
+p2 --> 3
+p2 --> 4
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/exercise-2.24-2.png]]
