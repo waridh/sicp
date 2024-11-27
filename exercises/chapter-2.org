@@ -969,3 +969,5 @@ p2 --> 4
 #+caption: Tree representation of the given structure.
 #+RESULTS:
 [[file:./images/exercise-2.24-2.png]]
+
+Tree representation abstracts away the implementation detail of using pairs.
