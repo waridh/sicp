@@ -944,6 +944,8 @@ p21 --> 4
 #+RESULTS:
 [[file:./images/exercise-2.24-1.png]]
 
+[[./images/exercise-2.24-1.png]]
+
 #+caption: Tree representation of the given structure.
 #+begin_src plantuml :exports result :file ./images/exercise-2.24-2.png
 @startuml
