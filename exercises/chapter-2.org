@@ -947,7 +947,7 @@ p21 --> 4
 [[./images/exercise-2.24-1.png]]
 
 #+caption: Tree representation of the given structure.
-#+begin_src plantuml :exports result :file ./images/exercise-2.24-2.png
+#+begin_src plantuml :exports results :file ./images/exercise-2.24-2.png
 @startuml
 rectangle "(list 1 (list 2 (list 3 4)))" as p0
 rectangle "(list 2 (list 3 4))" as p1
