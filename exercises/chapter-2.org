@@ -1096,3 +1096,246 @@ We could re-frame the problem into flattening a list. Since I have done some of 
 : (1 2 3 4 1 2 3 4 1 2 3 4 1 2 3 4)
 
 This is lovely, but the downside is that it is not truly an iterative process, since there are branches that would cause the previous scope to wait for a new iterative process to finish evaluation. Still, this lowers the growth of memory when there are long lists in the tree.
+* Exercise 2.29
+** Prompt
+Working with the concept of a binary mobile, which has the following constructors.
+#+begin_src racket :exports code
+;; make-mobile makes a binary mobile. left and right are branches.
+(define (make-mobile left right) (list left right))
+;; make-branch is the constructor for a branch. length must be an integer, and
+;; structure could either be a number or another mobile
+(define (make-branch length structure) (list length structure))
+#+end_src
+*** Local Analysis
+This problem is introducing the concept of indirect recursive data structure.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+(define (make-mobile left right)
+  (list left right))
+(define (make-branch length structure)
+  (list length structure))
+
+;; Part a. make a selector for mobile called left-branch and right-branch.
+;; Make a selector for branches called branch-length and branch-structure
+(define (left-branch mobile)
+  (car mobile))
+(define (right-branch mobile)
+  (car (cdr mobile)))
+
+(define (branch-length branch)
+  (car branch))
+(define (branch-structure branch)
+  (car (cdr branch)))
+
+(left-branch (make-mobile (make-branch 2 2) (make-branch 3 3)))
+(right-branch (make-mobile (make-branch 2 2) (make-branch 3 3)))
+
+(branch-length (make-branch 2 4))
+(branch-structure (make-branch 2 4))
+
+;; Part b. define a procedure called total weight that will return the total
+;; weight of the mobile.
+;; We're really looking to accumulate the sum of the weights, with the
+;; assumption that the mobile type does not have a weight associated with it.
+;; Branches are actually tagged unions, so we should have a predicate that
+;; determines the type. Base case is that we have reached a branch that is a
+;; weight, then we could return the value.
+
+(define (mobile? x)
+  (pair? x))
+
+(define (total-weight mobile)
+  (define (total-weight-branch branch)
+    (let ([local-structure (branch-structure branch)])
+      (if (mobile? local-structure)
+          (total-weight local-structure)
+          local-structure)))
+  (+ (total-weight-branch (left-branch mobile)) (total-weight-branch (right-branch mobile))))
+
+(define test-mobile-1
+  (make-mobile
+   (make-branch 4 (make-mobile (make-branch 2 2) (make-branch 4 2)))
+   (make-branch 7
+                (make-mobile (make-branch 3 (make-mobile (make-branch 3 3) (make-branch 3 12)))
+                             (make-branch 2 2)))))
+
+;; expect the total-weight to be 21 for test-mobile-1
+(total-weight test-mobile-1)
+
+;; Part c. Make a predicate that will determine if the mobile is balanced,
+;; where balanced means that the torque of the left and right branch is
+;; equal, and all the mobiles underneath are balanced as well. As a reminder,
+;; torque is the product of the length of the rod and the weight it is
+;; carrying.
+;; For the sake of computational efficiency, we're going to calculate this
+;; predicate as we traverse the tree
+(define (balanced? mobile)
+  (define (get-torque x)
+    (car x))
+  (define (get-branch-weight x)
+    (cdr x))
+  ;; handle-branch should return a pair of the torque and weight or propagate a
+  ;; nil
+  (define (handle-branch branch)
+    (let ([local-structure (branch-structure branch)])
+      (if (mobile? local-structure)
+          (let ([mobile-return (handle-mobile local-structure)])
+            (if (null? mobile-return)
+                mobile-return
+                (cons (* (branch-length branch) mobile-return) mobile-return)))
+          (cons (* (branch-length branch) local-structure) local-structure))))
+  ;; handle-mobile should either return a nil if it does not find the mobile
+  ;; parameter to be balanced, else return the sum of the weight of the
+  ;; two branches.
+  (define (handle-mobile mobile)
+    (let ([left (handle-branch (left-branch mobile))]
+          [right (handle-branch (right-branch mobile))])
+      (cond
+        [(or (null? left) (null? right)) nil]
+        [(= (get-torque left) (get-torque right))
+         (+ (get-branch-weight left) (get-branch-weight right))]
+        [else nil])))
+  (not (null? (handle-mobile mobile))))
+
+(balanced? test-mobile-1)
+(balanced? (make-mobile (make-branch 1 1)
+                        (make-branch 1 1)))
+(balanced? (make-mobile (make-branch 1 8)
+                        (make-branch 2 4)))
+(balanced? (make-mobile (make-branch 1 (make-mobile (make-branch 1 4)
+                                                    (make-branch 1 4)))
+                        (make-branch 2 4)))
+
+
+#+end_src
+
+#+RESULTS:
+: (2 2)
+: (3 3)
+: 2
+: 4
+: 21
+: #f
+: #t
+: #t
+: #t
+
+In part d of the exercise, we are changing the implementation of the constructor. How many procedures must change to keep the functionality the same?
+
+#+caption: Constructor and data structure representation changes.
+#+begin_src racket :exports code
+(define (make-mobile left right) (cons left right))
+(define (make-branch length structure) (cons length structure))
+#+end_src
+
+The answer is just the ~cdr~ selectors, since we are using the abstraction for data structure access in all higher level procedures that work with this system. Swapping from list to pair means that you no longer need the ~car~ to access the second element, since the pair here does not need the facility to allow for dynamic extension.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (make-mobile left right)
+  (cons left right))
+(define (make-branch length structure)
+  (cons length structure))
+
+;; Part a. make a selector for mobile called left-branch and right-branch.
+;; Make a selector for branches called branch-length and branch-structure
+(define (left-branch mobile)
+  (car mobile))
+(define (right-branch mobile)
+  (cdr mobile))
+
+(define (branch-length branch)
+  (car branch))
+(define (branch-structure branch)
+  (cdr branch))
+
+(left-branch (make-mobile (make-branch 2 2) (make-branch 3 3)))
+(right-branch (make-mobile (make-branch 2 2) (make-branch 3 3)))
+
+(branch-length (make-branch 2 4))
+(branch-structure (make-branch 2 4))
+
+;; Part b. define a procedure called total weight that will return the total
+;; weight of the mobile.
+;; We're really looking to accumulate the sum of the weights, with the
+;; assumption that the mobile type does not have a weight associated with it.
+;; Branches are actually tagged unions, so we should have a predicate that
+;; determines the type. Base case is that we have reached a branch that is a
+;; weight, then we could return the value.
+
+(define (mobile? x)
+  (pair? x))
+
+(define (total-weight mobile)
+  (define (total-weight-branch branch)
+    (let ([local-structure (branch-structure branch)])
+      (if (mobile? local-structure)
+          (total-weight local-structure)
+          local-structure)))
+  (+ (total-weight-branch (left-branch mobile)) (total-weight-branch (right-branch mobile))))
+
+(define test-mobile-1
+  (make-mobile
+   (make-branch 4 (make-mobile (make-branch 2 2) (make-branch 4 2)))
+   (make-branch 7
+                (make-mobile (make-branch 3 (make-mobile (make-branch 3 3) (make-branch 3 12)))
+                             (make-branch 2 2)))))
+
+;; expect the total-weight to be 21 for test-mobile-1
+(total-weight test-mobile-1)
+
+;; Part c. Make a predicate that will determine if the mobile is balanced,
+;; where balanced means that the torque of the left and right branch is
+;; equal, and all the mobiles underneath are balanced as well. As a reminder,
+;; torque is the product of the length of the rod and the weight it is
+;; carrying.
+;; For the sake of computational efficiency, we're going to calculate this
+;; predicate as we traverse the tree
+(define (balanced? mobile)
+  (define (get-torque x)
+    (car x))
+  (define (get-branch-weight x)
+    (cdr x))
+  ;; handle-branch should return a pair of the torque and weight or propagate a
+  ;; nil
+  (define (handle-branch branch)
+    (let ([local-structure (branch-structure branch)])
+      (if (mobile? local-structure)
+          (let ([mobile-return (handle-mobile local-structure)])
+            (if (null? mobile-return)
+                mobile-return
+                (cons (* (branch-length branch) mobile-return) mobile-return)))
+          (cons (* (branch-length branch) local-structure) local-structure))))
+  ;; handle-mobile should either return a nil if it does not find the mobile
+  ;; parameter to be balanced, else return the sum of the weight of the
+  ;; two branches.
+  (define (handle-mobile mobile)
+    (let ([left (handle-branch (left-branch mobile))]
+          [right (handle-branch (right-branch mobile))])
+      (cond
+        [(or (null? left) (null? right)) nil]
+        [(= (get-torque left) (get-torque right))
+         (+ (get-branch-weight left) (get-branch-weight right))]
+        [else nil])))
+  (not (null? (handle-mobile mobile))))
+
+(balanced? test-mobile-1)
+(balanced? (make-mobile (make-branch 1 1) (make-branch 1 1)))
+(balanced? (make-mobile (make-branch 1 8) (make-branch 2 4)))
+(balanced? (make-mobile (make-branch 1 (make-mobile (make-branch 1 4) (make-branch 1 4)))
+                        (make-branch 2 4)))
+#+end_src
+
+#+RESULTS:
+: (2 . 2)
+: (3 . 3)
+: 2
+: 4
+: 21
+: #f
+: #t
+: #t
+: #t
+
+And we can see that this was an acceptable refactor. We changed 2 procedures to accommodate for the change in the data structure representation.
