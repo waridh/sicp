@@ -1339,3 +1339,399 @@ The answer is just the ~cdr~ selectors, since we are using the abstraction for d
 : #t
 
 And we can see that this was an acceptable refactor. We changed 2 procedures to accommodate for the change in the data structure representation.
+* Exercise 2.30
+** Prompt
+Make a procedure ~square-tree~ that is analogous to the ~square-list~ procedure in exercise [[*Exercise 2.21][Exercise 2.21]]. Do this exercise with and without the ~map~ procedure.
+** Solution
+#+caption: Square tree without using map
+#+begin_src racket :exports both
+#lang sicp
+
+(define (square x)
+  (* x x))
+(define (square-tree tree)
+  (cond
+    [(null? tree) nil]
+    [(pair? tree) (cons (square-tree (car tree)) (square-tree (cdr tree)))]
+    [else (square tree)]))
+
+(square-tree (list 1 (list 2 (list 3 4) 5) (list 6 7)))
+#+end_src
+
+#+RESULTS:
+: (1 (4 (9 16) 25) (36 49))
+
+#+caption: Square tree using map
+#+begin_src racket :exports both
+#lang sicp
+
+(define (square x)
+  (* x x))
+(define (square-tree tree)
+  (map (lambda (x)
+         (if (pair? x)
+             (square-tree x)
+             (square x)))
+       tree))
+
+(square-tree (list 1 (list 2 (list 3 4) 5) (list 6 7)))
+#+end_src
+
+#+RESULTS:
+: (1 (4 (9 16) 25) (36 49))
+
+I'll say, the ~map~ version of the implementation was actually easier to reason about.
+* Exercise 2.31
+** Prompt
+Abstract tree map out of the previous implementation. Design such that the definition of ~square-tree~ from [[*Exercise 2.30][Exercise 2.30]] looks like the following code block.
+#+begin_src racket :exports code
+(define (square-tree tree) (tree-map square tree))
+#+end_src
+** Solution
+For the sake of reuse, I'll implement this using the pre-existing ~map~ procedure.
+
+#+begin_src racket :exports both
+#lang sicp
+
+(define (tree-map f items)
+  (map (lambda (x)
+         (if (pair? x)
+             (tree-map f x)
+             (f x)))
+       items))
+
+(define (square x)
+  (* x x))
+(define (square-tree tree)
+  (tree-map square tree))
+
+(square-tree (list 1 (list 2 (list 3 4) 5) (list 6 7)))
+#+end_src
+
+#+RESULTS:
+: (1 (4 (9 16) 25) (36 49))
+
+Just like that, we have a clean and efficient implementation of tree map.
+* Exercise 2.32
+** Prompt
+Knowing the definition of a set, make a procedure that generates a set of subsets using the given code.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+
+;; Invariant, s is a set that is represented as a list. This means that this
+;; list should have no duplicate elements.
+(define (subsets s)
+  (if (null? s)
+      (list nil)
+      (let ([rest (subsets (cdr s))]) (append rest (map (lambda (x) (cons (car s) x)) rest)))))
+
+;; this should return (() (3) (2) (2 3) (1) (1 3) (1 2) (1 2 3))
+(subsets (list 3))
+(subsets (list 2 3))
+(subsets (list 1 2 3))
+#+end_src
+
+#+RESULTS:
+: (() (3))
+: (() (3) (2) (2 3))
+: (() (3) (2) (2 3) (1) (1 3) (1 2) (1 2 3))
+
+In this problem, we are working with a power set. The pattern is that we want the combination of all the elements of the input set. Recursive approach is the following. Since we are returning a set of set, the base case is the very last element of the input set, which is nil. Then the recursion case goes back one layer, where we are working with an input set of 3 and nil. This layer has two elements in the input set, and we have the power-set of the tail of the input set. Now we generate the next layer output by appending the power-set of the tail with a set of the head of the set with the power-set of the tail. The set of the head appended to the power-set of the tail will create the rest of the elements that would appear upon adding the head element to the input set. Excuse the less than clear explanation, the writer of this file did not have a very formal mathematical background.
+* Exercise 2.33
+** Prompt
+This is the first element after learning about sequence operations and how it contributes to modular design. Task for this exercise is to define ~map~, ~append~, and ~length~ in terms of accumulate.
+** Solution
+This exercise makes us use right fold to achieve different solutions.
+#+begin_src racket :exports both
+#lang sicp
+;; Accumulate designed as right fold
+(define (accumulate p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (accumulate p initial (cdr sequence)))))
+
+(accumulate (lambda (x y) (+ x y)) 0 (list 1 2 3 4))
+
+;; This implementation requires that the accumulate function be a right fold,
+;; else we would not be able to build like this.
+(define (map p sequence)
+  (accumulate (lambda (x y)
+                (cons (p x) y))
+              nil
+              sequence))
+
+(map (lambda (x) (* x x)) (list 1 2 3 4))
+
+(define (append seq1 seq2)
+  (accumulate cons seq2 seq1))
+(append (list 1 2) (list 3 4))
+
+(define (length sequence)
+  (accumulate (lambda (x y) (+ y 1)) 0 sequence))
+
+(length nil)
+(length (list 1 2 2 2 2))
+#+end_src
+
+#+RESULTS:
+: 10
+: (1 4 9 16)
+: (1 2 3 4)
+: 0
+: 5
+* Exercise 2.34
+** Prompt
+Using Horner's rule, evaluate the polynomial as an accumulation.
+
+\[a_{n} x^{n} + a_{n-1}x^{n -1} + \cdots + a_{1} x + a_{0} \rightarrow \left( \cdots \left( a_{n} x + a_{n-1} \right) x + \cdots + a_{1} \right) x + a_{0}\]
+** Solution
+Horner's rule brings the evaluation of the \(x\) term into a recursive case, which also reduces the number of multiplication that is happening. This can be done in a single accumulation sequence operation.
+
+#+begin_src racket :exports both
+#lang sicp
+;; Accumulate designed as right fold
+(define (accumulate p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (accumulate p initial (cdr sequence)))))
+
+;; coefficient-sequence is given in order or a_0 to a_n
+(define (horner-eval x coefficient-sequence)
+  ;; accumulate must be a right fold for this implementation
+  (accumulate (lambda (curr-coefficient accumulation) (+ curr-coefficient (* x accumulation)))
+              0
+              coefficient-sequence))
+
+(horner-eval 2 (list 1 1 1))
+(horner-eval 2 (list 1 3 0 5 0 1))
+#+end_src
+
+#+RESULTS:
+: 7
+: 79
+
+Cool note. Horner's rule is the most optimal algorithm for polynomial evaluation.
+* Exercise 2.35
+** Prompt
+Redefine ~count-leaves~ from section 2.2.2 as an accumulation.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+
+;; still using right fold for accumulation
+(define (accumulate p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (accumulate p initial (cdr sequence)))))
+;; Procedure under test
+(define (count-leaves t)
+  (accumulate +
+              0
+              (map (lambda (x)
+                     (if (pair? x)
+                         (count-leaves x)
+                         1))
+                   t)))
+
+(count-leaves (list 1 (list 3 4) 5))
+#+end_src
+
+#+RESULTS:
+: 4
+
+Modularity is a powerful tool for designing software.
+* Exercise 2.36
+** prompt
+Make a procedure called ~accumulate-n~ where the third parameter is a sequence of equal length sequences. The accumulation will now happen on the different sequences at the same index.
+
+#+caption: Example output
+#+begin_src racket :exports code
+(accumulate-n + 0 (list (list 1 2 3) (list 4 5 6) (list 7 8 9) (list 10 11 12)))
+(22 26 30)
+#+end_src
+
+A template for the solution was provided. Work within the constraint.
+** Solution
+
+#+begin_src racket :exports both
+#lang sicp
+
+;; still using right fold for accumulation
+(define (accumulate p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (accumulate p initial (cdr sequence)))))
+(define (accumulate-n op initial seqs)
+  (if (null? (car seqs))
+      nil
+      (cons (accumulate op initial (map car seqs))
+            (accumulate-n op initial (map cdr seqs)))))
+
+(accumulate-n + 0 (list (list 1 2 3) (list 4 5 6) (list 7 8 9) (list 10 11 12)))
+#+end_src
+
+#+RESULTS:
+: (22 26 30)
+
+Our solution uses sequence operators to quickly build this system. Hoping that this is sufficiently modular.
+* Exercise 2.37
+** Prompt
+Matrix operation. Vectors \(v\) are sequences of numbers and matrices are sequence of equal length vectors. Implement ~dot-product~, ~matrix-*-vector~, ~matrix-*-matrix~, and ~transpose~. Note that the implementation of the matrix is a list of list by rows.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+;; still using right fold for accumulation
+(define (accumulate p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (accumulate p initial (cdr sequence)))))
+;; Need to use this for transpose
+(define (accumulate-n op initial seqs)
+  (if (null? (car seqs))
+      nil
+      (cons (accumulate op initial (map car seqs)) (accumulate-n op initial (map cdr seqs)))))
+
+(define (dot-product v w)
+  (accumulate + 0 (map * v w))) ;; This is using expanded map
+
+(define (matrix-*-vector m v)
+  (map (lambda (x) (dot-product x v)) m))
+;; This implementation is reliant on accumulate-n being a right fold.
+(define (transpose mat)
+  (accumulate-n cons nil mat))
+
+(define (matrix-*-matrix m n)
+  (let ([cols (transpose n)])
+    (map (lambda (x) (matrix-*-vector cols x)) m)))
+
+(dot-product (list 1 2 3) (list 4 5 6))
+(matrix-*-vector (list (list 1 2) (list 3 4)) (list 5 6))
+(transpose (list (list 1 2) (list 3 4)))
+(matrix-*-matrix (list (list 1 2) (list 3 4)) (list (list 5 6) (list 7 8)))
+#+end_src
+
+#+RESULTS:
+: 32
+: (17 39)
+: ((1 3) (2 4))
+: ((19 22) (43 50))
+
+We got the expected values out of this implementation. This implementation does not focus on getting the best cache hits, but instead it was all about modularity and reusing abstractions created as we implement each of the matrix operations.
+* Exercise 3.38
+** Prompt
+We realize that we were using a right fold for accumulate previously. Now we introduce a fold left procedure that operates from left to right. This implementation is an iterative process.
+#+caption: Implementation of fold left and fold right
+#+begin_src racket :exports code
+(define (fold-right p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (fold-right p initial (cdr sequence)))))
+
+(define (fold-left op initial seq)
+  (define (iter acc s)
+    (if (null? s)
+        acc
+        (iter (op acc (car s))
+              (cdr s))))
+  (iter initial seq))
+#+end_src
+
+Find the value of the following operations.
+#+begin_src racket :exports code
+(fold-right / 1 (list 1 2 3))
+(fold-left / 1 (list 1 2 3))
+(fold-right list nil (list 1 2 3))
+(fold-left list nil (list 1 2 3))
+#+end_src
+** Solution
+#+caption: Solution (before verifying)
+#+begin_src racket :exports code
+;; (fold-right / 1 (list 1 2 3))
+(/ 1 (/ 2 (/ 3 1)))
+(3/2)
+;; (fold-left / 1 (list 1 2 3))
+(/ (/ (/ 1 1) 2) 3)
+(1/6)
+;; (fold-right list nil (list 1 2 3))
+(list 1 (list 2 (list 3 nil)))
+(1 (2 (3 ())))
+;; (fold-left list nil (list 1 2 3))
+(list (list (list nil 1) 2) 3)
+(((() 1) 2) 3)
+#+end_src
+
+With that solution done, we should verify the result.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (fold-right p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (fold-right p initial (cdr sequence)))))
+
+(define (fold-left op initial seq)
+  (define (iter acc s)
+    (if (null? s)
+        acc
+        (iter (op acc (car s))
+              (cdr s))))
+  (iter initial seq))
+(fold-right / 1 (list 1 2 3))
+(fold-left / 1 (list 1 2 3))
+(fold-right list nil (list 1 2 3))
+(fold-left list nil (list 1 2 3))
+#+end_src
+
+#+RESULTS:
+: 3/2
+: 1/6
+: (1 (2 (3 ())))
+: (((() 1) 2) 3)
+
+Nice, we were correct about the semantics of the problem. Now to talk about the property of the operator that would make ~fold-left~ and ~fold-right~ return the same value. That operator property is the commutative property. Commutative property is a property that means that the operator will produce the same output if you swap the position of the operands.
+* Exercise 3.39
+** Prompt
+Define ~reverse~ using both ~fold-left~ and ~fold-right~.
+** Solution
+#+caption: Fold right implementation of reverse.
+#+begin_src racket :exports both
+#lang sicp
+(define (fold-right p initial sequence)
+  (if (null? sequence)
+      initial
+      (p (car sequence) (fold-right p initial (cdr sequence)))))
+
+(define (reverse seq)
+  (fold-right (lambda (x y) (if (null? y)
+                                (cons x nil)
+                                (append y (cons x nil)))) nil seq))
+
+(reverse (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: (4 3 2 1)
+
+The fold right implementation requires the use of the append procedure, which is inefficient.
+
+#+caption: Fold left implementation of reverse.
+#+begin_src racket :exports both
+#lang sicp
+(define (fold-left op initial seq)
+  (define (iter acc s)
+    (if (null? s)
+        acc
+        (iter (op acc (car s))
+              (cdr s))))
+  (iter initial seq))
+
+(define (reverse seq)
+  (fold-left (lambda (x y) (cons y x)) nil seq))
+(reverse (list 1 2 3 4))
+#+end_src
+
+#+RESULTS:
+: (4 3 2 1)
+
+Fold left is much more efficient for reversing a list, as it is an iterative process, and it avoids append.
