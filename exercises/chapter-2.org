@@ -1618,7 +1618,7 @@ Matrix operation. Vectors \(v\) are sequences of numbers and matrices are sequen
 : ((19 22) (43 50))
 
 We got the expected values out of this implementation. This implementation does not focus on getting the best cache hits, but instead it was all about modularity and reusing abstractions created as we implement each of the matrix operations.
-* Exercise 3.38
+* Exercise 2.38
 ** Prompt
 We realize that we were using a right fold for accumulate previously. Now we introduce a fold left procedure that operates from left to right. This implementation is an iterative process.
 #+caption: Implementation of fold left and fold right
@@ -1690,7 +1690,7 @@ With that solution done, we should verify the result.
 : (((() 1) 2) 3)
 
 Nice, we were correct about the semantics of the problem. Now to talk about the property of the operator that would make ~fold-left~ and ~fold-right~ return the same value. That operator property is the commutative property. Commutative property is a property that means that the operator will produce the same output if you swap the position of the operands.
-* Exercise 3.39
+* Exercise 2.39
 ** Prompt
 Define ~reverse~ using both ~fold-left~ and ~fold-right~.
 ** Solution
