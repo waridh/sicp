@@ -1735,3 +1735,54 @@ The fold right implementation requires the use of the append procedure, which is
 : (4 3 2 1)
 
 Fold left is much more efficient for reversing a list, as it is an iterative process, and it avoids append.
+* Exercise 2.40
+** Prompt
+This problem goes into the application of the ~flatmap~. Define a procedure called ~unique-map~ that when given an integer ~n~, generate the sequence of pairs (i, j) with 1 <= j < i <= n. Use this to simplify the definition of ~prime-sum-pairs~.
+** Solution
+#+begin_src racket :exports both
+#lang sicp
+;; Importing prime?
+(define (square x) (* x x))
+(define (smallest-divisor n) (find-divisor n 2))
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+        ((divides? test-divisor n) test-divisor)
+        (else (find-divisor n (+ test-divisor 1)))))
+(define (divides? x y) (= (remainder y x) 0))
+(define (prime? n)
+  (= n (smallest-divisor n)))
+
+(define (fold-right op initial seq)
+  (if (null? seq)
+      initial
+      (op (car seq) (fold-right op initial (cdr seq)))))
+
+(define (filter predicate seq)
+  (fold-right (lambda (x y) (if (predicate x) (cons x y) y)) nil seq))
+
+
+(define (flatmap f seq)
+  (fold-right append nil (map f seq)))
+(define (enumerate-range lower upper)
+  (if (> lower upper)
+      nil
+      (cons lower (enumerate-range (+ lower 1) upper))))
+
+(define (unique-pairs n)
+  (flatmap (lambda (x) (map (lambda (y) (list x y)) (enumerate-range 1 (- x 1))))
+           (enumerate-range 2 n)))
+
+(define (make-pair-sum pair)
+  (let ((left (car pair)) (right (car (cdr pair))))
+    (list left right (+ left right))))
+(define (prime-sum-pairs n)
+  (define (prime-sum? x) (prime? (+ (car x) (car (cdr x) ))))
+  (map make-pair-sum (filter prime-sum? (unique-pairs n))))
+
+(unique-pairs 8)
+(prime-sum-pairs 8)
+#+end_src
+
+#+RESULTS:
+: ((2 1) (3 1) (3 2) (4 1) (4 2) (4 3) (5 1) (5 2) (5 3) (5 4) (6 1) (6 2) (6 3) (6 4) (6 5) (7 1) (7 2) (7 3) (7 4) (7 5) (7 6) (8 1) (8 2) (8 3) (8 4) (8 5) (8 6) (8 7))
+: ((2 1 3) (3 2 5) (4 1 5) (4 3 7) (5 2 7) (6 1 7) (6 5 11) (7 4 11) (7 6 13) (8 3 11) (8 5 13))
