@@ -1786,3 +1786,71 @@ This problem goes into the application of the ~flatmap~. Define a procedure call
 #+RESULTS:
 : ((2 1) (3 1) (3 2) (4 1) (4 2) (4 3) (5 1) (5 2) (5 3) (5 4) (6 1) (6 2) (6 3) (6 4) (6 5) (7 1) (7 2) (7 3) (7 4) (7 5) (7 6) (8 1) (8 2) (8 3) (8 4) (8 5) (8 6) (8 7))
 : ((2 1 3) (3 2 5) (4 1 5) (4 3 7) (5 2 7) (6 1 7) (6 5 11) (7 4 11) (7 6 13) (8 3 11) (8 5 13))
+* Exercise 2.41
+** Prompt
+Write a procedure to find all ordered triples of distinct positive integers i, j, and k less than or equal to a given integer n that sum to a given integer s
+** Solution
+We are looking for all ordered integers of distinct positive integers. Distinct means that we will not accept cases where i, j, or k are equal. Furthermore, the values no longer has to be less than each other, they just need to be distinct. We'd usually generate this with three for loops. Next, we will filter by summing.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (fold-right op initial seq)
+  (if (null? seq)
+      initial
+      (op (car seq) (fold-right op initial (cdr seq)))))
+
+(define (filter predicate seq)
+  (fold-right (lambda (x y)
+                (if (predicate x)
+                    (cons x y)
+                    y))
+              nil
+              seq))
+
+(define (flatmap f seq)
+  (fold-right append nil (map f seq)))
+(define (enumerate-range lower upper)
+  (if (> lower upper)
+      nil
+      (cons lower (enumerate-range (+ lower 1) upper))))
+
+;; This procedure checks if the target value is contained inside the sequence
+;; Currently only comparing numerical contents
+(define (contains? target seq)
+  (fold-right (lambda (left right)
+                (cond
+                  [(= left target) #t]
+                  [else right]))
+              #f
+              seq))
+
+;; Enumerates from 1 to n, inclusive, but do not include the values in the
+;; excl dynamic parameter.
+(define (enumerate-exclusion n . excl)
+  (define (enumerate-exclusion-aux lower)
+    (cond ((> lower n ) nil)
+          ((contains? lower excl) (enumerate-exclusion-aux (+ lower 1)))
+          (else (cons lower (enumerate-exclusion-aux (+ lower 1))))))
+  (enumerate-exclusion-aux 1))
+
+;; constructor and selector for the triple
+(define (make-triple a b c)
+  (list a b c))
+(define (first x)
+  (car x))
+(define (second x)
+  (car (cdr x)))
+(define (third x)
+  (car (cdr (cdr x))))
+
+;; predicate factory for the value
+(define (make-sum-predicate s)
+  (lambda (triple) (= s (+ (first triple) (second triple) (third triple)))))
+
+;; Main function should do the following to reduce work. Only enumerate through
+;; what is possible to get to the target sum. If we cannot get to the target
+;; sum, then move on to the next iteration.
+#+end_src
+
+#+RESULTS:
+: (1 4 5 6 7 8 9 10)
