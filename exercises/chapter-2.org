@@ -1853,4 +1853,3 @@ We are looking for all ordered integers of distinct positive integers. Distinct 
 #+end_src
 
 #+RESULTS:
-: (1 4 5 6 7 8 9 10)
