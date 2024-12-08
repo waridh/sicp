@@ -1864,3 +1864,191 @@ We are looking for all ordered integers of distinct positive integers. Distinct 
 : ((1 2 8) (1 3 7) (1 4 6) (1 6 4) (1 7 3) (1 8 2) (2 1 8) (2 3 6) (2 4 5) (2 5 4) (2 6 3) (2 8 1) (3 1 7) (3 2 6) (3 6 2) (3 7 1) (4 1 6) (4 2 5) (4 5 2) (4 6 1) (5 2 4) (5 4 2) (6 1 4) (6 2 3) (6 3 2) (6 4 1) (7 1 3) (7 3 1) (8 1 2) (8 2 1))
 
 For the sake of performance, instead of building all the permuatations first, and then filtering them out, we could reduce the permutation problem size by filtering the enumeration out as we go.
+* Exercise 2.42
+** Prompt
+This is the eight queens problem, which asks how to place 8 queens on a chessboard. Strategy being asked of us is to place a queen in each column. For the k-th queen, check we can place a queen in a row that will not conflict with the previously placed queens. To do this, we are asked to keep track of all the previous legal moves, and as we move forward, filter out the ones that are not legal. On the k-th queen, don't just produce one legal position, but all of them. Actually, the generalization will be done for a square chessboard of equal size. The following is the provided code, implement the rest.
+
+#+begin_src racket :exports code
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter (lambda (position) (safe? k position))
+                (flatmap
+                 (lambda (rest-of-queens)
+                   (map (lambda (new-row)
+                          (adjoin-position
+                           new-row k rest-of-queens))
+                        (enumerate-interval 1 board-size)))
+                 (queen-cols (-k 1))))))
+  (queen-cols board-size))
+#+end_src
+** Solution
+We can make our solution more flexible by making the underlying representation a pair, and forgo the index. This way, the previous queens do not have to be ordered. Our recusions could be much more efficient with this strategy of implementing this.
+#+begin_src racket :exports code
+#lang sicp
+;; unit testing
+(define (assert-predicate pred-fn test-name value expected)
+  (display (if (pred-fn value expected) "pass: " "fail: "))
+  (display test-name)
+  (display " value: ")
+  (display value)
+  (display " expected: ")
+  (display expected)
+  (newline))
+(define (assert-eq test-name value expected)
+  (assert-predicate eq? test-name value expected))
+(define (assert-almost-eq test-name value expected)
+  (define dx 0.0001)
+  (define (almost-eq? left right)
+    (< (abs (- left right)) dx))
+  (assert-predicate almost-eq? test-name value expected))
+
+;; Common sequence operators
+(define (fold-right op initial seq)
+  (if (null? seq)
+      initial
+      (op (car seq) (fold-right op initial (cdr seq)))))
+(define (fold-left op initial seq)
+  (define (iter acc remaining)
+    (if (null? remaining)
+        acc
+        (iter (op (car remaining) acc) (cdr remaining))))
+  (iter initial seq))
+(define (filter predicate seq)
+  (fold-right (lambda (x y)
+                (if (predicate x)
+                    (cons x y)
+                    y))
+              nil
+              seq))
+
+(define (flatmap f seq)
+  (fold-right append nil (map f seq)))
+(define (enumerate-range lower upper)
+  (if (> lower upper)
+      nil
+      (cons lower (enumerate-range (+ lower 1) upper))))
+(define (enumerate-interval lower upper)
+  (enumerate-range lower upper))
+
+;; Need to implement the representation of the queens on the board. We can
+;; make this representation unordered if we store the col and row information
+;; with the queen
+(define empty-board nil)
+(define (make-queen row col)
+  (cons row col))
+(define (get-row queen)
+  (car queen))
+(define (get-col queen)
+  (cdr queen))
+;; Looks like k actually does nothing for us yet
+(define (adjoin-position nr k roq)
+  (cons (make-queen nr k) roq))
+
+(define (safe? k positions)
+  (define (get-queen)
+    (fold-left (lambda (x acc)
+                 (if (null? acc)
+                     (if (= (get-col x) k) x acc)
+                     acc))
+               nil
+               positions))
+  ;; check if the two queens are diag from each other
+  (define (diag? a b)
+    (= (abs (- (get-col a)
+               (get-col b)))
+     (abs (- (get-row a)
+             (get-row b)))))
+  ;; where target is the queen that is being tested against
+  (define (safe?-aux target roq)
+    (define (iter rest-of-queens)
+      (cond
+        [(null? rest-of-queens) #t]
+        [(= (get-row target) (get-row (car rest-of-queens))) #f]
+        [(= (get-col target) (get-col (car rest-of-queens))) #f]
+        [(diag? target (car rest-of-queens)) #f]
+        [else (iter (cdr rest-of-queens))]))
+    (iter roq))
+  (let ((k-queen (get-queen))) (safe?-aux k-queen
+                                          (filter (lambda (x) (not (and (= (get-col x)
+                                                                           (get-col k-queen))
+                                                                        (= (get-row x)
+                                                                           (get-row k-queen)))))
+                                                  positions))))
+
+(display "testing safe?")
+(newline)
+(define base-1 (adjoin-position 7 3 (adjoin-position 5 2 (adjoin-position 1 1 empty-board))))
+(define base-2 (adjoin-position 1 1 empty-board))
+(assert-eq "horizontal collision" (safe? 4 (adjoin-position 1 4 base-1)) #f)
+(assert-eq "no collision" (safe? 4 (adjoin-position 2 4 base-1)) #t)
+(assert-eq "diagonal collision 1" (safe? 4 (adjoin-position 3 4 base-1)) #f)
+(assert-eq "diagonal collision 2" (safe? 4 (adjoin-position 6 4 base-1)) #f)
+(assert-eq "diagonal collision 3" (safe? 4 (adjoin-position 4 4 base-1)) #f)
+(assert-eq "fail by horizontal collision" (safe? 2 (adjoin-position 1 2 base-2)) #f)
+(assert-eq "fail by diagonal collision" (safe? 2 (adjoin-position 2 2 base-2)) #f)
+(assert-eq "safe 1" (safe? 2 (adjoin-position 3 2 base-2)) #t)
+(assert-eq "safe 2" (safe? 2 (adjoin-position 4 2 base-2)) #t)
+(assert-eq "safe 3" (safe? 2 (adjoin-position 5 2 base-2)) #t)
+(assert-eq "safe 4" (safe? 2 (adjoin-position 6 2 base-2)) #t)
+(assert-eq "safe 5" (safe? 2 (adjoin-position 7 2 base-2)) #t)
+(assert-eq "safe 6" (safe? 2 (adjoin-position 8 2 base-2)) #t)
+(newline)
+
+;; We are using board-size as a local global (all the other recursion will use
+;; this value to test if the system is working as intended)
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        ;; Making the base board
+        (list empty-board)
+        ;; filter, safe? is given the current col being tested, and positions
+        ;; actually already includes the parameter
+        (filter (lambda (positions) (safe? k positions))
+                (flatmap (lambda (rest-of-queens)
+                           (map (lambda (new-row) (adjoin-position new-row k rest-of-queens))
+                                (enumerate-interval 1 board-size)))
+                         (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
+(display "one queens")
+(newline)
+(queens 1)
+(display "four queens")
+(newline)
+(queens 4)
+(display "five queens")
+(newline)
+(queens 5)
+(display "eight queens")
+(newline)
+(queens 8)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+testing safe?
+pass: horizontal collision value: #f expected: #f
+pass: no collision value: #t expected: #t
+pass: diagonal collision 1 value: #f expected: #f
+pass: diagonal collision 2 value: #f expected: #f
+pass: diagonal collision 3 value: #f expected: #f
+pass: fail by horizontal collision value: #f expected: #f
+pass: fail by diagonal collision value: #f expected: #f
+pass: safe 1 value: #t expected: #t
+pass: safe 2 value: #t expected: #t
+pass: safe 3 value: #t expected: #t
+pass: safe 4 value: #t expected: #t
+pass: safe 5 value: #t expected: #t
+pass: safe 6 value: #t expected: #t
+
+one queens
+(((1 . 1)))
+four queens
+(((3 . 4) (1 . 3) (4 . 2) (2 . 1)) ((2 . 4) (4 . 3) (1 . 2) (3 . 1)))
+five queens
+(((4 . 5) (2 . 4) (5 . 3) (3 . 2) (1 . 1)) ((3 . 5) (5 . 4) (2 . 3) (4 . 2) (1 . 1)) ((5 . 5) (3 . 4) (1 . 3) (4 . 2) (2 . 1)) ((4 . 5) (1 . 4) (3 . 3) (5 . 2) (2 . 1)) ((5 . 5) (2 . 4) (4 . 3) (1 . 2) (3 . 1)) ((1 . 5) (4 . 4) (2 . 3) (5 . 2) (3 . 1)) ((2 . 5) (5 . 4) (3 . 3) (1 . 2) (4 . 1)) ((1 . 5) (3 . 4) (5 . 3) (2 . 2) (4 . 1)) ((3 . 5) (1 . 4) (4 . 3) (2 . 2) (5 . 1)) ((2 . 5) (4 . 4) (1 . 3) (3 . 2) (5 . 1)))
+eight queens
+(((4 . 8) (2 . 7) (7 . 6) (3 . 5) (6 . 4) (8 . 3) (5 . 2) (1 . 1)) ((5 . 8) (2 . 7) (4 . 6) (7 . 5) (3 . 4) (8 . 3) (6 . 2) (1 . 1)) ((3 . 8) (5 . 7) (2 . 6) (8 . 5) (6 . 4) (4 . 3) (7 . 2) (1 . 1)) ((3 . 8) (6 . 7) (4 . 6) (2 . 5) (8 . 4) (5 . 3) (7 . 2) (1 . 1)) ((5 . 8) (7 . 7) (1 . 6) (3 . 5) (8 . 4) (6 . 3) (4 . 2) (2 . 1)) ((4 . 8) (6 . 7) (8 . 6) (3 . 5) (1 . 4) (7 . 3) (5 . 2) (2 . 1)) ((3 . 8) (6 . 7) (8 . 6) (1 . 5) (4 . 4) (7 . 3) (5 . 2) (2 . 1)) ((5 . 8) (3 . 7) (8 . 6) (4 . 5) (7 . 4) (1 . 3) (6 . 2) (2 . 1)) ((5 . 8) (7 . 7) (4 . 6) (1 . 5) (3 . 4) (8 . 3) (6 . 2) (2 . 1)) ((4 . 8) (1 . 7) (5 . 6) (8 . 5) (6 . 4) (3 . 3) (7 . 2) (2 . 1)) ((3 . 8) (6 . 7) (4 . 6) (1 . 5) (8 . 4) (5 . 3) (7 . 2) (2 . 1)) ((4 . 8) (7 . 7) (5 . 6) (3 . 5) (1 . 4) (6 . 3) (8 . 2) (2 . 1)) ((6 . 8) (4 . 7) (2 . 6) (8 . 5) (5 . 4) (7 . 3) (1 . 2) (3 . 1)) ((6 . 8) (4 . 7) (7 . 6) (1 . 5) (8 . 4) (2 . 3) (5 . 2) (3 . 1)) ((1 . 8) (7 . 7) (4 . 6) (6 . 5) (8 . 4) (2 . 3) (5 . 2) (3 . 1)) ((6 . 8) (8 . 7) (2 . 6) (4 . 5) (1 . 4) (7 . 3) (5 . 2) (3 . 1)) ((6 . 8) (2 . 7) (7 . 6) (1 . 5) (4 . 4) (8 . 3) (5 . 2) (3 . 1)) ((4 . 8) (7 . 7) (1 . 6) (8 . 5) (5 . 4) (2 . 3) (6 . 2) (3 . 1)) ((5 . 8) (8 . 7) (4 . 6) (1 . 5) (7 . 4) (2 . 3) (6 . 2) (3 . 1)) ((4 . 8) (8 . 7) (1 . 6) (5 . 5) (7 . 4) (2 . 3) (6 . 2) (3 . 1)) ((2 . 8) (7 . 7) (5 . 6) (8 . 5) (1 . 4) (4 . 3) (6 . 2) (3 . 1)) ((1 . 8) (7 . 7) (5 . 6) (8 . 5) (2 . 4) (4 . 3) (6 . 2) (3 . 1)) ((2 . 8) (5 . 7) (7 . 6) (4 . 5) (1 . 4) (8 . 3) (6 . 2) (3 . 1)) ((4 . 8) (2 . 7) (7 . 6) (5 . 5) (1 . 4) (8 . 3) (6 . 2) (3 . 1)) ((5 . 8) (7 . 7) (1 . 6) (4 . 5) (2 . 4) (8 . 3) (6 . 2) (3 . 1)) ((6 . 8) (4 . 7) (1 . 6) (5 . 5) (8 . 4) (2 . 3) (7 . 2) (3 . 1)) ((5 . 8) (1 . 7) (4 . 6) (6 . 5) (8 . 4) (2 . 3) (7 . 2) (3 . 1)) ((5 . 8) (2 . 7) (6 . 6) (1 . 5) (7 . 4) (4 . 3) (8 . 2) (3 . 1)) ((6 . 8) (3 . 7) (7 . 6) (2 . 5) (8 . 4) (5 . 3) (1 . 2) (4 . 1)) ((2 . 8) (7 . 7) (3 . 6) (6 . 5) (8 . 4) (5 . 3) (1 . 2) (4 . 1)) ((7 . 8) (3 . 7) (1 . 6) (6 . 5) (8 . 4) (5 . 3) (2 . 2) (4 . 1)) ((5 . 8) (1 . 7) (8 . 6) (6 . 5) (3 . 4) (7 . 3) (2 . 2) (4 . 1)) ((1 . 8) (5 . 7) (8 . 6) (6 . 5) (3 . 4) (7 . 3) (2 . 2) (4 . 1)) ((3 . 8) (6 . 7) (8 . 6) (1 . 5) (5 . 4) (7 . 3) (2 . 2) (4 . 1)) ((6 . 8) (3 . 7) (1 . 6) (7 . 5) (5 . 4) (8 . 3) (2 . 2) (4 . 1)) ((7 . 8) (5 . 7) (3 . 6) (1 . 5) (6 . 4) (8 . 3) (2 . 2) (4 . 1)) ((7 . 8) (3 . 7) (8 . 6) (2 . 5) (5 . 4) (1 . 3) (6 . 2) (4 . 1)) ((5 . 8) (3 . 7) (1 . 6) (7 . 5) (2 . 4) (8 . 3) (6 . 2) (4 . 1)) ((2 . 8) (5 . 7) (7 . 6) (1 . 5) (3 . 4) (8 . 3) (6 . 2) (4 . 1)) ((3 . 8) (6 . 7) (2 . 6) (5 . 5) (8 . 4) (1 . 3) (7 . 2) (4 . 1)) ((6 . 8) (1 . 7) (5 . 6) (2 . 5) (8 . 4) (3 . 3) (7 . 2) (4 . 1)) ((8 . 8) (3 . 7) (1 . 6) (6 . 5) (2 . 4) (5 . 3) (7 . 2) (4 . 1)) ((2 . 8) (8 . 7) (6 . 6) (1 . 5) (3 . 4) (5 . 3) (7 . 2) (4 . 1)) ((5 . 8) (7 . 7) (2 . 6) (6 . 5) (3 . 4) (1 . 3) (8 . 2) (4 . 1)) ((3 . 8) (6 . 7) (2 . 6) (7 . 5) (5 . 4) (1 . 3) (8 . 2) (4 . 1)) ((6 . 8) (2 . 7) (7 . 6) (1 . 5) (3 . 4) (5 . 3) (8 . 2) (4 . 1)) ((3 . 8) (7 . 7) (2 . 6) (8 . 5) (6 . 4) (4 . 3) (1 . 2) (5 . 1)) ((6 . 8) (3 . 7) (7 . 6) (2 . 5) (4 . 4) (8 . 3) (1 . 2) (5 . 1)) ((4 . 8) (2 . 7) (7 . 6) (3 . 5) (6 . 4) (8 . 3) (1 . 2) (5 . 1)) ((7 . 8) (1 . 7) (3 . 6) (8 . 5) (6 . 4) (4 . 3) (2 . 2) (5 . 1)) ((1 . 8) (6 . 7) (8 . 6) (3 . 5) (7 . 4) (4 . 3) (2 . 2) (5 . 1)) ((3 . 8) (8 . 7) (4 . 6) (7 . 5) (1 . 4) (6 . 3) (2 . 2) (5 . 1)) ((6 . 8) (3 . 7) (7 . 6) (4 . 5) (1 . 4) (8 . 3) (2 . 2) (5 . 1)) ((7 . 8) (4 . 7) (2 . 6) (8 . 5) (6 . 4) (1 . 3) (3 . 2) (5 . 1)) ((4 . 8) (6 . 7) (8 . 6) (2 . 5) (7 . 4) (1 . 3) (3 . 2) (5 . 1)) ((2 . 8) (6 . 7) (1 . 6) (7 . 5) (4 . 4) (8 . 3) (3 . 2) (5 . 1)) ((2 . 8) (4 . 7) (6 . 6) (8 . 5) (3 . 4) (1 . 3) (7 . 2) (5 . 1)) ((3 . 8) (6 . 7) (8 . 6) (2 . 5) (4 . 4) (1 . 3) (7 . 2) (5 . 1)) ((6 . 8) (3 . 7) (1 . 6) (8 . 5) (4 . 4) (2 . 3) (7 . 2) (5 . 1)) ((8 . 8) (4 . 7) (1 . 6) (3 . 5) (6 . 4) (2 . 3) (7 . 2) (5 . 1)) ((4 . 8) (8 . 7) (1 . 6) (3 . 5) (6 . 4) (2 . 3) (7 . 2) (5 . 1)) ((2 . 8) (6 . 7) (8 . 6) (3 . 5) (1 . 4) (4 . 3) (7 . 2) (5 . 1)) ((7 . 8) (2 . 7) (6 . 6) (3 . 5) (1 . 4) (4 . 3) (8 . 2) (5 . 1)) ((3 . 8) (6 . 7) (2 . 6) (7 . 5) (1 . 4) (4 . 3) (8 . 2) (5 . 1)) ((4 . 8) (7 . 7) (3 . 6) (8 . 5) (2 . 4) (5 . 3) (1 . 2) (6 . 1)) ((4 . 8) (8 . 7) (5 . 6) (3 . 5) (1 . 4) (7 . 3) (2 . 2) (6 . 1)) ((3 . 8) (5 . 7) (8 . 6) (4 . 5) (1 . 4) (7 . 3) (2 . 2) (6 . 1)) ((4 . 8) (2 . 7) (8 . 6) (5 . 5) (7 . 4) (1 . 3) (3 . 2) (6 . 1)) ((5 . 8) (7 . 7) (2 . 6) (4 . 5) (8 . 4) (1 . 3) (3 . 2) (6 . 1)) ((7 . 8) (4 . 7) (2 . 6) (5 . 5) (8 . 4) (1 . 3) (3 . 2) (6 . 1)) ((8 . 8) (2 . 7) (4 . 6) (1 . 5) (7 . 4) (5 . 3) (3 . 2) (6 . 1)) ((7 . 8) (2 . 7) (4 . 6) (1 . 5) (8 . 4) (5 . 3) (3 . 2) (6 . 1)) ((5 . 8) (1 . 7) (8 . 6) (4 . 5) (2 . 4) (7 . 3) (3 . 2) (6 . 1)) ((4 . 8) (1 . 7) (5 . 6) (8 . 5) (2 . 4) (7 . 3) (3 . 2) (6 . 1)) ((5 . 8) (2 . 7) (8 . 6) (1 . 5) (4 . 4) (7 . 3) (3 . 2) (6 . 1)) ((3 . 8) (7 . 7) (2 . 6) (8 . 5) (5 . 4) (1 . 3) (4 . 2) (6 . 1)) ((3 . 8) (1 . 7) (7 . 6) (5 . 5) (8 . 4) (2 . 3) (4 . 2) (6 . 1)) ((8 . 8) (2 . 7) (5 . 6) (3 . 5) (1 . 4) (7 . 3) (4 . 2) (6 . 1)) ((3 . 8) (5 . 7) (2 . 6) (8 . 5) (1 . 4) (7 . 3) (4 . 2) (6 . 1)) ((3 . 8) (5 . 7) (7 . 6) (1 . 5) (4 . 4) (2 . 3) (8 . 2) (6 . 1)) ((5 . 8) (2 . 7) (4 . 6) (6 . 5) (8 . 4) (3 . 3) (1 . 2) (7 . 1)) ((6 . 8) (3 . 7) (5 . 6) (8 . 5) (1 . 4) (4 . 3) (2 . 2) (7 . 1)) ((5 . 8) (8 . 7) (4 . 6) (1 . 5) (3 . 4) (6 . 3) (2 . 2) (7 . 1)) ((4 . 8) (2 . 7) (5 . 6) (8 . 5) (6 . 4) (1 . 3) (3 . 2) (7 . 1)) ((4 . 8) (6 . 7) (1 . 6) (5 . 5) (2 . 4) (8 . 3) (3 . 2) (7 . 1)) ((6 . 8) (3 . 7) (1 . 6) (8 . 5) (5 . 4) (2 . 3) (4 . 2) (7 . 1)) ((5 . 8) (3 . 7) (1 . 6) (6 . 5) (8 . 4) (2 . 3) (4 . 2) (7 . 1)) ((4 . 8) (2 . 7) (8 . 6) (6 . 5) (1 . 4) (3 . 3) (5 . 2) (7 . 1)) ((6 . 8) (3 . 7) (5 . 6) (7 . 5) (1 . 4) (4 . 3) (2 . 2) (8 . 1)) ((6 . 8) (4 . 7) (7 . 6) (1 . 5) (3 . 4) (5 . 3) (2 . 2) (8 . 1)) ((4 . 8) (7 . 7) (5 . 6) (2 . 5) (6 . 4) (1 . 3) (3 . 2) (8 . 1)) ((5 . 8) (7 . 7) (2 . 6) (6 . 5) (3 . 4) (1 . 3) (4 . 2) (8 . 1)))
+#+end_example
