@@ -1885,7 +1885,7 @@ This is the eight queens problem, which asks how to place 8 queens on a chessboa
 #+end_src
 ** Solution
 We can make our solution more flexible by making the underlying representation a pair, and forgo the index. This way, the previous queens do not have to be ordered. Our recusions could be much more efficient with this strategy of implementing this.
-#+begin_src racket :exports code
+#+begin_src racket :exports both
 #lang sicp
 ;; unit testing
 (define (assert-predicate pred-fn test-name value expected)
