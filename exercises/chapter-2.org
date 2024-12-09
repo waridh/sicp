@@ -2064,4 +2064,4 @@ Louis Reasoner has a slower implementation of queens than we do. His code differ
  (enumerate-interval 1 board-size))
 #+end_src
 ** Solution
-Difference between his implementation and ours is that the level of nesting that rest-of-queen generation and enumeration of an interval between 1 and the size of the board is swapped. This ordering has large implications, since queen-cols without the filter stage will grow at $\theta(n^{2})$.
+Difference between his implementation and ours is that the level of nesting that rest-of-queen generation and enumeration of an interval between 1 and the size of the board is swapped. This ordering has large implications, since queen-cols without the filter stage will grow at \theta(board-size^{k}).
