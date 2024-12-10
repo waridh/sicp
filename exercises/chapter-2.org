@@ -2060,8 +2060,8 @@ Louis Reasoner has a slower implementation of queens than we do. His code differ
  (lambda (new-row)
    (map (lambda (rest-of-queens)
           (adjoin-position new-row k rest-of-queens))
-        (queen-col (- k 1))))
+        (queen-cols (- k 1))))
  (enumerate-interval 1 board-size))
 #+end_src
 ** Solution
-Difference between his implementation and ours is that the level of nesting that rest-of-queen generation and enumeration of an interval between 1 and the size of the board is swapped. This ordering has large implications, since queen-cols without the filter stage will grow at \theta(board-size^{k}).
+To estimate, we should look at the different components of the program that are executed at each of the recusive stage. Let's start with our version of the program. First, at the base case of k = 0, we immediately return, preventing work from occurring. Let's call this constant cost C_0. In the other case, we get the result from the k - 1 recursive case of the process.
