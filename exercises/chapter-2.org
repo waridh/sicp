@@ -2064,4 +2064,125 @@ Louis Reasoner has a slower implementation of queens than we do. His code differ
  (enumerate-interval 1 board-size))
 #+end_src
 ** Solution
-To estimate, we should look at the different components of the program that are executed at each of the recusive stage. Let's start with our version of the program. First, at the base case of k = 0, we immediately return, preventing work from occurring. Let's call this constant cost C_0. In the other case, we get the result from the k - 1 recursive case of the process.
+Louis's queen's implementation is slow because each iteration in the recursion is calling the next recursion step multiple times, causing repeated work. This problem compounds heavily fast.
+
+To estimate runtime differences, we should look at the different components of the program that are executed at each of the recursive stage. Let's start with our version of the program. First, at the base case of k = 0, we immediately return, preventing work from occurring. Let's call this constant cost C_0. In the other case, we get the result from the k - 1 recursive case of the process. Here are just some quantitative estimation of the runtime of the process. First, we can observe that the base case of ~queen-cols~ has nearly no work being done, just a single conditional, followed by the construction of an empty board. In the recursive case of the program that we implement, we see that the size of the board we are working with multiplies by the width of the board. Finally, the ~safe?~ procedure is ran on the expanding result size. This problem could be tricky to model, since the runtime of ~safe?~ will grow linearly with the size of the board that has already been built, and the number of times that ~safe?~ is called also increases as we find more permutations. Luckily, our implementation of adjoin position is a constant time operation because we have decided to keep track of both the row and column for each of the queen, opening us up to future unordered implementations, while sacrificing twice the amount of memory as other solutions. Let's write the equation for the growth of our process now.
+
+T_k = T_{k - 1} + ((b * C_1 + k * C_2) * N_k)
+
+Where N_k is the number of returns from ~queens~ at the problem size, b is the board size, C_1 is the time it takes to append a new queen on to the board and C_2 is the time it takes to check if the queen is in a valid position one a board on size one. Now we should consider the base case, T_0 and T_0' for the Louis implementation. We could say that it takes constant time C_0, and that it is nearly 0 due to the fact that it is one conditional. As a good engineer, I will just take that as fact, and make T_0 disappear when faced with it.
+
+Now we'll define the expression for the Louis case, which really just multiplies the recursive case by the width of the board, along with a few difference in the nesting.
+
+T_k' = b * (T_{k - 1}' + C_1 * N_k ) + (k * C_2 * N_k)
+
+Now we should calculate how long it takes to run the two cases for b = 8.
+
+#+begin_src racket :exports both
+#lang sicp
+
+(define (fold-right op initial seq)
+  (if (null? seq)
+      initial
+      (op (car seq) (fold-right op initial (cdr seq)))))
+(define (fold-left op initial seq)
+  (define (iter acc remaining)
+    (if (null? remaining)
+        acc
+        (iter (op (car remaining) acc) (cdr remaining))))
+  (iter initial seq))
+(define (filter predicate seq)
+  (fold-right (lambda (x y)
+                (if (predicate x)
+                    (cons x y)
+                    y))
+              nil
+              seq))
+
+(define (flatmap f seq)
+  (fold-right append nil (map f seq)))
+(define (enumerate-range lower upper)
+  (if (> lower upper)
+      nil
+      (cons lower (enumerate-range (+ lower 1) upper))))
+(define (enumerate-interval lower upper)
+  (enumerate-range lower upper))
+
+;; Need to implement the representation of the queens on the board. We can
+;; make this representation unordered if we store the col and row information
+;; with the queen
+(define empty-board nil)
+(define (make-queen row col)
+  (cons row col))
+(define (get-row queen)
+  (car queen))
+(define (get-col queen)
+  (cdr queen))
+;; Looks like k actually does nothing for us yet
+(define (adjoin-position nr k roq)
+  (cons (make-queen nr k) roq))
+
+(define (safe? k positions)
+  (define (get-queen)
+    (fold-left (lambda (x acc)
+                 (if (null? acc)
+                     (if (= (get-col x) k) x acc)
+                     acc))
+               nil
+               positions))
+  ;; check if the two queens are diag from each other
+  (define (diag? a b)
+    (= (abs (- (get-col a) (get-col b))) (abs (- (get-row a) (get-row b)))))
+  ;; where target is the queen that is being tested against
+  (define (safe?-aux target roq)
+    (define (iter rest-of-queens)
+      (cond
+        [(null? rest-of-queens) #t]
+        [(= (get-row target) (get-row (car rest-of-queens))) #f]
+        [(= (get-col target) (get-col (car rest-of-queens))) #f]
+        [(diag? target (car rest-of-queens)) #f]
+        [else (iter (cdr rest-of-queens))]))
+    (iter roq))
+  (let ([k-queen (get-queen)])
+    (safe?-aux k-queen
+               (filter (lambda (x)
+                         (not (and (= (get-col x) (get-col k-queen))
+                                   (= (get-row x) (get-row k-queen)))))
+                       positions))))
+
+;; We are using board-size as a local global (all the other recursion will use
+;; this value to test if the system is working as intended)
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        ;; Making the base board
+        (list empty-board)
+        ;; filter, safe? is given the current col being tested, and positions
+        ;; actually already includes the parameter
+        (filter (lambda (positions) (safe? k positions))
+                (flatmap (lambda (rest-of-queens)
+                           (map (lambda (new-row) (adjoin-position new-row k rest-of-queens))
+                                (enumerate-interval 1 board-size)))
+                         (queen-cols (- k 1))))))
+  (queen-cols board-size))
+(define (tk-prime b c1 c2)
+  (define (iter k)
+    (let ([nk (length (queens k))])
+      (if (= k 0)
+          0
+          (+ (* b (+ (iter (- k 1)) (* c1 nk))) (* k c2 nk)))))
+  (iter b))
+(define (tk b c1 c2)
+  (define (iter acc k)
+    (if (> k b)
+        acc
+        (iter (+ acc (* (length (queens k)) (+ (* b c1) (* k c2)))) (+ k 1))))
+  (iter 0 0))
+
+(/ (tk-prime 8 0.1 0.5) (tk 8 0.1 0.5))
+#+end_src
+
+#+RESULTS:
+: 4135.805227781927
+
+So we can see that the Louis implementation is approximately 3 order of magnitudes more expensive to run than our implementation.
