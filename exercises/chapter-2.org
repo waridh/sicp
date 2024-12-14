@@ -2186,3 +2186,24 @@ Now we should calculate how long it takes to run the two cases for b = 8.
 : 4135.805227781927
 
 So we can see that the Louis implementation is approximately 3 order of magnitudes more expensive to run than our implementation.
+* Exercise 2.44
+** Prompt
+Define ~up-split~ which is similar to ~right-split~, but upwards.
+** Solution
+Luckily for us, Racket's ~sicp~ package comes with the picture language, so we could just printout the solution to a file and render it on Org. In this solution, we will start to use ~org-tangle~, since it is helpful in literate programming.
+#+header: :tangle ./src/exercise-2.44.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+#lang sicp
+(#%require sicp-pict)
+(define (up-split p n)
+  (if (= n 0)
+      p
+      (let ((up (up-split p (- n 1))))
+        (below p (beside up up)))))
+(paint (up-split einstein 10))
+#+end_src
+
+#+RESULTS:
+: #(struct:object:image-snip% ... ...)
+
+Result can be obtained through DrRacket with the ~sicp~ package.
