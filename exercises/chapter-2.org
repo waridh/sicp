@@ -2207,3 +2207,36 @@ Luckily for us, Racket's ~sicp~ package comes with the picture language, so we c
 : #(struct:object:image-snip% ... ...)
 
 Result can be obtained through DrRacket with the ~sicp~ package.
+* Exercise 2.45
+** Prompt
+Make ~right-split~ and ~up-split~ use a higher order procedure in it's implementation. Allow it to be built like the following.
+
+#+begin_src racket :exports code
+(define right-split (split beside below))
+(define up-split (split below beside))
+#+end_src
+** Solution
+Tangling again.
+
+#+header: :tangle ./src/exercise-2.45.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+#lang sicp
+(#%require sicp-pict)
+(define (split first-proc second-proc)
+  (define (proc p n)
+    (if (= n 0)
+        p
+        (let ([rec (proc p (- n 1))]) (first-proc p (second-proc rec rec)))))
+  proc)
+(define right-split (split beside below))
+(define up-split (split below beside))
+
+(paint (right-split mark-of-zorro 10))
+(paint (up-split einstein 10))
+#+end_src
+
+#+RESULTS:
+: #(struct:object:image-snip% ... ...)
+: #(struct:object:image-snip% ... ...)
+
+Running this on DrRacket produced the expected result.
