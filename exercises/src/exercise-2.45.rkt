@@ -10,6 +10,6 @@
 (define right-split (split beside below))
 (define up-split (split below beside))
 
-(paint (right-split einstein 10))
+(paint (right-split mark-of-zorro 10))
 (paint (up-split einstein 10))
 ;; Solution:1 ends here

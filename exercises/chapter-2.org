@@ -2240,3 +2240,128 @@ Tangling again.
 : #(struct:object:image-snip% ... ...)
 
 Running this on DrRacket produced the expected result.
+* Exercise 2.46
+** Prompt
+Make the constructor and selector for the vector we are working with. Following this, implement ~add-vect~, ~sub-vect~, and ~scale-vect~ that does the corresponding vector operations.
+** Solution
+#+name: vect-def
+#+header: :tangle ./src/exercise-2.46.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+(define (make-vect x y)
+  (cons x y))
+(define (xcor-vect v)
+  (car v))
+(define (ycor-vect v)
+  (cdr v))
+
+(define (add-vect a b)
+  (make-vect (+ (xcor-vect a) (xcor-vect b)) (+ (ycor-vect a) (ycor-vect b))))
+(define (sub-vect a b)
+  (make-vect (- (xcor-vect a) (xcor-vect b)) (- (ycor-vect a) (ycor-vect b))))
+(define (scale-vect s v)
+  (make-vect (* s (xcor-vect v)) (* s (ycor-vect v))))
+#+end_src
+* Exercise 2.47
+** Prompt
+There are two possible constructors for the frames, make selectors for them.
+#+caption: The two possible constructors for frames.
+#+begin_src racket :exports code
+(define (make-frame origin edge1 edge2)
+  (list origin edge1 edge2))
+(define (make-frame origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+#+end_src
+** Solution
+#+caption: List implementation selectors
+#+name: list-frame
+#+begin_src racket :exports both
+#lang sicp
+(define (make-frame origin edge1 edge2)
+  (list origin edge1 edge2))
+
+(define (origin-frame f) (car f))
+(define (edge1-frame f) (cadr f))
+(define (edge2-frame f) (caddr f))
+;; This is really bad testing since we should be testing with vectors
+(define test-frame (make-frame 1 2 3 ))
+(origin-frame test-frame)
+(edge1-frame test-frame)
+(edge2-frame test-frame)
+#+end_src
+
+#+RESULTS: list-frame
+: 1
+: 2
+: 3
+
+#+caption: Pair of pair implementation selectors
+#+begin_src racket :exports both
+#lang sicp
+(define (make-frame origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+
+(define (origin-frame f) (car f))
+(define (edge1-frame f) (cadr f))
+(define (edge2-frame f) (cddr f))
+;; This is really bad testing since we should be testing with vectors
+(define test-frame (make-frame 1 2 3))
+(origin-frame test-frame)
+(edge1-frame test-frame)
+(edge2-frame test-frame)
+#+end_src
+
+#+RESULTS:
+: 1
+: 2
+: 3
+
+We can see that the selectors can obtain the values that corresponds to each of the argument used to build the frame.
+* Exercise 2.48
+** Prompt
+A direct line segment on a plane could be represented as a vector from origin to the start point and a vector from origin from the origin to the end point. Using the vector representation from 2.46, define the representation for the segment with ~make-segment~ as the constructor and ~start-segment~ and ~end-segment~ as the selectors
+** Solution
+Will need to import the definition for vectors.
+
+#+begin_src racket :exports both
+(define (make-vect x y)
+  (cons x y))
+(define (xcor-vect v)
+  (car v))
+(define (ycor-vect v)
+  (cdr v))
+
+(define (add-vect a b)
+  (make-vect (+ (xcor-vect a) (xcor-vect b)) (+ (ycor-vect a) (ycor-vect b))))
+(define (sub-vect a b)
+  (make-vect (- (xcor-vect a) (xcor-vect b)) (- (ycor-vect a) (ycor-vect b))))
+(define (scale-vect s v)
+  (make-vect (* s (xcor-vect v)) (* s (ycor-vect v))))
+
+(define (make-segment start-x start-y end-x end-y)
+  (cons (make-vect start-x start-y) (make-vect end-x end-y)))
+(define (start-segment s) (car s))
+(define (end-segment s) (cdr s))
+#+end_src
+* Exercise 2.49
+** Prompt
+Use ~segment->painter~ to define the following primitive painters
+a. The painter that draws the outline of the designated frame
+b. The painter that draws an "X" by connecting opposite corners of the frame
+c. The painter that draws a diamond shape by connecting the midpoints of the sides
+** Solution
+*** Part a
+#+header: :tangle ./src/exercise-2.49-a.rkt :mkdirp yes :comments link
+#+begin_src racket :exports both
+(#lang sicp)
+(#%require sicp-pict)
+(define (segments->painter segment-list)
+  (lambda (frame)
+    (for-each
+     (lambda (segment)
+       (draw-line
+        ((frame-coord-map frame)
+         (start-segment segment))
+        ((frame-coord-map frame)
+         (end-segment segment))))
+     segment-list)))
+#+end_src
