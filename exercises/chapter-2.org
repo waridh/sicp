@@ -2428,14 +2428,6 @@ Build the diamond painter. In this solution, we over engineer and add a vector a
 (paint diamond-painter)
 #+end_src
 *** Part d
-Build the wave painter
-#+header: :tangle ./src/exercise-2.49.rkt :mkdirp yes :comments link
-#+begin_src racket :exports code :noweb yes
-(define wave (segments->painter (list
-                                            (make-segment top-left bottom-right)
-                                            (make-segment top-right bottom-left))))
+Build the wave painter.
 
-(display "Part d. wave")
-(newline)
-(paint wave)
-#+end_src
+- Actually, I won't be doing this. I don't think that it is adding that value that I want from this book. We'll see each other in the next exercise.

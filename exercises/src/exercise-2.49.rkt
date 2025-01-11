@@ -59,13 +59,3 @@
 (newline)
 (paint diamond-painter)
 ;; Part c:1 ends here
-
-;; [[file:../chapter-2.org::*Part d][Part d:1]]
-(define wave (segments->painter (list
-                                            (make-segment top-left bottom-right)
-                                            (make-segment top-right bottom-left))))
-
-(display "Part d. wave")
-(newline)
-(paint wave)
-;; Part d:1 ends here
