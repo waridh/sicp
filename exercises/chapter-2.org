@@ -2431,3 +2431,108 @@ Build the diamond painter. In this solution, we over engineer and add a vector a
 Build the wave painter.
 
 - Actually, I won't be doing this. I don't think that it is adding that value that I want from this book. We'll see each other in the next exercise.
+* Exercise 2.50
+** Prompt
+Define a ~flip-horiz~ that will flip a painter horizontally (left-right flip).
+** Solution
+#+caption: setup
+#+header: :tangle ./src/exercise-2.50.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none :noweb yes
+#lang sicp
+(#%require sicp-pict)
+<<vect-consts>>
+#+end_src
+
+#+caption: flip-horiz implementation
+#+header: :tangle ./src/exercise-2.50.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+(define (flip-horiz painter)
+  (transform-painter painter
+                     bottom-right
+                     bottom-left
+                     top-right))
+#+end_src
+
+#+caption: flip-horiz test
+#+header: :tangle ./src/exercise-2.50.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none
+(display "einstein")
+(newline)
+(paint einstein)
+
+(display "flipped einstein")
+(newline)
+(paint (flip-horiz einstein))
+#+end_src
+
+* Exercise 2.51
+** Prompt
+Define the ~below~ procedure that takes in two painters and put the first painter below the second painter. Make this procedure twice, once the same way as the provided ~beside~ procedure, and the second time using the ~beside~ procedure.
+** Solution
+
+*** Part a
+Implement ~below~ analogous to ~beside~.
+
+#+caption: setup
+#+header: :tangle ./src/exercise-2.51-a.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none :noweb yes
+#lang sicp
+(#%require sicp-pict)
+<<vect-consts>>
+#+end_src
+
+#+caption: below implementation
+#+header: :tangle ./src/exercise-2.51-a.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+(define (below painter-1 painter-2)
+  (let ([split-point (make-vect 0 0.5)])
+    (let ([paint-below (transform-painter painter-1 (make-vect 0 0) (make-vect 1 0) split-point)]
+          [paint-above (transform-painter painter-2 split-point (make-vect 1 0.5) (make-vect 0 1))])
+      (lambda (frame)
+        (paint-below frame)
+        (paint-above frame)))))
+#+end_src
+
+#+caption: below test a
+#+header: :tangle ./src/exercise-2.51-a.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none
+(display "einstein")
+(newline)
+(paint einstein)
+
+(display "below einstein")
+(newline)
+(paint (below einstein einstein))
+#+end_src
+
+*** Part b
+Implementing ~below~ using beside and some transformations. We will pretend that a rotate procedure has already been implemented. We will rotate both input values clockwise, and then rotate the entire full image counter clockwise.
+
+#+caption: setup
+#+header: :tangle ./src/exercise-2.51-b.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none :noweb yes
+#lang sicp
+(#%require sicp-pict)
+<<vect-consts>>
+#+end_src
+
+#+caption: below implementation
+#+header: :tangle ./src/exercise-2.51-b.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+(define (below painter-1 painter-2)
+  (let ([paint-below (rotate90 painter-1)]
+        [paint-above (rotate90 painter-2)])
+    (lambda (frame) ((rotate270 (beside paint-below paint-above)) frame))))
+#+end_src
+
+#+caption: below test a
+#+header: :tangle ./src/exercise-2.51-b.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none
+(display "einstein")
+(newline)
+(paint einstein)
+
+(display "below einstein")
+(newline)
+(paint (below einstein einstein))
+#+end_src
