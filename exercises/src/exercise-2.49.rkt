@@ -31,7 +31,7 @@
 (paint cross-painter)
 ;; Part b:1 ends here
 
-;; [[file:../chapter-2.org::*Part c][Part c:1]]
+;; [[file:../chapter-2.org::*Part c][Part c:2]]
 (define (vector-average . v)
   (define (count-aux x acc)
     (if (null? x)
@@ -58,4 +58,4 @@
 (display "Part c. The diamond")
 (newline)
 (paint diamond-painter)
-;; Part c:1 ends here
+;; Part c:2 ends here

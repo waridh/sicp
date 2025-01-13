@@ -2206,6 +2206,21 @@ Luckily for us, Racket's ~sicp~ package comes with the picture language, so we c
 #+RESULTS:
 : #(struct:object:image-snip% ... ...)
 
+#+name: higher-order-painters
+#+begin_src racket :exports none
+(define (up-split p n)
+  (if (= n 0)
+      p
+      (let ((up (up-split p (- n 1))))
+        (below p (beside up up)))))
+(define (right-split p n)
+  (if (= n 0)
+      p
+      (let ((right (right-split p (- n 1))))
+        (beside p (below right right)))))
+#+end_src
+
+
 Result can be obtained through DrRacket with the ~sicp~ package.
 * Exercise 2.45
 ** Prompt
@@ -2398,8 +2413,8 @@ You only need two segments to draw an x in the frame
 #+end_src
 *** Part c
 Build the diamond painter. In this solution, we over engineer and add a vector average procedure.
-#+header: :tangle ./src/exercise-2.49.rkt :mkdirp yes :comments link
-#+begin_src racket :exports code :noweb yes
+#+name: vector-average
+#+begin_src racket :exports code
 (define (vector-average . v)
   (define (count-aux x acc)
     (if (null? x)
@@ -2414,6 +2429,11 @@ Build the diamond painter. In this solution, we over engineer and add a vector a
   (define (vector-sum vecs)
     (vector-sum-aux vecs zero-vector))
   (vector-scale (/ 1 (count v)) (vector-sum v)))
+#+end_src
+
+#+header: :tangle ./src/exercise-2.49.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code :noweb yes
+<<vector-average>>
 
 (define diamond-painter
   (segments->painter
@@ -2536,3 +2556,138 @@ Implementing ~below~ using beside and some transformations. We will pretend that
 (newline)
 (paint (below einstein einstein))
 #+end_src
+
+* Exercise 2.52
+** Prompt
+Leverage the concept of stratification by changing different levels of the system. Here are what needs to be done.
+1. Add more segment to a painter
+2. Change ~corner-split~ pattern
+3. Modify ~square-limit~ so that the corners are in different patterns
+** Solution
+We're going to implement the three features at the same time. For the first requirement, we will swap from using wave painter to using the diamond painter, and this time, we will make sure that this new version of painter is asymmetrical.
+
+#+caption: setup
+#+header: :tangle ./src/exercise-2.52.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none :noweb yes
+#lang sicp
+(#%require sicp-pict)
+<<higher-order-painters>>
+<<vect-consts>>
+<<vector-average>>
+#+end_src
+
+#+caption: adding segment to a painter (not wave, since I did not make that)
+#+header: :tangle ./src/exercise-2.52.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+;; Adding new segments to make the painter assymmetrical
+(define diamond-painter
+  (let ([mid-left (vector-average bottom-left top-left)]
+        [top-central (vector-average top-left top-right)]
+        [mid-right (vector-average top-right bottom-right)]
+        [bottom-central (vector-average bottom-right bottom-left)]
+        [middle (make-vect 0.5 0.5)])
+    (segments->painter (list (make-segment mid-left top-central)
+                             (make-segment top-central mid-right)
+                             (make-segment mid-right bottom-central)
+                             (make-segment bottom-central mid-left)
+                             (make-segment middle (vector-average middle top-central))
+                             (make-segment middle (vector-average middle mid-right))
+                             (make-segment (vector-average middle mid-right)
+                                           (vector-average middle top-central))))))
+#+end_src
+
+We're going to make the corner more asymmetrical as well.
+
+#+caption: change the corner split pattern
+#+header: :tangle ./src/exercise-2.52.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+;; Adding new segments to make the painter assymmetrical
+(define (corner-split painter n)
+  (if (= n 0)
+      painter
+      (let ([top (up-split painter (- n 1))])
+        (let ([top-right (beside top top)]
+              [corner (corner-split painter (- n 1))])
+          (beside (below white corner)
+                  (below painter top-right))))))
+
+#+end_src
+
+Instead of flipping the top-left and bottom-right corner, we're going to move to rotating them.
+
+#+caption: change the square limit procedure so that the corners are more interesting
+#+header: :tangle ./src/exercise-2.52.rkt :mkdirp yes :comments link
+#+begin_src racket :exports code
+;; Adding new segments to make the painter assymmetrical
+(define (square-limit painter n)
+  (let ([cornered-painter (corner-split painter n)])
+    (beside (below (rotate180 cornered-painter) (rotate90 cornered-painter))
+            (below (rotate270 cornered-painter) cornered-painter))))
+#+end_src
+
+
+#+header: :tangle ./src/exercise-2.52.rkt :mkdirp yes :comments link
+#+begin_src racket :exports none
+(paint (square-limit diamond-painter 5))
+#+end_src
+
+Now we're done.
+* Exercise 2.53
+** Prompt
+Describe what the interpreter would output with the following expressions
+** Solution
+We will write the expected output as the comment. We can easily verify that this is correct by running the code.
+
+#+begin_src racket :exports code
+#lang sicp
+
+(list 'a 'b 'c)
+;; (a b c)
+(list (list 'george))
+;; ((george))
+(cdr '((x1 x2) (y1 y2)))
+;; ((y1 y2))
+(cadr '((x1 x2) (y1 y2)))
+;; (y1 y2)
+(pair? (car '(a short list)))
+;; false
+(memq 'red '((red shoes) (blue socks)))
+;; false
+(memq 'red '(red shoes blue socks))
+;; (red shoes blue socks)
+#+end_src
+
+#+RESULTS:
+: (a b c)
+: ((george))
+: ((y1 y2))
+: (y1 y2)
+: #f
+: #f
+: (red shoes blue socks)
+
+* Exercise 2.54
+** Prompt
+Define a procedure called ~equal?~ that will compare two lists using ~eq?~ and if the element is a list, navigate that one and do the same as well.
+** Solution
+We could implement this recursively. Our strategy is to move through both lists at the same time.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (equal? a b)
+  (cond
+    [(and (null? a) (null? b)) true]
+    [(and (pair? (car a)) (pair? (car b)))
+     (if (equal? (car a) (car b))
+         (equal? (cdr a) (cdr b))
+         false)]
+    [(not (eq? (car a) (car b))) false]
+    [else (equal? (cdr a) (cdr b))]))
+
+(equal? '(this is a list) '(this is a list))
+(equal? '(this is a list) '(this (is a) list))
+#+end_src
+
+#+RESULTS:
+: #t
+: #f
