@@ -2691,3 +2691,42 @@ We could implement this recursively. Our strategy is to move through both lists 
 #+RESULTS:
 : #t
 : #f
+
+Raw testing result showed that we successfully implemented the procedure.
+* Exercise 2.55
+** Prompt
+Eva Lu Ator types to the interpreter the following expression.
+
+#+begin_src racket :exports both
+#lang sicp
+(car ''abracadabra)
+#+end_src
+
+#+RESULTS:
+: quote
+
+Why the heck did we get ~quote~. Explain.
+** Solution
+The ~'~ operator in Scheme will treat the values following it as the symbol, and not the value. We should wonder, how does Scheme actually interpret this? Well since we are getting the ~quote~ from a ~car~ it is safe to assume that ~''abracadabra~ will return either a pair or a list. I will not pretend I know the answer right now, so I will do a little experiment.
+
+#+begin_src racket :exports both
+#lang sicp
+(car ''abracadabra)
+''abracadabra
+'abracadabra
+(car ''(a b c d))
+''(a b c d)
+'''(a b c d)
+(quote (a b c d))
+#+end_src
+
+#+RESULTS:
+: quote
+: (quote abracadabra)
+: abracadabra
+: quote
+: (quote (a b c d))
+: (quote (quote (a b c d)))
+: (a b c d)
+
+Interesting, it looks like by accessing ~'abracadabra~ with another ~'~ we are able to see the representation for the symbol access. It is a compound object with the first element being the ~quote~ symbol, and the second element being the symbol being shown. This must be used to tell the Scheme interpreter how to access and how the value that is prepended with a quote. More accurately, prepending with a ~'~ will tell the interpreter to return the symbol, and not the value. In our experiment, we did ~'''(a b c d)~ which returned ~(quote (quote (a b c d)))~ and we see that ~(quote (a b c d))~ returns ~(a b c d)~. I think with these tests, we can see that ~quote~ is a procedure that returns its parameter as a symbol. We can also see that ~'~ is actually syntactic sugar for the ~quote~ procedure, meaning that ~(car ''abradacadabra)~ is actually just ~(car (quote (quote abradacadabra)))~ where ~quote~ will evaluate first due to applicative ordered evaluation, resulting in ~(car (quote abradacadabra))~ which will finally evaluate to ~quote~.
