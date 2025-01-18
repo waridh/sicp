@@ -2757,7 +2757,10 @@ Below is the implementation that is provided to us. We will proceed to extend th
   (and (variable? x) (variable? y) (eq? x y)))
 (define (=number? exp val)
   (and (number? exp) (= exp val)))
+#+end_src
 
+#+name: deriv-base-sum
+#+begin_src racket :exports code
 (define (make-sum x y)
   (cond
     [(=number? x 0) y]
@@ -2770,7 +2773,10 @@ Below is the implementation that is provided to us. We will proceed to extend th
   (cadr s))
 (define (augend s)
   (caddr s))
+#+end_src
 
+#+name: deriv-base-product
+#+begin_src racket :exports code
 (define (make-product x y)
   (cond
     [(or (=number? x 0) (=number? y 0)) 0]
@@ -2785,6 +2791,8 @@ Below is the implementation that is provided to us. We will proceed to extend th
 (define (multiplicand p)
   (caddr p))
 #+end_src
+
+#+RESULTS: deriv-base-dependencies
 
 #+name: deriv-base-test
 #+begin_src racket :exports code
@@ -2826,6 +2834,8 @@ Now we will test our implementation.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
 <<deriv-base-dependencies>>
+<<deriv-base-sum>>
+<<deriv-base-product>>
 <<deriv-exponentiation>>
 <<deriv-base-test>>
 (deriv '(+ (* x y) (** x 8)) 'x)
@@ -2838,3 +2848,81 @@ Now we will test our implementation.
 : (+ y (* 8 (** x 7)))
 
 The test is not exhaustive, but this does look right.
+
+* Exercise 2.57: Multiple arguments to product and sum
+** Prompt
+The goal here is to extend the representation of both product and sum to handle arbitrary amount of parameters.
+** Solution
+We have to make sure that we don't actually need to change the implementation of the ~deriv~ procedure to make this work. Here is the current strategy that we will attempt. We don't really need dynamic parameter unpacking, we just need to make the selector be able to retrieve representation of the sum expression that have more than two elements properly. We should be surgical with where we make the changes.
+
+In our implementation, we made the constructor merge two instances of sums, and made the augend selector handle the case where there are more than two operands. We then do the analogous implementation on the product version.
+
+#+name: deriv-multiple-sum
+#+begin_src racket :exports code
+(define (make-sum x y)
+  (cond
+    [(=number? x 0) y]
+    [(=number? y 0) x]
+    [(and (number? x) (number? y)) (+ x y)]
+    [(sum? y) (make-sum (make-sum x (addend y) ) (augend y))]
+    [else (list '+ x y)]))
+(define (sum? x)
+  (and (pair? x) (eq? (car x) '+)))
+(define (addend s)
+  (cadr s))
+(define (augend s)
+  (let ([ag (cddr s)])
+      (cond [(null? (cdr ag)) (car ag)]
+            [(null? (cddr ag)) (make-sum (car ag) (cadr ag))]
+            [else (make-sum (car ag) (cons '+ (cdr ag)))])))
+#+end_src
+
+
+#+name: deriv-multiple-product
+#+begin_src racket :exports code
+(define (make-product x y)
+  (cond
+    [(or (=number? x 0) (=number? y 0)) 0]
+    [(=number? x 1) y]
+    [(=number? y 1) x]
+    [(and (number? x) (number? y)) (* x y)]
+    [(product? y) (make-product (make-product x (multiplier y)) (multiplicand y))]
+    [else (list '* x y)]))
+(define (product? x)
+  (and (pair? x) (eq? (car x) '*)))
+(define (multiplier p)
+  (cadr p))
+(define (multiplicand p)
+  (let ([mp (cddr p)])
+    (cond
+      [(null? (cdr mp)) (car mp)]
+      [(null? (cddr mp)) (make-product (car mp) (cadr mp))]
+      [else (make-product (car mp) (cons '* (cdr mp)))])))
+#+end_src
+
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<deriv-base-dependencies>>
+<<deriv-multiple-sum>>
+<<deriv-multiple-product>>
+<<deriv-exponentiation>>
+<<deriv-base-test>>
+(deriv '(+ (* x y) (** x 8)) 'x)
+(deriv '(* x y (+ x 3)) 'x)
+(deriv '(* x y (+ x 3) 0) 'x)
+(deriv '(* x y (+ x 3) 1 y) 'x)
+(deriv '(+ x y (* x 3) (** x 7)) 'x)
+(deriv '(+ x y (* x 3) 0 (** x 7)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: (+ (* x y) (* y (+ x 3)))
+: (+ y (* 8 (** x 7)))
+: (+ (* x y) (* y (+ x 3)))
+: 0
+: (+ (* (* x y) y) (* (* y (+ x 3)) y))
+: (+ 4 (* 7 (** x 6)))
+: (+ 4 (* 7 (** x 6)))
