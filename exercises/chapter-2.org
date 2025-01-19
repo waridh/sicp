@@ -2817,7 +2817,10 @@ We'll use the strategy that often used in sicp, which is to actually use the abs
     [(exponentiation? exp)
      (make-product (exponent exp) (make-exponentiation (base exp) (- (exponent exp) 1)))]
     [else (error "unknown expression type: DERIV" exp)]))
+#+end_src
 
+#+name: deriv-base-exponentiation
+#+begin_src racket :exports code
 ;; Need to now make the representation of the exponentiation expression
 (define (make-exponentiation base exponent)
   (cond [(=number? exponent 0) 1]
@@ -2837,6 +2840,7 @@ Now we will test our implementation.
 <<deriv-base-sum>>
 <<deriv-base-product>>
 <<deriv-exponentiation>>
+<<deriv-base-exponentiation>>
 <<deriv-base-test>>
 (deriv '(+ (* x y) (** x 8)) 'x)
 #+end_src
@@ -2907,6 +2911,7 @@ In our implementation, we made the constructor merge two instances of sums, and 
 <<deriv-multiple-sum>>
 <<deriv-multiple-product>>
 <<deriv-exponentiation>>
+<<deriv-base-exponentiation>>
 <<deriv-base-test>>
 (deriv '(+ (* x y) (** x 8)) 'x)
 (deriv '(* x y (+ x 3)) 'x)
@@ -2926,3 +2931,149 @@ In our implementation, we made the constructor merge two instances of sums, and 
 : (+ (* (* x y) y) (* (* y (+ x 3)) y))
 : (+ 4 (* 7 (** x 6)))
 : (+ 4 (* 7 (** x 6)))
+* Exercise 2.58: Infix operators
+** Prompt
+Now modify the program to work on a representation that is infix. Make two versions, first version being that all group of expression is binary, and the second using actual normal algebraic syntax, with PEDMAS order of operations.
+** Solution
+*** Part A
+We'll implement the system to the state where it will correctly evaluate binary infix operations. The chained implementation will be done in part B.
+#+name: deriv-infix-sum
+#+begin_src racket :exports code
+(define (make-sum x y)
+  (cond
+    [(=number? x 0) y]
+    [(=number? y 0) x]
+    [(and (number? x) (number? y)) (+ x y)]
+    ;; [(sum? y) (make-sum (make-sum x (addend y) ) (augend y))]
+    [else (list x '+ y)]))
+(define (sum? x)
+  (and (pair? x) (eq? (cadr x) '+)))
+(define (addend s)
+  (car s))
+(define (augend s)
+  (caddr s))
+#+end_src
+
+
+#+name: deriv-infix-product
+#+begin_src racket :exports code
+(define (make-product x y)
+  (cond
+    [(or (=number? x 0) (=number? y 0)) 0]
+    [(=number? x 1) y]
+    [(=number? y 1) x]
+    [(and (number? x) (number? y)) (* x y)]
+    ;; [(product? y) (make-product (make-product x (multiplier y)) (multiplicand y))]
+    [else (list x '* y)]))
+(define (product? x)
+  (and (pair? x) (eq? (cadr x) '*)))
+(define (multiplier p)
+  (car p))
+(define (multiplicand p)
+  (caddr p))
+#+end_src
+
+#+name: deriv-infix-exponentiation
+#+begin_src racket :exports code
+;; Need to now make the representation of the exponentiation expression
+(define (make-exponentiation base exponent)
+  (cond [(=number? exponent 0) 1]
+        [(=number? exponent 1) base]
+        [else (list base '** exponent)]))
+
+(define (exponentiation? exp) (and (pair? exp) (eq? (cadr exp) '**)))
+(define (base exp) (car exp))
+(define (exponent exp) (caddr exp))
+#+end_src
+
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<deriv-base-dependencies>>
+<<deriv-infix-sum>>
+<<deriv-infix-product>>
+<<deriv-infix-exponentiation>>
+<<deriv-exponentiation>>
+(deriv '(x + 3) 'x)
+(deriv '(x * y) 'x)
+(deriv '((x * y) * (x + 3)) 'x)
+(deriv '((x * y) + (x ** 8)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: ((x * y) + (y * (x + 3)))
+: (y + (8 * (x ** 7)))
+
+*** Part B
+In this part, we are trying to parse regular expressions, like those that people would use. This is the type of parsing that calculators do, and to do this cleanly, we'll make an abstract syntax tree.
+
+#+name: deriv-infix-sum
+#+begin_src racket :exports code
+(define (make-sum x y)
+  (cond
+    [(=number? x 0) y]
+    [(=number? y 0) x]
+    [(and (number? x) (number? y)) (+ x y)]
+    ;; [(sum? y) (make-sum (make-sum x (addend y) ) (augend y))]
+    [else (list x '+ y)]))
+(define (sum? x)
+  (and (pair? x) (eq? (cadr x) '+)))
+(define (addend s)
+  (car s))
+(define (augend s)
+  (caddr s))
+#+end_src
+
+
+#+name: deriv-infix-product
+#+begin_src racket :exports code
+(define (make-product x y)
+  (cond
+    [(or (=number? x 0) (=number? y 0)) 0]
+    [(=number? x 1) y]
+    [(=number? y 1) x]
+    [(and (number? x) (number? y)) (* x y)]
+    ;; [(product? y) (make-product (make-product x (multiplier y)) (multiplicand y))]
+    [else (list x '* y)]))
+(define (product? x)
+  (and (pair? x) (eq? (cadr x) '*)))
+(define (multiplier p)
+  (car p))
+(define (multiplicand p)
+  (caddr p))
+#+end_src
+
+#+name: deriv-infix-exponentiation
+#+begin_src racket :exports code
+;; Need to now make the representation of the exponentiation expression
+(define (make-exponentiation base exponent)
+  (cond [(=number? exponent 0) 1]
+        [(=number? exponent 1) base]
+        [else (list base '** exponent)]))
+
+(define (exponentiation? exp) (and (pair? exp) (eq? (cadr exp) '**)))
+(define (base exp) (car exp))
+(define (exponent exp) (caddr exp))
+#+end_src
+
+- [ ] Add the chained cases to this one
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<deriv-base-dependencies>>
+<<deriv-infix-sum>>
+<<deriv-infix-product>>
+<<deriv-infix-exponentiation>>
+<<deriv-exponentiation>>
+(deriv '(x + 3) 'x)
+(deriv '(x * y) 'x)
+(deriv '((x * y) * (x + 3)) 'x)
+(deriv '((x * y) + (x ** 8)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: ((x * y) + (y * (x + 3)))
+: (y + (8 * (x ** 7)))
