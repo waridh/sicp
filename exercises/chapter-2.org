@@ -4,16 +4,16 @@
 #+name: assertion-suite
 #+begin_src racket :exports code
 (define (assert-predicate pred-fn test-name value expected)
-  (newline)
   (display (if (pred-fn value expected) "pass: " "fail: "))
   (display test-name)
   (display " value: ")
   (display value)
   (display " expected: ")
-  (display expected))
+  (display expected)
+  (newline))
 
 (define (assert-eq test-name value expected)
-  (assert-predicate eq? test-name value expected))
+  (assert-predicate equal? test-name value expected))
 (define (assert-almost-eq test-name value expected)
   (define dx 0.0001)
   (define (almost-eq? left right)
@@ -2944,7 +2944,6 @@ We'll implement the system to the state where it will correctly evaluate binary 
     [(=number? x 0) y]
     [(=number? y 0) x]
     [(and (number? x) (number? y)) (+ x y)]
-    ;; [(sum? y) (make-sum (make-sum x (addend y) ) (augend y))]
     [else (list x '+ y)]))
 (define (sum? x)
   (and (pair? x) (eq? (cadr x) '+)))
@@ -2963,7 +2962,6 @@ We'll implement the system to the state where it will correctly evaluate binary 
     [(=number? x 1) y]
     [(=number? y 1) x]
     [(and (number? x) (number? y)) (* x y)]
-    ;; [(product? y) (make-product (make-product x (multiplier y)) (multiplicand y))]
     [else (list x '* y)]))
 (define (product? x)
   (and (pair? x) (eq? (cadr x) '*)))
@@ -2996,7 +2994,9 @@ We'll implement the system to the state where it will correctly evaluate binary 
 <<deriv-exponentiation>>
 (deriv '(x + 3) 'x)
 (deriv '(x * y) 'x)
+(deriv '(x * y) 'y)
 (deriv '((x * y) * (x + 3)) 'x)
+(deriv '((x * y) * (x + 3)) 'y)
 (deriv '((x * y) + (x ** 8)) 'x)
 #+end_src
 
@@ -3007,9 +3007,37 @@ We'll implement the system to the state where it will correctly evaluate binary 
 : (y + (8 * (x ** 7)))
 
 *** Part B
-In this part, we are trying to parse regular expressions, like those that people would use. This is the type of parsing that calculators do, and to do this cleanly, we'll make an abstract syntax tree.
+In this part, we are trying to parse normal algebraic expressions, like those that people would use. This is the type of parsing that calculators do, and to do this cleanly, we'll make an abstract syntax tree. Another goal is that we should not need to change how the ~deriv~ method works.
 
-#+name: deriv-infix-sum
+We'll treat the representation as a list, but we'll still recursively split it into a sequence of binary operations. The way that it has to work, since we are using recursion is that the lowest priority operation will actually just take the highest precedence, in that an expression that contains the lowest level operator will be treated as a statement of that operator. What this does is that the higher level operators will have to check for the previous level, as to allow them to take precedence in the recursion. (Taking precedence actually makes it evaluate last in our recursive architecture).
+
+#+name: deriv-normal-common
+#+begin_src racket :exports code
+;; Returns true if the provided symbol, v, is in the list, l
+(define (contain? l v)
+  (define (iter li)
+    (cond
+      [(null? li) false]
+      [(eq? (car li) v) true]
+      [else (iter (cdr li))]))
+  (iter l))
+
+;; Returns list of all elements before the value, v
+(define (before-first l v)
+  (cond
+    [(null? l) l]
+    [(eq? (car l) v) nil]
+    [else (cons (car l) (before-first (cdr l) v))]))
+
+;; Returns list of all elements after the value, v
+(define (after-first l v)
+  (cond
+    [(null? l) l]
+    [(eq? (car l) v) (cdr l)]
+    [else (after-first (cdr l) v)]))
+#+end_src
+
+#+name: deriv-normal-sum
 #+begin_src racket :exports code
 (define (make-sum x y)
   (cond
@@ -3019,15 +3047,24 @@ In this part, we are trying to parse regular expressions, like those that people
     ;; [(sum? y) (make-sum (make-sum x (addend y) ) (augend y))]
     [else (list x '+ y)]))
 (define (sum? x)
-  (and (pair? x) (eq? (cadr x) '+)))
+  (and (pair? x) (contain? x '+)))
+;; Assumption is that the sum check has already completed before this procedure
+;; is called.
+;; addend will be the elements before the first '+ symbol
 (define (addend s)
-  (car s))
+  (let ([v (before-first s '+)])
+    (if (null? (cdr v))
+        (car v)
+        v)))
 (define (augend s)
-  (caddr s))
+  (let ([v (after-first s '+)])
+    (if (null? (cdr v))
+        (car v)
+        v)))
 #+end_src
 
 
-#+name: deriv-infix-product
+#+name: deriv-normal-product
 #+begin_src racket :exports code
 (define (make-product x y)
   (cond
@@ -3037,15 +3074,20 @@ In this part, we are trying to parse regular expressions, like those that people
     [(and (number? x) (number? y)) (* x y)]
     ;; [(product? y) (make-product (make-product x (multiplier y)) (multiplicand y))]
     [else (list x '* y)]))
+;; This is more tricky. It is product if there is a * in the least nested
+;; layer of the expression
 (define (product? x)
-  (and (pair? x) (eq? (cadr x) '*)))
+  (and (pair? x) (not (contain? x '+)) (contain? x '*)))
+;; Assuming that product check has always happened before this line
 (define (multiplier p)
-  (car p))
+  (let ([val (before-first p '*)])
+    (if (null? (cdr val)) (car val) val)))
 (define (multiplicand p)
-  (caddr p))
+  (let ([val (after-first p '*)])
+    (if (null? (cdr val)) (car val) val)))
 #+end_src
 
-#+name: deriv-infix-exponentiation
+#+name: deriv-normal-exponentiation
 #+begin_src racket :exports code
 ;; Need to now make the representation of the exponentiation expression
 (define (make-exponentiation base exponent)
@@ -3053,27 +3095,93 @@ In this part, we are trying to parse regular expressions, like those that people
         [(=number? exponent 1) base]
         [else (list base '** exponent)]))
 
-(define (exponentiation? exp) (and (pair? exp) (eq? (cadr exp) '**)))
-(define (base exp) (car exp))
+(define (exponentiation? exp) (and (pair? exp) (not (or (contain? exp '+) (contain? exp '*))) (contain? exp '**)))
+(define (base exp)
+  (car exp))
 (define (exponent exp) (caddr exp))
 #+end_src
 
-- [ ] Add the chained cases to this one
 #+begin_src racket :exports both :noweb yes
 #lang sicp
+<<assertion-suite>>
 <<deriv-base-dependencies>>
-<<deriv-infix-sum>>
-<<deriv-infix-product>>
-<<deriv-infix-exponentiation>>
+<<deriv-normal-common>>
+<<deriv-normal-sum>>
+<<deriv-normal-product>>
+<<deriv-normal-exponentiation>>
 <<deriv-exponentiation>>
+(assert-eq "sum predicate check" (sum? '(x + 3)) #t)
+(assert-eq "sum predicate check" (sum? '(x * 3)) #f)
+(assert-eq "multiple sum predicate check" (sum? '(x + 3 + 4 + y)) #t)
+(assert-eq "normal expression, with one product predicate check" (sum? '(x + 3 * 4 + y)) #t)
+(assert-eq "normal expression, one product predicate check" (sum? '(x * 3 + 4 + y)) #t)
+(assert-eq "sum predicate on variable (should fail)" (sum? '(x)) #f)
+(assert-eq "sum predicate on variable (should fail)" (sum? 'x) #f)
+(assert-eq "sum predicate on number (should fail)" (sum? '(3)) #f)
+(assert-eq "getting the adden" (addend '(3 + 4)) 3)
+(assert-eq "getting the augend" (augend '(3 + 4)) 4)
+(assert-eq "getting the augend" (augend '(3 + x + y)) '(x + y))
+(assert-eq "getting the augend" (augend '(3 + x + y + z)) '(x + y + z))
+(assert-eq "getting the addend" (addend '(x + 3 * 4 + y)) 'x)
+(assert-eq "getting the augend" (augend '(x + 3 * 4 + y)) '(3 * 4 + y))
+(assert-eq "getting the addend" (addend '(x * 3 + 4 + y)) '(x * 3))
+(assert-eq "getting the addend" (augend '(x * 3 + 4 + y)) '(4 + y))
+(assert-eq "product predicate check" (product? '(x * 3)) #t)
+(assert-eq "product predicate check" (product? '(x + 3)) #f)
+(assert-eq "multiple product predicate check" (product? '(x * 3 * y)) #t)
+(assert-eq "multiple product predicate check" (product? '(x + 3 + y)) #f)
+(assert-eq "multiple product predicate check" (product? '(x + 3 * y)) #f)
+(assert-eq "multiple product predicate check" (product? '(x * 3 + y)) #f)
+(assert-eq "product predicate on variable (should fail)" (product? '(x)) #f)
+(assert-eq "product predicate on variable (should fail)" (product? 'x) #f)
+(assert-eq "product predicate on number (should fail)" (product? '(3)) #f)
+(assert-eq "multiple exponent predicate check" (exponentiation? '(x * 3 * y)) #f)
+(assert-eq "multiple exponent predicate check" (exponentiation? '(x * 3 * y ** 2)) #f)
+(assert-eq "multiple exponent predicate check" (exponentiation? '(x ** 3)) #t)
 (deriv '(x + 3) 'x)
+(deriv '(x + 3 + y) 'x)
 (deriv '(x * y) 'x)
 (deriv '((x * y) * (x + 3)) 'x)
+(deriv '(x + 3 * (x + y + 2)) 'x)
 (deriv '((x * y) + (x ** 8)) 'x)
 #+end_src
 
 #+RESULTS:
-: 1
-: y
-: ((x * y) + (y * (x + 3)))
-: (y + (8 * (x ** 7)))
+#+begin_example
+pass: sum predicate check value: #t expected: #t
+pass: sum predicate check value: #f expected: #f
+pass: multiple sum predicate check value: #t expected: #t
+pass: normal expression, with one product predicate check value: #t expected: #t
+pass: normal expression, one product predicate check value: #t expected: #t
+pass: sum predicate on variable (should fail) value: #f expected: #f
+pass: sum predicate on variable (should fail) value: #f expected: #f
+pass: sum predicate on number (should fail) value: #f expected: #f
+pass: getting the adden value: 3 expected: 3
+pass: getting the augend value: 4 expected: 4
+pass: getting the augend value: (x + y) expected: (x + y)
+pass: getting the augend value: (x + y + z) expected: (x + y + z)
+pass: getting the addend value: x expected: x
+pass: getting the augend value: (3 * 4 + y) expected: (3 * 4 + y)
+pass: getting the addend value: (x * 3) expected: (x * 3)
+pass: getting the addend value: (4 + y) expected: (4 + y)
+pass: product predicate check value: #t expected: #t
+pass: product predicate check value: #f expected: #f
+pass: multiple product predicate check value: #t expected: #t
+pass: multiple product predicate check value: #f expected: #f
+pass: multiple product predicate check value: #f expected: #f
+pass: multiple product predicate check value: #f expected: #f
+pass: product predicate on variable (should fail) value: #f expected: #f
+pass: product predicate on variable (should fail) value: #f expected: #f
+pass: product predicate on number (should fail) value: #f expected: #f
+pass: multiple exponent predicate check value: #f expected: #f
+pass: multiple exponent predicate check value: #f expected: #f
+pass: multiple exponent predicate check value: #t expected: #t
+1
+1
+y
+((x * y) + (y * (x + 3)))
+4
+(y + (8 * (x ** 7)))
+#+end_example
+
+And voila! We are now able to symbolically differentiate a smaller subset of normal algebraic expressions.
