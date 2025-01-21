@@ -3031,10 +3031,8 @@ We'll treat the representation as a list, but we'll still recursively split it i
 
 ;; Returns list of all elements after the value, v
 (define (after-first l v)
-  (cond
-    [(null? l) l]
-    [(eq? (car l) v) (cdr l)]
-    [else (after-first (cdr l) v)]))
+  (let ([ret (memq v l)])
+    (if (pair? ret) (cdr ret) nil)))
 #+end_src
 
 #+name: deriv-normal-sum
@@ -3185,3 +3183,58 @@ y
 #+end_example
 
 And voila! We are now able to symbolically differentiate a smaller subset of normal algebraic expressions.
+* Exercise 2.59
+** Prompt
+Implement ~union-set~ for the unordered-list representation of a set
+** Solution
+The following is the provided code from sicp.
+
+#+name: set-unordered-list
+#+begin_src racket :exports code
+(define (element-of-set? x set)
+  (cond
+    [(null? set) false]
+    [(equal? x (car set)) true]
+    [else (element-of-set? x (cdr set))]))
+
+(define (adjoin-set x set)
+  (if (element-of-set? x set)
+      set
+      (cons x set)))
+
+(define (intersection-set set1 set2)
+  (cond
+    [(or (null? set1) (null? set2)) '()]
+    [(element-of-set? (car set1) set2) (cons (car set1) (intersection-set (cdr set1) set2))]
+    [else (intersection-set (cdr set1) set2)]))
+#+end_src
+
+Set unions are the combination of two sets, all we would have to do is to make sure that we don't include an element that already exists.
+
+#+name: set-unordered-list-union
+#+begin_src racket :exports code
+(define (union-set set1 set2)
+  (cond
+    [(null? set1) set2]
+    [(null? set2) set1]
+    [(element-of-set? (car set1) set2) (union-set (cdr set1) set2)]
+    [else (cons (car set1) (union-set (cdr set1) set2))]))
+#+end_src
+
+The following is just some checks to make sure that union is unioning.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<set-unordered-list>>
+<<set-unordered-list-union>>
+<<assertion-suite>>
+(define seta '(a b c d e))
+(define setb '(d e f g h i j))
+(intersection-set seta setb)
+(union-set seta setb)
+#+end_src
+
+#+RESULTS:
+: (d e)
+: (a b c d e f g h i j)
+
+Judging by the result of evaluating the code block, the union is unioning.
