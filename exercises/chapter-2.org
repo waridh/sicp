@@ -3238,3 +3238,112 @@ The following is just some checks to make sure that union is unioning.
 : (a b c d e f g h i j)
 
 Judging by the result of evaluating the code block, the union is unioning.
+* Exercise 2.60
+** Prompt
+Now let the representation allow for duplicates. Re-implement the selectors and constructors, then compare the efficiency of this representation with the noon-duplicate version.
+** Solution
+
+#+name: set-unordered-list-duplicate
+#+begin_src racket :exports code
+;; Does not need to change
+(define (element-of-set? x set)
+  (cond
+    [(null? set) false]
+    [(equal? x (car set)) true]
+    [else (element-of-set? x (cdr set))]))
+
+;; Always add without checking. This is how we get duplicates
+(define (adjoin-set x set)
+  (cons x set))
+
+(define (intersection-set set1 set2)
+  (cond
+    [(or (null? set1) (null? set2)) '()]
+    [(element-of-set? (car set1) set2) (adjoin-set (car set1) (intersection-set (cdr set1) set2))]
+    [else (intersection-set (cdr set1) set2)]))
+
+(define (union-set set1 set2)
+  (cond
+    [(null? set1) set2]
+    [(null? set2) set1]
+    [else (cons (car set1) (union-set (cdr set1) set2))]))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<set-unordered-list-duplicate>>
+<<assertion-suite>>
+(define seta '(a b c d e))
+(define setb '(d e f g h i j))
+(define int-set (intersection-set seta setb) )
+(define uni-set (union-set seta setb) )
+(element-of-set? 'a int-set)
+(element-of-set? 'a uni-set)
+int-set
+uni-set
+#+end_src
+
+#+RESULTS:
+: #f
+: #t
+: (d e)
+: (a b c d e d e f g h i j)
+
+Let's talk about the efficiency of this implementation. Adjoining the set, unioning a set is faster, however, after enough duplicates have been inserted into the set, lookup will become slower. This means in general, both the containment predicate and set intersection will perform worse than the non-duplicate version. The specifics of when each implementation is better than the other is very dependent on the usecase. The generalization here is that many insertion with few containment checks make duplicate good, few insertions with many containment checks make non-duplicate good.
+* Exercise 2.61
+** Prompt
+We have now looked at the ordered list representation of the set, and how it could make intersection operations linear due to the invariant of the representation being sorted, as we no longer have to search the entire list again everytime. This is very akin to merge sort. In fact, merge sort might be easier to implement on lisp than other sorting algorithms.
+
+Now the goal of this exercise is to implement ~adjoin-set~ and show how using ordering can, on average, make the implementation take half the steps of the unordered representation.
+** Solution
+
+#+name: ordered-list-set-base
+#+begin_src racket :exports code
+(define (element-of-set? x set)
+  (cond
+    [(null? set) false]
+    [(= x (car set)) true]
+    [(< x (car set)) false]
+    [else (element-of-set? x (cdr set))]))
+
+(define (intersection-set set1 set2)
+  (if (or (null? set1) (null? set2))
+      '()
+      (let ([x1 (car set1)]
+            [x2 (car set2)])
+        (cond
+          [(= x1 x2) (cons x1 (intersection-set (cdr set1) (cdr set2)))]
+          [(< x1 x2) (intersection-set (cdr set1) set2)]
+          [else (intersection-set set1 (cdr set2))]))))
+#+end_src
+
+#+name: ordered-list-set-adjoin
+#+begin_src racket :exports code
+;; let's make an iterative closure to check if we have gotten to the thing.
+;; This procedure can either return the original set or a newly sorted
+;; set.
+(define (adjoin-set x set)
+  (cond [(null? set) (list x)]
+        [(= x (car set)) set]
+        [(< x (car set)) (cons x set)]
+        [else (cons (car set) (adjoin-set x (cdr set)))]))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<ordered-list-set-base>>
+<<ordered-list-set-adjoin>>
+(define test-set (list 1 2 3 6 7 10))
+test-set
+(adjoin-set 5 test-set)
+(adjoin-set 3 test-set)
+(adjoin-set 100 test-set)
+#+end_src
+
+#+RESULTS:
+: (1 2 3 6 7 10)
+: (1 2 3 5 6 7 10)
+: (1 2 3 6 7 10)
+: (1 2 3 6 7 10 100)
+
+I'll just describe how we took advantage of ordering to half the steps on average vs the unordered method. Because ordered, we can find out when the element does not exist in the set as we traverse from the first element to the last element by seeing when the value we are trying to add is lower than the element we are looking at, as all elements after that will be even larger. If we managed to get to the end of the list, we know that the element does not exist in the set, and that it is larger than all the other element, so we could place it there.
