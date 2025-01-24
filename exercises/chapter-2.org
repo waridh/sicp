@@ -3347,3 +3347,36 @@ test-set
 : (1 2 3 6 7 10 100)
 
 I'll just describe how we took advantage of ordering to half the steps on average vs the unordered method. Because ordered, we can find out when the element does not exist in the set as we traverse from the first element to the last element by seeing when the value we are trying to add is lower than the element we are looking at, as all elements after that will be even larger. If we managed to get to the end of the list, we know that the element does not exist in the set, and that it is larger than all the other element, so we could place it there.
+* Exercise 2.62
+** Prompt
+Make ~union-set~ for ordered list set.
+** Solution
+
+#+name: ordered-list-set-union
+#+begin_src racket :exports code
+(define (union-set set1 set2)
+  (cond
+    [(null? set1) set2]
+    [(null? set2) set1]
+    [else
+     (let ([x1 (car set1)]
+           [x2 (car set2)]
+           [rest1 (cdr set1)]
+           [rest2 (cdr set2)])
+       (cond
+         [(= x1 x2) (cons x1 (union-set rest1 rest2))]
+         [(< x1 x2) (cons x1 (cons x2 (union-set rest1 rest2)))]
+         [(< x2 x1) (cons x2 (cons x1 (union-set rest1 rest2)))]))]))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<ordered-list-set-base>>
+<<ordered-list-set-adjoin>>
+<<ordered-list-set-union>>
+(define test-set (list 1 2 3 6 7 10))
+(define test-set2 (list 5 6 7 8 9 10))
+test-set
+test-set2
+(union-set test-set test-set2)
+#+end_src
