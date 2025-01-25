@@ -3360,13 +3360,11 @@ Make ~union-set~ for ordered list set.
     [(null? set2) set1]
     [else
      (let ([x1 (car set1)]
-           [x2 (car set2)]
-           [rest1 (cdr set1)]
-           [rest2 (cdr set2)])
+           [x2 (car set2)])
        (cond
-         [(= x1 x2) (cons x1 (union-set rest1 rest2))]
-         [(< x1 x2) (cons x1 (cons x2 (union-set rest1 rest2)))]
-         [(< x2 x1) (cons x2 (cons x1 (union-set rest1 rest2)))]))]))
+         [(= x1 x2) (cons x1 (union-set (cdr set1) (cdr set2)))]
+         [(< x1 x2) (cons x1 (union-set (cdr set1) set2))]
+         [(< x2 x1) (cons x2 (union-set set1 (cdr set2)))]))]))
 #+end_src
 
 #+begin_src racket :exports both :noweb yes
@@ -3380,3 +3378,99 @@ test-set
 test-set2
 (union-set test-set test-set2)
 #+end_src
+
+#+RESULTS:
+: (1 2 3 6 7 10)
+: (5 6 7 8 9 10)
+: (1 2 3 5 6 7 8 9 10)
+* Exercise 2.63
+** Prompt
+We are provided two procedures that transforms a tree into a list. Answer the following two questions:
+a. Do the two procedures generate the same output for every tree? If not, how do they differ? We are provided three input trees, what list do they make?
+b. Do the two procedures have the same order of growth (balanced tree only)? If not, which one grows more slowly?
+** Solution
+#+name: base-tree-representation
+#+begin_src racket :exports code
+(define (entry tree)
+  (car tree))
+(define (left-branch tree)
+  (cadr tree))
+(define (right-branch tree)
+  (caddr tree))
+(define (make-tree entry left right)
+  (list entry left right))
+#+end_src
+
+#+name: flat-tree-1
+#+begin_src racket :exports code
+(define (tree->list-1 tree)
+  (if (null? tree)
+      '()
+      (append (tree->list-1 (left-branch tree))
+              (cons (entry tree) (tree->list-1 (right-branch tree))))))
+
+(define (tree->list-2 tree)
+  (define (copy-to-list tree result-list)
+    (if (null? tree)
+        result-list
+        (copy-to-list (left-branch tree)
+                      (cons (entry tree) (copy-to-list (right-branch tree) result-list)))))
+  (copy-to-list tree '()))
+#+end_src
+
+#+name: trees-2.16
+#+begin_src racket :exports code
+(define tree-1
+  (make-tree 7
+             (make-tree 3 (make-tree 1 '() '()) (make-tree 5 '() '()))
+             (make-tree 9 '() (make-tree 11 '() '()))))
+(define tree-2
+  (make-tree 3
+             (make-tree 1 '() '())
+             (make-tree 7 (make-tree 5 '() '()) (make-tree 9 '() (make-tree 11 '() '())))))
+(define tree-3
+  (make-tree 5
+             (make-tree 3  (make-tree 1 '() '()) '())
+             (make-tree 9 (make-tree 7 '() '()) (make-tree 11 '() '()))))
+#+end_src
+*** Part a
+They make the same output. They are both built with recursive breakdown of the tree where each unit of the procedure is combining the flatten list of the left subtree is combined with the right flattened list of the right subtree with the entry as the value in between these new flattened list. This means that the output of both the procedures will generate the same value. Actually, because of the invariant of the binary tree, the output list will just be a sorted list.
+
+Running the procedure on all three trees in [[trees-2.16]] will result in the following lists.
+
+#+beg
+(1 3 5 7 9 11)
+(1 3 5 7 9 11)
+(1 3 5 7 9 11)
+#+end_example
+
+The above solution was done before evaluating the procedure on the sample trees. As a good engineer, we should double check the work.
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<base-tree-representation>>
+<<flat-tree-1>>
+<<trees-2.16>>
+(tree->list-1 tree-1)
+(tree->list-1 tree-2)
+(tree->list-1 tree-3)
+(tree->list-2 tree-1)
+(tree->list-2 tree-2)
+(tree->list-2 tree-3)
+#+end_src
+
+#+RESULTS:
+: (1 3 5 7 9 11)
+: (1 3 5 7 9 11)
+: (1 3 5 7 9 11)
+: (1 3 5 7 9 11)
+: (1 3 5 7 9 11)
+: (1 3 5 7 9 11)
+
+Wow, that's crazy.
+*** Part b
+Do they have the same order of growth? If not, which one grows more slowly.
+
+Well this question is implementation specific. If we're using the Scheme in the SICP lectures, it's important to analyze ~append~. ~append~ is a procedure that combines two LISP lists together, and since the Scheme list is a singly linked list, ~append~ must generate a new list by iterating over all element of one of them, and using ~cons~ to make the combined one. Although we are under the illusion that we arrive at each nodes once, ~tree->list-1~ is actually \(\Theta \left( n^{2} \right)\), while ~tree->list-2~ grows at \(\Theta \left( n \right)\), which is really a lession on how data structures could subtly affect the best algorithm implementation.
+* Exercise 2.64
+** Prompt
