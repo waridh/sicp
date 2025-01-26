@@ -3720,13 +3720,8 @@ Only thing we really need to do here is port over the procedure from the chapter
         (adjoin-set (make-leaf (car pair) (cadr pair)) (make-leaf-set (cdr pairs))))))
 #+end_src
 
-
-#+begin_src racket :exports both :noweb yes
-#lang sicp
-<<huffman-leaf>>
-<<huffman-tree>>
-<<huffman-tree-decode>>
-<<weighted-set>>
+#+name: sample-huffman
+#+begin_src racket :exports code
 (define sample-tree
          (make-code-tree (make-leaf 'A 4)
                          (make-code-tree (make-leaf 'B 2)
@@ -3734,7 +3729,15 @@ Only thing we really need to do here is port over the procedure from the chapter
                                           (make-leaf 'D 1)
                                           (make-leaf 'C 1)))))
 (define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+#+end_src
 
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+<<sample-huffman>>
 (decode sample-message sample-tree)
 #+end_src
 
@@ -3742,3 +3745,65 @@ Only thing we really need to do here is port over the procedure from the chapter
 : (A D A B B C A)
 
 Yep, this looks correct.
+* Exercise 2.68
+** Prompt
+We are now given an ~encode~ procedure, and we must implement the ~encode-symbol~ procedure. After this, test the procedure on the sample messages from the previous exercise.
+** Solution
+Looking at how we implemented the datastructure for the huffman tree, we need to leverage the following attributes. Are we at a leaf node? If not, we should look at the children, and check if the target is in those sets. If not a leaf and not in the children, then raise error. If in, then traverse there.
+#+name: huffman-encode
+#+begin_src racket :exports code
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree) (encode (cdr message) tree))))
+
+;; This means that encode-symbol only have to make one symbol turn into a
+;; collection of bits by navigating the huffman tree.
+;; We need to be able to check if the symbol is in a set, therefore, we need to
+;; implement a new set lookup procedure as well
+(define (encode-symbol char tree)
+  (define (local-lookup val subtree)
+    (pair? (list-lookup val (symbols subtree) (lambda (x) x))))
+  (define (encode-symbol-aux code subtree)
+    (cond
+      [(null? subtree) (error "empty subtree")]
+      [(and (leaf? subtree) (eq? (symbol-leaf subtree) char)) (list code)]
+      [(local-lookup char (left-branch subtree))
+       (cons code (encode-symbol-aux 0 (left-branch subtree)))]
+      [(local-lookup char (right-branch subtree))
+       (cons code (encode-symbol-aux 1 (right-branch subtree)))]
+      [else (error "symbol not found in tree, Symbol, Tree: " char tree)]))
+  (if (local-lookup char (left-branch tree))
+      (encode-symbol-aux 0 (left-branch tree))
+      (encode-symbol-aux 1 (right-branch tree))))
+
+;; Iterative procedure that will lookup our representation of the set
+(define (list-lookup target-key set key-getter)
+  (if (null? set)
+      false
+      (let ([head-val (key-getter (car set))])
+        (if (equal? head-val target-key)
+            set
+            (list-lookup target-key (cdr set) key-getter)))))
+#+end_src
+
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+<<sample-huffman>>
+<<huffman-encode>>
+sample-message
+(decode sample-message sample-tree)
+(encode (decode sample-message sample-tree) sample-tree)
+;; The following line fails in a failure like we expect it to.
+;; (encode '(A B D B A X) sample-tree)
+#+end_src
+
+#+RESULTS:
+: (0 1 1 0 0 1 0 1 0 1 1 1 0)
+: (A D A B B C A)
+: (0 1 1 0 0 1 0 1 0 1 1 1 0)
