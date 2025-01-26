@@ -3900,7 +3900,7 @@ Suppose we are trying to huffman encode data with incrementing frequency, (with 
 
 So we could see that the number of bits to represent the most frequent symbol is 2, and the bits required to represent the largest symbol is 3 bits. Hmm, 2^2=4, and 2^3=8, we have five symbols, so maybe we are running into a pattern?
 
-#+begin_src plantuml :exports results :results file :file ./images/exercise-2.71.png
+#+begin_src plantuml :exports results :results file :file ./images/exercise-2.71.svg
 @startuml
 circle 55
 circle 22
@@ -3948,7 +3948,7 @@ rectangle J
 #+end_src
 
 #+RESULTS:
-[[file:./images/exercise-2.71.png]]
+[[file:./images/exercise-2.71.svg]]
 
 Well, we see that the most frequent symbol only takes up 2 bits, and the least frequent symbol takes up 5 bits. The assumption that we had earlier was incorrect. Now let's try to actually generalize this correctly. We see that the left subtree holds both the most and least frequent symbol. It has a certain, linear shape. Extrapolating this, we can say that the most frequent symbol will always be the symbol closest to root on this tree, so it will always take 2 bits. As for the least frequent symbol, we can see that it would always take up the same number of symbols on the left branch. The Huffman tree, when taking in this sort of input, always output a relatively balanced tree, with remainder symbols being weighted to the left subtree first. Well, to count the number of elements on a balanced tree, we could just use the following expression: ~(floor (/ (+ n 1) 2))~. This holds true for both the sample values, and I am relatively confident that it will generalize (but I can't do a very formal proof on it, since I was not trained that way).
 
