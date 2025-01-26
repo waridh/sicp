@@ -3474,3 +3474,271 @@ Do they have the same order of growth? If not, which one grows more slowly.
 Well this question is implementation specific. If we're using the Scheme in the SICP lectures, it's important to analyze ~append~. ~append~ is a procedure that combines two LISP lists together, and since the Scheme list is a singly linked list, ~append~ must generate a new list by iterating over all element of one of them, and using ~cons~ to make the combined one. Although we are under the illusion that we arrive at each nodes once, ~tree->list-1~ is actually \(\Theta \left( n^{2} \right)\), while ~tree->list-2~ grows at \(\Theta \left( n \right)\), which is really a lession on how data structures could subtly affect the best algorithm implementation.
 * Exercise 2.64
 ** Prompt
+We are given a procedure that converts a list to a tree. It uses a helper procedure called ~partial-tree~ that takes an argument ~n~ for the number of elements of the list to be transformed into a tree, and the list of elements to be transformed. Answer the following two questions:
+a. Write a short paragraph explaining, as clearly as possible, how ~partial-tree~ works. Then draw the tree ~(1 3 5 7 9 11)~ produced from ~list->tree~
+b. What is the order of growth for the ~list->tree~ for a list of ~n~ elements?
+** Solution
+#+name: list->tree
+#+begin_src racket :exports code
+(define (list->tree elements)
+  (car (partial-tree elements (length elements))))
+(define (partial-tree elts n)
+  (if (= n 0)
+      (cons '() elts)
+      (let ([left-size (quotient (- n 1) 2)])
+        (let ([left-result (partial-tree elts left-size)])
+          (let ([left-tree (car left-result)]
+                [non-left-elts (cdr left-result)]
+                [right-size (- n (+ left-size 1))])
+            (let ([this-entry (car non-left-elts)]
+                  [right-result (partial-tree (cdr non-left-elts) right-size)])
+              (let ([right-tree (car right-result)]
+                    [remaining-elts (cdr right-result)])
+                (cons (make-tree this-entry left-tree right-tree) remaining-elts))))))))
+#+end_src
+*** Part a
+Let's explain what the ~partial-tree~ procedure is doing. This helper procedure lets build arbitrary balanced trees in a recursive manner. The input parameter ~n~ and the ~remaining-elts~ return value allow flexible use of the procedure. Let's get into what it is doing. At a high level, the procedure is splitting the input list into left side, and right side, where it will build the left side first. Because of the ~(quotient (- n 1) 2)~ as the ~n~ for the left side, it means that the left branch of the tree will be filled last. It will do recursive calls on the tree until it cannot get a left branch anymore, which occurs at ~n~ equals or less than 2. Once this happens, it will use the first element of the list as the current sub-tree entry, and the remaining ~n~ values that do not count the left tree entries and the current entry as the right subtree. The algorithm of the right subtree is the same. Once both the left and right subtrees are built (although the left subtree would be empty), the left and right trees are combined with the current entry as the top-level node. After this, we return both the newly constructed tree and the rest of the elements that are not used in constructing the tree. And then the same process is done. Procedure can operate without knowing if it is building the left or the right tree.
+
+#+caption: Diagram of the tree that is built from list->tree
+#+begin_example
+   5
+ /   \
+1     9
+ \   / \
+  3 7   11
+#+end_example
+*** Part b
+What is the order of growth for the steps for a list of ~n~ elements?
+
+This is a linear algorithm, the elements becomes a node exactly once. \(\Theta \left( n \right)\).
+* Exercise 2.65
+** Prompt
+Create a \Theta(n) implementation of ~union-set~ and ~intersection-set~ for the set implementation of the balanced binary tree
+
+** Solution
+#+name: tree-set-unit
+#+begin_src racket :exports code
+(define (element-of-set? x set)
+  (cond
+    [(null? set) false]
+    [(= x (entry set) true)]
+    [(< x (entry set)) (element-of-set? x (left-branch set))]
+    [else (element-of-set? x (right-branch set))]))
+
+(define (adjoin-set x set)
+  (cond
+    [(null? set) (make-tree x '() '())]
+    [(= x (entry set)) set]
+    [(< x (entry set)) (make-tree (entry set) (adjoin-set x (left-branch set)) (right-branch set))]
+    [else (make-tree (entry set) (left-branch set) (adjoin-set x (right-branch set)))]))
+#+end_src
+
+So if we want to intersection or union, at best it will be a linear algorithm (we'll have to iterate through at least one, at most both of the elements of the sets). We've solved this problem pretty well using ordered list representation of set, and we happen to have the ability to make an ordered list from the tree representation. Obviously, we will just do that again.
+
+#+name: tree-set-union
+#+begin_src racket :exports code
+(define (union-ordered-list list1 list2)
+  (cond
+    [(null? list1) list2]
+    [(null? list2) list1]
+    [else
+     (let ([x1 (car list1)]
+           [x2 (car list2)])
+       (cond
+         [(= x1 x2) (cons x1 (union-ordered-list (cdr list1) (cdr list2)))]
+         [(< x1 x2) (cons x1 (union-ordered-list (cdr list1) list2))]
+         [(< x2 x1) (cons x2 (union-ordered-list list1 (cdr list2)))]))]))
+(define (union-set set1 set2)
+  (let ([list1 (tree->list-2 set1)]
+        [list2 (tree->list-2 set2)])
+    (list->tree (union-ordered-list list1 list2))))
+
+#+end_src
+
+#+name: tree-set-intersection
+#+begin_src racket :exports code
+(define (intersection-ordered-list list1 list2)
+  (if (or (null? list1) (null? list2))
+      '()
+      (let ([x1 (car list1)]
+            [x2 (car list2)])
+        (cond
+          [(= x1 x2) (cons x1 (intersection-ordered-list (cdr list1) (cdr list2)))]
+          [(< x1 x2) (intersection-ordered-list (cdr list1) list2)]
+          [else (intersection-ordered-list list1 (cdr list2))]))))
+
+(define (intersection-set set1 set2)
+  (let ([list1 (tree->list-2 set1)]
+        [list2 (tree->list-2 set2)])
+    (list->tree (intersection-ordered-list list1 list2))))
+#+end_src
+
+
+#+name: tree-set-intersect
+#+begin_src racket :exports code
+#+end_src
+
+#+RESULTS: tree-set-intersect
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<base-tree-representation>>
+<<flat-tree-1>>
+<<list->tree>>
+<<tree-set-unit>>
+<<tree-set-union>>
+<<tree-set-intersection>>
+(define test-set (list->tree (list 1 2 3 6 7 10)))
+(define test-set2 (list->tree (list 5 6 7 8 9 10)))
+test-set
+test-set2
+(union-set test-set test-set2)
+(intersection-set test-set test-set2)
+(tree->list-2 test-set)
+(tree->list-2 test-set2)
+(tree->list-2 (union-set test-set test-set2))
+(tree->list-2 (intersection-set test-set test-set2))
+#+end_src
+
+#+RESULTS:
+: (3 (1 () (2 () ())) (7 (6 () ()) (10 () ())))
+: (7 (5 () (6 () ())) (9 (8 () ()) (10 () ())))
+: (6 (2 (1 () ()) (3 () (5 () ()))) (8 (7 () ()) (9 () (10 () ()))))
+: (7 (6 () ()) (10 () ()))
+: (1 2 3 6 7 10)
+: (5 6 7 8 9 10)
+: (1 2 3 5 6 7 8 9 10)
+: (6 7 10)
+
+Yep, here is your \Theta(n) implementation of the union and intersection operators.
+* Exercise 2.66
+** Prompt
+Implement the ~lookup~ procedure for the case where the set of records is structured as binary tree ordered by the numerical values of the keys
+** Solution
+#+name: binary-tree-lookup
+#+begin_src racket :exports code
+(define (lookup given-key bin-tree)
+  (if (null? bin-tree) false
+      (let ([curr-val (entry bin-tree)])
+        (cond [(= given-key curr-val) bin-tree]
+              [(< given-key curr-val) (lookup given-key (left-branch bin-tree))]
+              [else (lookup given-key (right-branch bin-tree))]))))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<base-tree-representation>>
+<<flat-tree-1>>
+<<list->tree>>
+<<tree-set-unit>>
+<<tree-set-union>>
+<<tree-set-intersection>>
+<<binary-tree-lookup>>
+(define test-set (list->tree (list 1 2 3 6 7 10)))
+(define test-set2 (list->tree (list 5 6 7 8 9 10)))
+test-set
+test-set2
+(lookup 1000 test-set)
+(lookup 1 test-set)
+(lookup 8 test-set2)
+#+end_src
+
+#+RESULTS:
+: (3 (1 () (2 () ())) (7 (6 () ()) (10 () ())))
+: (7 (5 () (6 () ())) (9 (8 () ()) (10 () ())))
+: #f
+: (1 () (2 () ()))
+: (8 () ())
+
+Yes, it works, and it is not so bad to implement.
+* Exercise 2.67
+** Prompt
+This is a non-problem. We are given a Huffman tree and a code. Evaluate.
+** Solution
+Only thing we really need to do here is port over the procedure from the chapter, and then run the procedure on the exercise data. Technically, I could just hand evaluate the code, but that would come back and waste my time in the next exercises.
+
+#+name: huffman-leaf
+#+begin_src racket :exports code
+;; This is just the representation that we chose for the leaf
+(define (make-leaf symbol weight) (list 'leaf symbol weight))
+(define (leaf? object) (eq? (car object) 'leaf))
+(define (symbol-leaf x) (cadr x))
+(define (weight-leaf x) (caddr x))
+#+end_src
+
+#+name: huffman-tree
+#+begin_src racket :exports code
+;; Constructors and selectors for the component in the huffman tree
+;; for navigation
+(define (make-code-tree left right)
+  (list left right (append (symbols left) (symbols right)) (+ (weight left) (weight right))))
+(define (left-branch tree)
+  (car tree))
+(define (right-branch tree)
+  (cadr tree))
+(define (symbols tree)
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (caddr tree)))
+(define (weight tree)
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (cadddr tree)))
+#+end_src
+
+#+name: huffman-tree-decode
+#+begin_src racket :exports code
+(define (decode bits tree)
+  (define (decode-1 bits current-branch)
+    (if (null? bits)
+        '()
+        (let ((next-branch (choose-branch (car bits) current-branch)))
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (cdr bits) tree))
+              (decode-1 (cdr bits) next-branch)))))
+  (decode-1 bits tree))
+
+(define (choose-branch bit branch)
+  (cond [(= bit 0) (left-branch branch)]
+        [(= bit 1) (right-branch branch)]
+        [else (error "bad bit: CHOOSE-BRANCH" bit)]))
+#+end_src
+
+#+name: weighted-set
+#+begin_src racket :exports code
+(define (adjoin-set x set)
+  (cond
+    [(null? set) (list x)]
+    [(< (weight x) (weight (car set))) (cons x set)]
+    [else (cons (car set) (adjoin-set x (cdr set)))]))
+
+(define (make-leaf-set pairs)
+  (if (null? pairs)
+      '()
+      (let ([pair (car pairs)])
+        (adjoin-set (make-leaf (car pair) (cadr pair)) (make-leaf-set (cdr pairs))))))
+#+end_src
+
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+(define sample-tree
+         (make-code-tree (make-leaf 'A 4)
+                         (make-code-tree (make-leaf 'B 2)
+                                         (make-code-tree
+                                          (make-leaf 'D 1)
+                                          (make-leaf 'C 1)))))
+(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+
+(decode sample-message sample-tree)
+#+end_src
+
+#+RESULTS:
+: (A D A B B C A)
+
+Yep, this looks correct.
