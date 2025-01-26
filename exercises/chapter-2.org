@@ -3713,6 +3713,7 @@ Only thing we really need to do here is port over the procedure from the chapter
     [(< (weight x) (weight (car set))) (cons x set)]
     [else (cons (car set) (adjoin-set x (cdr set)))]))
 
+;; Pairs is a list of list that looks like this (symbol weight), but we should have appropriate selectors.
 (define (make-leaf-set pairs)
   (if (null? pairs)
       '()
@@ -3807,3 +3808,175 @@ sample-message
 : (0 1 1 0 0 1 0 1 0 1 1 1 0)
 : (A D A B B C A)
 : (0 1 1 0 0 1 0 1 0 1 1 1 0)
+* Exercise 2.69
+** Prompt
+We are to make the infrastructure required to make a huffman tree from just the frequency list. We are given ~generate-huffman-tree~, and we have to make ~successive-merge~ that will keep merging the smallest elements of the set until there is only one element left. Most of the required procedures have been built, so this should be a relatively simple procedure.
+** Solution
+#+name: generate-huffman-tree
+#+begin_src racket :exports code
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+#+end_src
+
+Let's just get into the meat of building successive merge.
+
+#+name: huffman-successive-merge
+#+begin_src racket :exports code
+;; Working with a set of leaves, but actually, the elements are not just leaves.
+;; Here is the invariant we are working with. The set is ordered by weight, and
+;; we are trying to combine the smallest weighted values together recursively
+(define (successive-merge leaf-set)
+  (cond
+    [(null? leaf-set) (error "reached empty set")]
+    [(null? (cdr leaf-set)) (car leaf-set)]
+    [else
+     (successive-merge (adjoin-set (make-code-tree (car leaf-set) (cadr leaf-set))
+                                   (cddr leaf-set)))]))
+#+end_src
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+<<sample-huffman>>
+<<huffman-encode>>
+<<generate-huffman-tree>>
+<<huffman-successive-merge>>
+(generate-huffman-tree '((A 4) (B 2) (C 1) (D 1)))
+sample-tree
+#+end_src
+
+#+RESULTS:
+: ((leaf A 4) ((leaf B 2) ((leaf D 1) (leaf C 1) (D C) 2) (B D C) 4) (A B D C) 8)
+: ((leaf A 4) ((leaf B 2) ((leaf D 1) (leaf C 1) (D C) 2) (B D C) 4) (A B D C) 8)
+
+Yep, and now we are done.
+* Exercise 2.70
+** Prompt
+Run the huffman encoding on song lyric. Also describe the number of bits required to encode the song, and what the required number of bits to encode the song if we are using fixed width encoding.
+** Solution
+Okay.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+<<sample-huffman>>
+<<huffman-encode>>
+<<generate-huffman-tree>>
+<<huffman-successive-merge>>
+(define song-tree (generate-huffman-tree '((A 2) (GET 2) (SHA 3) (WAH 1) (BOOM 1) (JOB 2) (NA 16) (YIP 9))))
+song-tree
+(define song '(GET A JOB SHA NA NA NA NA NA NA NA NA GET A JOB SHA NA NA NA NA NA NA NA NA WAH YIP YIP YIP YIP YIP YIP YIP YIP YIP YIP SHA BOOM))
+(define encoded-song (encode song song-tree) )
+(display "number of symbols in the song: " ) (display (length song)) (newline)
+encoded-song
+(length encoded-song)
+#+end_src
+
+#+RESULTS:
+: ((leaf NA 16) ((leaf YIP 9) (((leaf A 2) ((leaf BOOM 1) (leaf WAH 1) (BOOM WAH) 2) (A BOOM WAH) 4) ((leaf SHA 3) ((leaf JOB 2) (leaf GET 2) (JOB GET) 4) (SHA JOB GET) 7) (A BOOM WAH SHA JOB GET) 11) (YIP A BOOM WAH SHA JOB GET) 20) (NA YIP A BOOM WAH SHA JOB GET) 36)
+: number of symbols in the song: 37
+: (1 1 1 1 1 1 1 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 1 1 0 1 1 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 1 1 0 1 1 0 1 0)
+: 86
+
+We needed 86 bits to encode the song. If we were to use fixed width encoding, for a song with 8 symbols, we would use 3 bits to encode each symbols. Knowing that there are 37 symbols in the song, we would use src_elisp{(* 3 37)} {{{results(=111=)}}} bits. So yes, huffman encoding is more efficient than fixed width encoding.
+* Exercise 2.71
+** Prompt
+Suppose we are trying to huffman encode data with incrementing frequency, (with n symbols, the frequency increments in the range [1, n]). Draw out the Huffman tree for n=5 and n=10. Generalize and tell us how many bits are required to represent the most frequent and least frequent symbols.
+** Solution
+#+begin_example
+              +
+            /   \
+          +      +
+        /   \  /   \
+       +    C D     E
+     /   \
+    A     B
+#+end_example
+
+So we could see that the number of bits to represent the most frequent symbol is 2, and the bits required to represent the largest symbol is 3 bits. Hmm, 2^2=4, and 2^3=8, we have five symbols, so maybe we are running into a pattern?
+
+#+begin_src plantuml :exports results :results file :file ./images/exercise-2.71.png
+@startuml
+circle 55
+circle 22
+circle 33
+circle 12
+circle 15
+circle 18
+circle 6
+circle 9
+circle 3
+
+rectangle A
+rectangle B
+rectangle C
+rectangle D
+rectangle E
+rectangle F
+rectangle G
+rectangle H
+rectangle I
+rectangle J
+
+55 --  22: 0
+55 --  33: 1
+
+22 -- J: 0
+22 -- 12: 1
+
+33 -- 15: 0
+33 -- 18: 1
+
+12 -- 6: 0
+12 -- F: 1
+15 -- G: 0
+15 -- H: 1
+18 -- 9: 0
+18 -- I: 1
+6 -- 3: 0
+6 -- C: 1
+9 -- D: 0
+9 -- E: 1
+3 -- A: 0
+3 -- B: 1
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/exercise-2.71.png]]
+
+Well, we see that the most frequent symbol only takes up 2 bits, and the least frequent symbol takes up 5 bits. The assumption that we had earlier was incorrect. Now let's try to actually generalize this correctly. We see that the left subtree holds both the most and least frequent symbol. It has a certain, linear shape. Extrapolating this, we can say that the most frequent symbol will always be the symbol closest to root on this tree, so it will always take 2 bits. As for the least frequent symbol, we can see that it would always take up the same number of symbols on the left branch. The Huffman tree, when taking in this sort of input, always output a relatively balanced tree, with remainder symbols being weighted to the left subtree first. Well, to count the number of elements on a balanced tree, we could just use the following expression: ~(floor (/ (+ n 1) 2))~. This holds true for both the sample values, and I am relatively confident that it will generalize (but I can't do a very formal proof on it, since I was not trained that way).
+
+Let's check our work by using our program.
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<huffman-leaf>>
+<<huffman-tree>>
+<<huffman-tree-decode>>
+<<weighted-set>>
+<<sample-huffman>>
+<<huffman-encode>>
+<<generate-huffman-tree>>
+<<huffman-successive-merge>>
+(define incrementing-symbols '(A B C D E F G H I J K L M N O P Q R S T U V W X Y Z))
+
+(define (make-incrementing-sequence n)
+  (define (iter m acc symbol-list) (if (> m n)
+                                       acc
+                                       (iter (+ m 1) (cons (list (car symbol-list) m) acc) (cdr symbol-list))))
+  (iter 1 '() incrementing-symbols))
+(make-incrementing-sequence 5)
+(generate-huffman-tree (make-incrementing-sequence 5))
+(generate-huffman-tree (make-incrementing-sequence 10))
+#+end_src
+
+#+RESULTS:
+: ((E 5) (D 4) (C 3) (B 2) (A 1))
+: (((leaf C 3) ((leaf A 1) (leaf B 2) (A B) 3) (C A B) 6) ((leaf D 4) (leaf E 5) (D E) 9) (C A B D E) 15)
+: (((leaf J 10) ((leaf F 6) ((leaf C 3) ((leaf A 1) (leaf B 2) (A B) 3) (C A B) 6) (F C A B) 12) (J F C A B) 22) (((leaf G 7) (leaf H 8) (G H) 15) ((leaf I 9) ((leaf D 4) (leaf E 5) (D E) 9) (I D E) 18) (G H I D E) 33) (J F C A B G H I D E) 55)
