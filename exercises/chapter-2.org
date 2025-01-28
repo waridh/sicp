@@ -3888,6 +3888,7 @@ We needed 86 bits to encode the song. If we were to use fixed width encoding, fo
 ** Prompt
 Suppose we are trying to huffman encode data with incrementing frequency, (with n symbols, the frequency increments in the range [1, n]). Draw out the Huffman tree for n=5 and n=10. Generalize and tell us how many bits are required to represent the most frequent and least frequent symbols.
 ** Solution
+# Oh my god, I could not read. The pattern was not like that
 #+begin_example
               +
             /   \
@@ -3967,16 +3968,31 @@ Let's check our work by using our program.
 (define incrementing-symbols '(A B C D E F G H I J K L M N O P Q R S T U V W X Y Z))
 
 (define (make-incrementing-sequence n)
-  (define (iter m acc symbol-list) (if (> m n)
+  (define (iter m acc symbol-list) (if (>= m n)
                                        acc
-                                       (iter (+ m 1) (cons (list (car symbol-list) m) acc) (cdr symbol-list))))
-  (iter 1 '() incrementing-symbols))
+                                       (iter (+ m 1) (cons (list (car symbol-list) (expt 2 m)) acc) (cdr symbol-list))))
+  (iter 0 '() incrementing-symbols))
 (make-incrementing-sequence 5)
 (generate-huffman-tree (make-incrementing-sequence 5))
 (generate-huffman-tree (make-incrementing-sequence 10))
 #+end_src
 
 #+RESULTS:
-: ((E 5) (D 4) (C 3) (B 2) (A 1))
-: (((leaf C 3) ((leaf A 1) (leaf B 2) (A B) 3) (C A B) 6) ((leaf D 4) (leaf E 5) (D E) 9) (C A B D E) 15)
-: (((leaf J 10) ((leaf F 6) ((leaf C 3) ((leaf A 1) (leaf B 2) (A B) 3) (C A B) 6) (F C A B) 12) (J F C A B) 22) (((leaf G 7) (leaf H 8) (G H) 15) ((leaf I 9) ((leaf D 4) (leaf E 5) (D E) 9) (I D E) 18) (G H I D E) 33) (J F C A B G H I D E) 55)
+: ((E 16) (D 8) (C 4) (B 2) (A 1))
+: (((((leaf A 1) (leaf B 2) (A B) 3) (leaf C 4) (A B C) 7) (leaf D 8) (A B C D) 15) (leaf E 16) (A B C D E) 31)
+: ((((((((((leaf A 1) (leaf B 2) (A B) 3) (leaf C 4) (A B C) 7) (leaf D 8) (A B C D) 15) (leaf E 16) (A B C D E) 31) (leaf F 32) (A B C D E F) 63) (leaf G 64) (A B C D E F G) 127) (leaf H 128) (A B C D E F G H) 255) (leaf I 256) (A B C D E F G H I) 511) (leaf J 512) (A B C D E F G H I J) 1023)
+* Exercise 2.72
+** Prompt
+What is the order of growth for encoding the symbols, using the implementation from [[*Exercise 2.68][Exercise 2.68]]? Include the search step as well. Consider the special case where the relative frequency of the signal is as described in [[*Exercise 2.71][Exercise 2.71]]. Specifically, the number of steps required to encode the most and least frequent symbol. (The book does not believe that I could define this for the general case).
+** Solution
+~encode~ takes two parameters, ~message~, and ~tree~. ~message~ is a list of symbols being encoded, and ~tree~ is the Huffman tree that is being used to encode the message. Each symbol in ~message~ will be converted to the bit sequence using the ~encode-symbol~ procedure. We'll try to analyze a ~message~ of size ~n~, and a ~tree~ of ~m~ symbols.
+
+To choose which branch to navigate to using the symbol in the tree, we do a set containment check, which should be treated as an unordered list (the tree is ordered by weight, so the ~symbols~ selector is functionally unordered). We will say that this will take around \Theta(n/2) steps on average for hits, and \Theta(n) on miss. Note that if navigation has lead us to a node has two branches, one of them will hit and one of them will miss.
+
+# TODO: Need to make both the upper bound and the lower bound for processing one symbol before we could continue.
+
+We'll continue our analysis for a symbol that will map to a sequence of ~b~ bits. If the symbol maps to ~b~ bits, then the main logic of ~encode-symbol~ would happen ~b~ times, with each layer having its own linear time set search to determine which branch to navigate to next. Another thing to note is that as the iteration continues, the size of the set being searched decreases, but for the sake of simplicity, let's say the searched set is of a constant size, and we'll just say this is the same size as ~m~. We did this because we cannot guarantee that the size of the set being searched would significantly decrease. It could half, or it could just decrease by 1, depending on the frequency.
+
+So far, putting all of this together, we have the following steps growth for processing each symbol. \Theta(b * m)
+
+Did you think we forgot about the ~append~? ~append~ is a linear operation, and in the ~encode~ procedure, it would multiply the step growth of processing one symbol by the number of bits in the output sequence for that one symbol.
