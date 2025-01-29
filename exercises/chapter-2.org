@@ -4069,7 +4069,7 @@ Here is an explanation of how we could have gotten $\Theta(m^2)$ if the symbols 
 
 $$\left( m - 1 \right) + \left( m - 2 \right) + \cdots + 2 + 1$$
 
-Using the young Gauss strategy of finding recurring patterns, we see that the pattern that we just showed allows us to form pairs of $\left( m - n \right)$ and $n$, which would cancel out to $m$. When $m$ is an odd value, the upper half and lower half of the sum will cancel out perfectly, leaving the result of the sum as $m^{2}/2$. If $m$ is an even value, there will be a leftover in the middle of the sum, resulting in $m^{2} \div 2 + m \div 2$ . \Theta notation only cares about the value that will contribute the most, and removes the coefficient, therefore, we get $\Theta(m^2)$.
+Using the young Gauss strategy of finding recurring patterns, we see that the pattern that we just showed allows us to form pairs of $\left( m - n \right)$ and $n$, which would cancel out to $m$. When $m$ is an odd value, the upper half and lower half of the sum will cancel out perfectly, leaving the result of the sum as $\left( m^{2}/2 \right)$. If $m$ is an even value, there will be a leftover in the middle of the sum, resulting in $\left( m^{2} \div 2 \right) + \left( m \div 2 \right)$. \Theta notation only cares about the value that will contribute the most, and removes the coefficient, therefore, we get $\Theta(m^2)$.
 
 As a reminder, the Huffman tree for this special case looks like the following:
 
