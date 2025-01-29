@@ -3765,20 +3765,21 @@ Looking at how we implemented the datastructure for the huffman tree, we need to
 (define (encode-symbol char tree)
   (define (local-lookup val subtree)
     (pair? (list-lookup val (symbols subtree) (lambda (x) x))))
-  (define (encode-symbol-aux code subtree)
-    (cond
-      [(null? subtree) (error "empty subtree")]
-      [(and (leaf? subtree) (eq? (symbol-leaf subtree) char)) (list code)]
-      [(local-lookup char (left-branch subtree))
-       (cons code (encode-symbol-aux 0 (left-branch subtree)))]
-      [(local-lookup char (right-branch subtree))
-       (cons code (encode-symbol-aux 1 (right-branch subtree)))]
-      [else (error "symbol not found in tree, Symbol, Tree: " char tree)]))
-  (if (local-lookup char (left-branch tree))
-      (encode-symbol-aux 0 (left-branch tree))
-      (encode-symbol-aux 1 (right-branch tree))))
+  (define (encode-symbol-aux subtree)
+    (let ([left (left-branch subtree)]
+          [right (right-branch subtree)])
+     (cond
+       [(null? subtree) (error "empty subtree")]
+       [(and (leaf? subtree) (eq? (symbol-leaf subtree) char)) '()]
+       [(local-lookup char left)
+        (cons 0 (encode-symbol-aux left))]
+       [(local-lookup char right)
+        (cons 1 (encode-symbol-aux right))]
+       [else (error "symbol not found in tree, Symbol, Tree: " char tree)])))
+  (encode-symbol-aux tree))
 
 ;; Iterative procedure that will lookup our representation of the set
+;; I will say that this procedure is written in an overkill way
 (define (list-lookup target-key set key-getter)
   (if (null? set)
       false
@@ -3787,6 +3788,8 @@ Looking at how we implemented the datastructure for the huffman tree, we need to
             set
             (list-lookup target-key (cdr set) key-getter)))))
 #+end_src
+
+#+RESULTS: huffman-encode
 
 
 #+begin_src racket :exports both :noweb yes
@@ -3886,31 +3889,50 @@ encoded-song
 We needed 86 bits to encode the song. If we were to use fixed width encoding, for a song with 8 symbols, we would use 3 bits to encode each symbols. Knowing that there are 37 symbols in the song, we would use src_elisp{(* 3 37)} {{{results(=111=)}}} bits. So yes, huffman encoding is more efficient than fixed width encoding.
 * Exercise 2.71
 ** Prompt
-Suppose we are trying to huffman encode data with incrementing frequency, (with n symbols, the frequency increments in the range [1, n]). Draw out the Huffman tree for n=5 and n=10. Generalize and tell us how many bits are required to represent the most frequent and least frequent symbols.
+Suppose we are trying to huffman encode data with the following incrementing pattern, for n symbols, each value is 2^{n-1}. Draw out the Huffman tree for n=5 and n=10. Generalize and tell us how many bits are required to represent the most frequent and least frequent symbols.
 ** Solution
-# Oh my god, I could not read. The pattern was not like that
-#+begin_example
-              +
-            /   \
-          +      +
-        /   \  /   \
-       +    C D     E
-     /   \
-    A     B
-#+end_example
+#+begin_src plantuml :exports results :results file :file ./images/exercise-2.71-a.svg
+@startuml
+circle 32
+circle 15
+circle 7
+circle 3
 
-So we could see that the number of bits to represent the most frequent symbol is 2, and the bits required to represent the largest symbol is 3 bits. Hmm, 2^2=4, and 2^3=8, we have five symbols, so maybe we are running into a pattern?
+rectangle A
+rectangle B
+rectangle C
+rectangle D
+rectangle E
+
+32 --  E: 1
+32 --  15: 0
+
+15 -- 7: 0
+15 -- D: 1
+
+7 -- 3: 0
+7 -- C: 1
+
+3 -- A: 0
+3 -- B: 1
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/exercise-2.71-a.svg]]
+
+This combination of values generates a very unbalanced tree, where other than the two least frequent elements, there will be a symbol for every number of bits. Actually, there might be more to it than that. We can discuss this after drawing the Huffman tree for n=10.
 
 #+begin_src plantuml :exports results :results file :file ./images/exercise-2.71.svg
 @startuml
-circle 55
-circle 22
-circle 33
-circle 12
+circle 1023
+circle 511
+circle 255
+circle 127
+circle 63
+circle 31
 circle 15
-circle 18
-circle 6
-circle 9
+circle 7
 circle 3
 
 rectangle A
@@ -3924,25 +3946,28 @@ rectangle H
 rectangle I
 rectangle J
 
-55 --  22: 0
-55 --  33: 1
+1023 --  511: 0
+1023 --  J: 1
 
-22 -- J: 0
-22 -- 12: 1
+511 -- 255: 0
+511 -- I: 1
 
-33 -- 15: 0
-33 -- 18: 1
+255 -- 127: 0
+255 -- H: 1
 
-12 -- 6: 0
-12 -- F: 1
-15 -- G: 0
-15 -- H: 1
-18 -- 9: 0
-18 -- I: 1
-6 -- 3: 0
-6 -- C: 1
-9 -- D: 0
-9 -- E: 1
+127 -- 63: 0
+127 -- G: 1
+
+63 -- 31: 0
+63 -- F: 1
+
+31 -- 15: 0
+31 -- E: 1
+
+15 -- 7: 0
+15 -- D: 1
+7 -- 3: 0
+7 -- C: 1
 3 -- A: 0
 3 -- B: 1
 @enduml
@@ -3951,7 +3976,7 @@ rectangle J
 #+RESULTS:
 [[file:./images/exercise-2.71.svg]]
 
-Well, we see that the most frequent symbol only takes up 2 bits, and the least frequent symbol takes up 5 bits. The assumption that we had earlier was incorrect. Now let's try to actually generalize this correctly. We see that the left subtree holds both the most and least frequent symbol. It has a certain, linear shape. Extrapolating this, we can say that the most frequent symbol will always be the symbol closest to root on this tree, so it will always take 2 bits. As for the least frequent symbol, we can see that it would always take up the same number of symbols on the left branch. The Huffman tree, when taking in this sort of input, always output a relatively balanced tree, with remainder symbols being weighted to the left subtree first. Well, to count the number of elements on a balanced tree, we could just use the following expression: ~(floor (/ (+ n 1) 2))~. This holds true for both the sample values, and I am relatively confident that it will generalize (but I can't do a very formal proof on it, since I was not trained that way).
+Well, we see that there is just a really long branch, and actually, the minimum number of bits is always going to be 1, and the largest number of bits will be n - 1, coming from the structure of the tree, where we see that there is a symbol that will be matched with every bit length except for the two least frequent symbols, which share the same tree nodes.
 
 Let's check our work by using our program.
 
@@ -3974,25 +3999,80 @@ Let's check our work by using our program.
   (iter 0 '() incrementing-symbols))
 (make-incrementing-sequence 5)
 (generate-huffman-tree (make-incrementing-sequence 5))
+(make-incrementing-sequence 10)
 (generate-huffman-tree (make-incrementing-sequence 10))
 #+end_src
 
 #+RESULTS:
 : ((E 16) (D 8) (C 4) (B 2) (A 1))
 : (((((leaf A 1) (leaf B 2) (A B) 3) (leaf C 4) (A B C) 7) (leaf D 8) (A B C D) 15) (leaf E 16) (A B C D E) 31)
+: ((J 512) (I 256) (H 128) (G 64) (F 32) (E 16) (D 8) (C 4) (B 2) (A 1))
 : ((((((((((leaf A 1) (leaf B 2) (A B) 3) (leaf C 4) (A B C) 7) (leaf D 8) (A B C D) 15) (leaf E 16) (A B C D E) 31) (leaf F 32) (A B C D E F) 63) (leaf G 64) (A B C D E F G) 127) (leaf H 128) (A B C D E F G H) 255) (leaf I 256) (A B C D E F G H I) 511) (leaf J 512) (A B C D E F G H I J) 1023)
+
+Yep, this looks right.
 * Exercise 2.72
 ** Prompt
-What is the order of growth for encoding the symbols, using the implementation from [[*Exercise 2.68][Exercise 2.68]]? Include the search step as well. Consider the special case where the relative frequency of the signal is as described in [[*Exercise 2.71][Exercise 2.71]]. Specifically, the number of steps required to encode the most and least frequent symbol. (The book does not believe that I could define this for the general case).
+What is the order of growth for encoding a single symbol, using the implementation from [[*Exercise 2.68][Exercise 2.68]]? Include the search step as well. Consider the special case where the relative frequency of the signal is as described in [[*Exercise 2.71][Exercise 2.71]]. Specifically, the number of steps required to encode the most and least frequent symbol. (The book does not believe that I could define this for the general case).
 ** Solution
-~encode~ takes two parameters, ~message~, and ~tree~. ~message~ is a list of symbols being encoded, and ~tree~ is the Huffman tree that is being used to encode the message. Each symbol in ~message~ will be converted to the bit sequence using the ~encode-symbol~ procedure. We'll try to analyze a ~message~ of size ~n~, and a ~tree~ of ~m~ symbols.
+Here is the implementation as a reminder.
+#+begin_src racket :exports code
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree) (encode (cdr message) tree))))
 
-To choose which branch to navigate to using the symbol in the tree, we do a set containment check, which should be treated as an unordered list (the tree is ordered by weight, so the ~symbols~ selector is functionally unordered). We will say that this will take around \Theta(n/2) steps on average for hits, and \Theta(n) on miss. Note that if navigation has lead us to a node has two branches, one of them will hit and one of them will miss.
+;; This means that encode-symbol only have to make one symbol turn into a
+;; collection of bits by navigating the huffman tree.
+;; We need to be able to check if the symbol is in a set, therefore, we need to
+;; implement a new set lookup procedure as well
+(define (encode-symbol char tree)
+  (define (local-lookup val subtree)
+    (pair? (list-lookup val (symbols subtree) (lambda (x) x))))
+  (define (encode-symbol-aux subtree)
+    (let ([left (left-branch subtree)]
+          [right (right-branch subtree)])
+     (cond
+       [(null? subtree) (error "empty subtree")]
+       [(and (leaf? subtree) (eq? (symbol-leaf subtree) char)) '()]
+       [(local-lookup char left)
+        (cons 0 (encode-symbol-aux left))]
+       [(local-lookup char right)
+        (cons 1 (encode-symbol-aux right))]
+       [else (error "symbol not found in tree, Symbol, Tree: " char tree)])))
+  (encode-symbol-aux tree))
 
-# TODO: Need to make both the upper bound and the lower bound for processing one symbol before we could continue.
+;; Iterative procedure that will lookup our representation of the set
+;; I will say that this procedure is written in an overkill way
+(define (list-lookup target-key set key-getter)
+  (if (null? set)
+      false
+      (let ([head-val (key-getter (car set))])
+        (if (equal? head-val target-key)
+            set
+            (list-lookup target-key (cdr set) key-getter)))))
+#+end_src
+~encode-symbol~ takes two parameters, the symbol being encoded, and the Huffman tree used to represent ~m~ symbols. We also have a few structure invariant, such as how each of the nodes will return a set for both the weight and the symbols that is under that node. The two notable things here is that the sets are represented as lists, and that they are sorted by weight (lowest to highest).
 
-We'll continue our analysis for a symbol that will map to a sequence of ~b~ bits. If the symbol maps to ~b~ bits, then the main logic of ~encode-symbol~ would happen ~b~ times, with each layer having its own linear time set search to determine which branch to navigate to next. Another thing to note is that as the iteration continues, the size of the set being searched decreases, but for the sake of simplicity, let's say the searched set is of a constant size, and we'll just say this is the same size as ~m~. We did this because we cannot guarantee that the size of the set being searched would significantly decrease. It could half, or it could just decrease by 1, depending on the frequency.
+We assume that list manipulation primitives are constant time: \Theta(1). Type checking, such as ~null?~ and ~pair?~ are also constant time: \Theta(1), and also that ~define~ is a \Theta(1) operation.
 
-So far, putting all of this together, we have the following steps growth for processing each symbol. \Theta(b * m)
+To choose which branch to navigate to using the symbol in the tree, we do a set containment check, which is done on a list that is sorted by weight. This is a linear search, with the size of the search being the elements of the tree that is under it, therefore, the steps of growth for this stage of the algorithm is linear, and it scales with ~m~. Best case is that the search target is in the front of the list, which would be \Theta(1), worst case is that the symbol is either at the back of the list, or it is not present, which would cost however many symbols are under that node.
 
-Did you think we forgot about the ~append~? ~append~ is a linear operation, and in the ~encode~ procedure, it would multiply the step growth of processing one symbol by the number of bits in the output sequence for that one symbol.
+We'll continue our analysis for a symbol that will map to a sequence of ~b~ bits. If the symbol maps to ~b~ bits, then the main logic of ~encode-symbol~ would happen ~b~ times, with each layer having its own linear time set search to determine which branch to navigate to next. Another thing to note is that as the iteration continues, the size of the set being searched decreases. What we find here is that the growth of the steps for searching the tree is compounded on the set search.
+
+What is difficult here is that the efficiency of the set search and the tree navigation is dependent on the shape of the tree. Knowing this, we will just analyze the two special case from [[*Exercise 2.71][Exercise 2.71]].
+
+First is the most frequent case. Here, ~b~ is 1, but the most frequent symbol will appear more than the combination of the rest of the symbols. In our implementation, we do the containment check on the left branch before the right branch, and since the target symbol is not present there, we will always check all the m - 1 elements in that set, and therefore, ~m~ elements will be searched before finding the most frequent symbol (just because of the list representation of the set). This leaves us at \Theta(m) steps of growth for the most frequent symbol.
+
+For the least frequent symbol, the searching would have to traverse the entire bit tree, but due to the set being sorted by weight, the target symbol will always show up at the front of the search, making the set lookup for the least frequent symbol a constant operation for this tree shape. Instead, the growth comes from traversing down to the lowest layer of the tree, building ~b~ bits. The value of ~b~ was solved in the previous exercise, giving us m - 1 steps. This also leaves us at \Theta(m) steps of growth for encoding the least frequent symbol in the Huffman tree of the shape defined in the previous exercise. Yes, if the set of symbol was not sorted by weight, then the searching component of the process would have been linear time, pushing this case to \Theta(m^2), but we should consider the implementation details.
+
+Here is an explanation of how we could have gotten \Theta(m^2) if the symbols were not sorted by weight. Searching is most intensive at the top of the tree, but every layer down the tree, the number of elements decrease by 1. Say in the worse case scenario, we always search the entire set, by the time we get to the bottom of the tree, we'd have to do the following set search sizes to the tree.
+
+$$\left( m - 1 \right) + \left( m - 2 \right) + \cdot + 2 + 1$$
+
+Using the young Gauss strategy of finding recurring patterns, we see that the pattern that we just showed allows us to form pairs of \(\left( m - n \right)\) and \(n\), which would cancel out to \(m\). When \(m\) is an odd value, the upper half and lower half of the sum will cancel out perfectly, leaving the result of the sum as \(m^{2}/2\). If \(m\) is an even value, there will be a leftover in the middle of the sum, resulting in \(m^{2}/2 + m/2\). \Theta notation only cares about the value that will contribute the most, and removes the coefficient, therefore, we get \Theta(m^2).
+
+As a reminder, the Huffman tree for this special case looks like the following:
+
+[[file:./images/exercise-2.71.svg]]
+
+I suppose that in conclusion, encoding a symbol with a tree of this shape takes linear time: \Theta(m).
