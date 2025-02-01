@@ -4069,10 +4069,102 @@ Here is an explanation of how we could have gotten $\Theta(m^2)$ if the symbols 
 
 $$\left( m - 1 \right) + \left( m - 2 \right) + \cdots + 2 + 1$$
 
-Using the young Gauss strategy of finding recurring patterns, we see that the pattern that we just showed allows us to form pairs of $\left( m - n \right)$ and $n$, which would cancel out to $m$. When $m$ is an odd value, the upper half and lower half of the sum will cancel out perfectly, leaving the result of the sum as $\left( m^2/2 \right)$. If $m$ is an even value, there will be a leftover in the middle of the sum, resulting in $\left( m^2 \div 2 \right) + \left( m \div 2 \right)$. \Theta notation only cares about the value that will contribute the most, and removes the coefficient, therefore, we get $\Theta(m^2)$.
+Using the young Gauss strategy of finding recurring patterns, we see that the pattern that we just showed allows us to form pairs of $\left( m - n \right)$ and $n$, which would cancel out to $m$. When $m$ is an odd value, the upper half and lower half of the sum will cancel out perfectly, leaving the result of the sum as $\left( m^2\div 2 \right)$. If $m$ is an even value, there will be a leftover in the middle of the sum, resulting in $\left( m^2 \div 2 \right) + \left( m \div 2 \right)$. \Theta notation only cares about the value that will contribute the most, and removes the coefficient, therefore, we get $\Theta(m^2)$.
 
 As a reminder, the Huffman tree for this special case looks like the following:
 
 [[file:./images/exercise-2.71.svg]]
 
 I suppose that in conclusion, encoding a symbol with a tree of this shape takes linear time: \Theta(m).
+* Exercise 2.73
+** Prompt
+We have just covered dispatches, and now we are working on data-directed style of generic procedures. For this exercise, we will review the symbolic differentiation procedure that was designed in sicp section 2.3.2.
+
+#+caption: Previous version of the symbolic differentiation procedure
+#+name: 2.73-old-dispatch
+#+begin_src racket :exports code
+(define (deriv exp var)
+  (cond
+    [(number? exp) 0]
+    [(variable? exp) (if (same-variable? exp var) 1 0)]
+    [(sum? exp) (make-sum (deriv (addend exp) var) (deriv (augend exp) var))]
+    [(product? exp)
+     (make-sum (make-product (multiplier exp) (deriv (multiplicand exp) var))
+               (make-product (deriv (multiplier exp) var) (multiplicand exp)))]
+    [else (error "Unknown expression type: DERIV" exp)]))
+#+end_src
+
+We can convert the old version of the symbolic differentiation to the data-directed procedure by doing the following to it.
+
+#+caption: Data-driven implementation of deriv
+#+name: 2.73-data-driven
+#+begin_src racket :exports code
+(define (deriv exp var)
+ (cond [(number? exp) 0]
+       [(variable? exp) (if (same-variable? exp var) 1 0)]
+       [else ((get 'deriv (operator exp)) (operand exp) var)]))
+
+(define (operator exp) (car exp))
+(define (operand exp) (cdr exp))
+#+end_src
+
+There are now a few questions that must be answered.
+
+a. Explain what was done above, and explain why ~number?~ and ~variable?~ cannot be moved into data-driven dispatch.
+b. Write the procedure for derivatives of sums and products, and the auxiliary code required to install them in the table used by the program above.
+c. Choose any additional differentiation rule that you like, such as exponents, and install it into this data-directed system.
+d. Right now, the type of the expression is the algebraic operator that binds the expression together. What if we index the procedure in the opposite way, such that the dispatch line in the ~deriv~ procedure look like the following. ~((get (operator exp) 'deriv') (operands exp) var)~.
+** Solution
+*** Part a
+The data driven solution is to check for the primitives, which are numbers and variables, and if the it was found that the exp is an actual registered expression, then use the data-driven table to lookup the corresponding procedure, and then dispatch it. Lookup process is done with ~deriv~ as the operation, and the expression operator as the type being used in the lookup. Following this, selectors for the data and the operation were defined. ~number?~ and ~variable?~ cannot be moved to the data-driven dispatch because we are dispatching with algebraic expressions as the type. ~variable~ and ~nubmer~ in this representation do not have operators, therefore, lookup cannot occur.
+*** Part b
+Writing an implementation for the sum and product implementation of ~deriv~, we must first setup our test script. We could just reuse a testing script from the ~deriv~ exercises.
+
+#+caption: Test for old version of the ~deriv~ procedure for regression testing.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.73-old-dispatch>>
+<<deriv-base-dependencies>>
+<<deriv-base-sum>>
+<<deriv-base-product>>
+
+(deriv '(+ x 3) 'x)
+(deriv '(* x y) 'x)
+(deriv '(* (* x y) (+ x 3)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: (+ (* x y) (* y (+ x 3)))
+
+With this value here, we could get to implementing the data-driven dispatch version of the ~deriv~ procedure.
+
+#+name: 2.73-data-driven-base
+#+begin_src racket :exports code
+(define (install-data-driven-sum)
+  (define (deriv-sum operand var)
+    (make-sum (deriv (addend operand) var)
+              (deriv (augend operand) var)))
+  (put 'deriv '+ make-sum))
+#+end_src
+
+Awkward thing we found here is that the racket implementation of ~sicp~ is missing the ~put~ and ~get~ procedure, therefore, we must implement this ourselves.
+
+#+caption: Test for data-driven version of the ~deriv~ procedure
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.73-data-driven>>
+<<deriv-base-dependencies>>
+<<deriv-base-sum>>
+<<deriv-base-product>>
+<<2.73-data-driven-base>>
+
+(install-data-driven-sum)
+
+(deriv '(+ x 3) 'x)
+(deriv '(* x y) 'x)
+(deriv '(* (* x y) (+ x 3)) 'x)
+#+end_src
+
+#+RESULTS:
