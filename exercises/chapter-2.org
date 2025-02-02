@@ -880,7 +880,15 @@ The first listing is reversed because our Scheme list implementation only allows
 The second listing does not work because we are no longer following the semantics of a Scheme list. The list is being built in reverse order.
 * Exercise 2.23
 ** Prompt
-We learn what a ~for-each~ is, which is just ~map~ but no return. Good for just doing side effects. Make an implementation of ~for-each~
+We learn what a ~for-each~ is, which is just ~map~ but no return. Good for just doin(define (make-from-real-imag
+         x y)
+  (define (dispatch op)
+    (cond [(eq? op 'real-part) x]
+          [(eq? op 'imag-part) y]
+          [(eq? op 'magnitude) (sqrt (+ (square x) (square y)))]
+          [(eq? op 'angle) (atan y x)]
+          [else (error "unknown op: MAKE-FROM-REAL-IMAG" op)]))
+  dispatch)g side effects. Make an implementation of ~for-each~
 ** Solution
 We have an implementation of ~for-each~ using the ~let~ procedure.
 #+begin_src racket :exports both
@@ -4120,6 +4128,7 @@ The data driven solution is to check for the primitives, which are numbers and v
 *** Part b
 Writing an implementation for the sum and product implementation of ~deriv~, we must first setup our test script. We could just reuse a testing script from the ~deriv~ exercises.
 
+
 #+caption: Test for old version of the ~deriv~ procedure for regression testing.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
@@ -4140,16 +4149,54 @@ Writing an implementation for the sum and product implementation of ~deriv~, we 
 
 With this value here, we could get to implementing the data-driven dispatch version of the ~deriv~ procedure.
 
-#+name: 2.73-data-driven-base
+#+name: 2.73-data-driven-sum
 #+begin_src racket :exports code
 (define (install-data-driven-sum)
   (define (deriv-sum operand var)
-    (make-sum (deriv (addend operand) var)
-              (deriv (augend operand) var)))
-  (put 'deriv '+ make-sum))
+    (make-sum (deriv (car operand) var)
+              (deriv (cadr operand) var)))
+  (put 'deriv '+ deriv-sum))
+#+end_src
+
+#+name: 2.73-data-driven-product
+#+begin_src racket :exports code
+(define (install-data-driven-product)
+  (define (deriv-product operand var)
+    (make-sum (make-product (car operand) (deriv (cadr operand) var))
+              (make-product (deriv (car operand) var) (cadr operand))))
+  (put 'deriv '* deriv-product))
 #+end_src
 
 Awkward thing we found here is that the racket implementation of ~sicp~ is missing the ~put~ and ~get~ procedure, therefore, we must implement this ourselves.
+#+caption: With help from the stack overflow answer provided here: https://stackoverflow.com/questions/5499005/how-do-i-get-the-functions-put-and-get-in-sicp-scheme-exercise-2-78-and-on.
+#+name: put-get-implementation
+#+begin_src racket :exports code
+(define *op-table* '())
+
+(define (make-entry k v) (list k v))
+(define (key entry) (car entry))
+(define (value entry) (cadr entry))
+;; Checks if the entry of the table has a matching parameter key
+(define (key? k entry)
+  (equal? (key entry) k))
+
+(define (put op type item)
+  (define (putter k array)
+    (cond [(null? array) (list (make-entry k item))]
+          [(key? k (car array)) array]
+          [else (cons (car array) (putter k (cdr array)))]))
+  (set! *op-table* (putter (list op type) *op-table*)))
+
+(define (get op type)
+  (define (getter k array)
+    (cond [(null? array) #f]
+          [(key? k (car array)) (value (car array))]
+          [else (getter k (cdr array))]))
+  (getter (list op type) *op-table*))
+
+#+end_src
+
+#+RESULTS: put-get-implementation
 
 #+caption: Test for data-driven version of the ~deriv~ procedure
 #+begin_src racket :exports both :noweb yes
@@ -4158,9 +4205,12 @@ Awkward thing we found here is that the racket implementation of ~sicp~ is missi
 <<deriv-base-dependencies>>
 <<deriv-base-sum>>
 <<deriv-base-product>>
-<<2.73-data-driven-base>>
+<<put-get-implementation>>
+<<2.73-data-driven-sum>>
+<<2.73-data-driven-product>>
 
 (install-data-driven-sum)
+(install-data-driven-product)
 
 (deriv '(+ x 3) 'x)
 (deriv '(* x y) 'x)
@@ -4168,3 +4218,204 @@ Awkward thing we found here is that the racket implementation of ~sicp~ is missi
 #+end_src
 
 #+RESULTS:
+: 1
+: y
+: (+ (* x y) (* y (+ x 3)))
+
+This is the expected result, but with one caveat. We had to stop using the selectors for the operands in the old implementation, as those selectors are working with the assumption that there is an operator at the front of the expression. The new interface does not have that.
+*** Part c
+Add the rule back in.
+
+Using data-driven dispatch, this should be easy to do.
+
+#+name: 2.73-data-driven-exponentiation
+#+begin_src racket :exports code
+(define (install-data-driven-exponentiation)
+  (define (deriv-exponentiation operand var)
+    (make-product (cadr operand) (make-exponentiation (car operand) (- (cadr operand) 1))))
+  (put 'deriv '** deriv-exponentiation))
+#+end_src
+
+#+caption: Test for data-driven version of the ~deriv~ procedure with exponentiation.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.73-data-driven>>
+<<deriv-base-dependencies>>
+<<deriv-base-sum>>
+<<deriv-base-product>>
+<<deriv-base-exponentiation>>
+<<put-get-implementation>>
+<<2.73-data-driven-sum>>
+<<2.73-data-driven-product>>
+<<2.73-data-driven-exponentiation>>
+
+(install-data-driven-sum)
+(install-data-driven-product)
+(install-data-driven-exponentiation)
+
+(deriv '(+ x 3) 'x)
+(deriv '(* x y) 'x)
+(deriv '(* (* x y) (+ x 3)) 'x)
+(deriv '(+ (* x y) (** x 8)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: (+ (* x y) (* y (+ x 3)))
+: (+ y (* 8 (** x 7)))
+
+Result came out as expected.
+*** Part d
+Suppose that we swapped the op and the type, so that the operation is now the operator in the expression and the type is ~'deriv~. What are the changes that are required?
+
+Well, we are now trying to implement ~'deriv~ for the different operations that could be described in an expression. The schema of the table will change, and both the installation and the retrieval of the procedure would change, but otherwise, ~deriv~ itself stays relatively the same. What we could do here is just implement this, and test it.
+
+#+caption: swapped data-driven implementation of deriv
+#+name: 2.73-data-driven-swapped
+#+begin_src racket :exports code
+(define (deriv exp var)
+  (cond
+    [(number? exp) 0]
+    [(variable? exp) (if (same-variable? exp var) 1 0)]
+    [else ((get (operator exp) 'deriv) (operand exp) var)]))
+
+(define (operator exp)
+  (car exp))
+(define (operand exp)
+  (cdr exp))
+#+end_src
+
+#+name: 2.73-data-driven-sum-swapped
+#+begin_src racket :exports code
+(define (install-data-driven-sum)
+  (define (deriv-sum operand var)
+    (make-sum (deriv (car operand) var)
+              (deriv (cadr operand) var)))
+  (put '+ 'deriv deriv-sum))
+#+end_src
+
+#+name: 2.73-data-driven-product-swapped
+#+begin_src racket :exports code
+(define (install-data-driven-product)
+  (define (deriv-product operand var)
+    (make-sum (make-product (car operand) (deriv (cadr operand) var))
+              (make-product (deriv (car operand) var) (cadr operand))))
+  (put '* 'deriv deriv-product))
+#+end_src
+
+#+name: 2.73-data-driven-exponentiation-swapped
+#+begin_src racket :exports code
+(define (install-data-driven-exponentiation)
+  (define (deriv-exponentiation operand var)
+    (make-product (cadr operand) (make-exponentiation (car operand) (- (cadr operand) 1))))
+  (put '** 'deriv deriv-exponentiation))
+#+end_src
+
+#+caption: Test for swapped operator and type for data-driven version of the ~deriv~ procedure.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.73-data-driven-swapped>>
+<<deriv-base-dependencies>>
+<<deriv-base-sum>>
+<<deriv-base-product>>
+<<deriv-base-exponentiation>>
+<<put-get-implementation>>
+<<2.73-data-driven-sum-swapped>>
+<<2.73-data-driven-product-swapped>>
+<<2.73-data-driven-exponentiation-swapped>>
+
+(install-data-driven-sum)
+(install-data-driven-product)
+(install-data-driven-exponentiation)
+
+(deriv '(+ x 3) 'x)
+(deriv '(* x y) 'x)
+(deriv '(* (* x y) (+ x 3)) 'x)
+(deriv '(+ (* x y) (** x 8)) 'x)
+#+end_src
+
+#+RESULTS:
+: 1
+: y
+: (+ (* x y) (* y (+ x 3)))
+: (+ y (* 8 (** x 7)))
+
+And just like that, we are done the exercise.
+* Exercise 2.74
+** Prompt
+We are larping as a software engineer for a company that used to have multiple distributed independent divisions, all having software infrastructure that was not standardized. We are responsible for making an interface that would allow a access to those different systems without changing those systems.
+a. Implement for headquarters a ~get-record~ procedure that retrieves a specified employee's record from a specified personnel file. The procedure should be applicable to any division's file. Explain how the individual divisions' file should be structured. In particular, what type information must be supplied?
+b. Implement for headquarters a ~get-salary~ procedure that returns the salary information from a given employee's record from any division's personnel file. How should the record be structured in order to make this operation work?
+c. Implement for HQ a ~find-employee-record~ procedure. This should search all division files for the record of a given employee and return the record. Assume that this procedure takes as arguments an employee's name and a list of all the divisions' file.
+d. When Insatiable takes over a new company, what changes must be made in order to incorporate the new personnel information into the central system?
+** Solution
+Let's talk a little about our requirements. Firstly, we are trying to integrate multiple systems that tries to do the same thing. Firstly, each of these systems should have selectors and constructors. Reading the requirements, the central system is mostly trying to read the content of each of the systems. There are also some similarities in how the data is stored. We know that the entries are stored as a record of records, meaning that for most of the exercise, we are trying to select and check for containment generically.
+*** Part a
+Parameters for this procedure are the name of the employee, and a record file. Here is what we will do to make this work.
+1. We are injecting the datastructure, and this is the thing that is different between the teams
+2. We assume that each of the teams have built their own querying system
+
+We could use data-driven dispatch to be able to generically operate on the different record types that are used by the different teams.
+
+Since we don't really have data to test with, nor do I really want to put the time to do that, we'll just pretend that the code I am writing has some underlying representation written up by someone else. The generic procedure is provided below.
+
+#+begin_src racket :exports code
+(define (attach-type type value)
+  (cons type value))
+(define (type-tag item)
+  (car item))
+(define (contents item)
+  (cdr item))
+#+end_src
+
+#+name: generic-apply
+#+begin_src racket :exports code
+(define (generic-apply op . args)
+  (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args))
+          (error "could not find the item for the following op and type" (list op type-tag))))))
+#+end_src
+
+#+begin_src racket :exports code
+(define (get-record record-store name)
+  (generic-apply 'get-record record-store name))
+#+end_src
+
+Each of the team just has to make an install procedure that contains the implementation of retrieving the record with the parameterized name. For the sake of correctness, this procedure should also return ~#f~ as the option value for when the search failed. If the search does not fail, then the returned record should be tagged by the implementer of the type.
+
+Finally, the record file should specify what team format it uses, so that we could use data-driven dispatch to find the correct procedure.
+*** Part b
+Implementing the ~get-salary~ procedure that takes the employee record as parameter.
+
+#+begin_src racket :exports code
+;; This procedure is using data-driven dispatch to find the correct selector
+;; procedure
+(define (get-salary emp-record)
+  (generic-apply 'get-salary emp-record))
+#+end_src
+
+So basically, we have written another generic procedure. What really matters here is that the employee record being passed into the procedure is tagged with a type, (the team that the record format belongs to). Finally, the selector procedure that is installed should tag the return salary information.
+*** Part c
+Making a list of record looking actually does not involve making the teams implement a new selector. Instead, we could leverage the procedure that was designed in part a.
+
+Luckily for us, we made the interface for the ~get-record~ method return ~#f~ if the name could not be found in the record, so now, we just make the procedure traverse all the records, and do a data-driven dispatch for the ~get-record~ operation. If the record returns a negative, we continue looking. If there are no more records, we return ~#f~ as the sentinel value, and if we find the record, we return the record.
+
+#+begin_src racket :exports code
+(define (find-employee-record name . records)
+  (if (null? records)
+      #f
+      (let ([curr-record (car records)])
+        (let ([res (get-record curr-record name)])
+          (if (not res)
+              (apply find-employee-record (cons name (cdr records)))
+              res)))))
+#+end_src
+*** Part d
+Once a new company is being purchased, and we must integrate their system into the central system, we have to do the following changes on their side.
+
+The new company must implement the ~get-record~ procedure, and the ~get-salary~ procedure, following the interface that we have defined, which includes the ~#f~ return and tagging the record value that was returned from ~get-record~. They must pick a unique type name for their team, and then tag their record data with this name. Then, they must make an install script that will register their version of ~get-record~ and ~get-salary~ into the data-driven table.
+
+This should be enough to integrate a new team into the central system.
