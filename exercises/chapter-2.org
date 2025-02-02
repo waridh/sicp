@@ -4419,3 +4419,49 @@ Once a new company is being purchased, and we must integrate their system into t
 The new company must implement the ~get-record~ procedure, and the ~get-salary~ procedure, following the interface that we have defined, which includes the ~#f~ return and tagging the record value that was returned from ~get-record~. They must pick a unique type name for their team, and then tag their record data with this name. Then, they must make an install script that will register their version of ~get-record~ and ~get-salary~ into the data-driven table.
 
 This should be enough to integrate a new team into the central system.
+* Exercise 2.75
+** Prompt
+We are exploring message passing in this part of the chapter. This looks to be the basis to object oriented programming. The task at hand is to make the message passing representation for ~make-from-mag-angle~ complex number object.
+** Solution
+
+We are basically defining some methods for the representation. Since I professionally write Python, here is the solution.
+#+begin_src racket :exports code
+(define (make-from-mag-angle m a)
+  (define (dispatch op)
+    (cond [(eq? op 'real-part) (* m (cos a))]
+          [(eq? op 'imag-part) (* m (sin a))]
+          [(eq? op 'magnitude) m]
+          [(eq? op 'angle) a]
+          [else (error "unrecognized operation found: MAKE-FROM-MAG-ANGLE" op)]))
+  dispatch)
+#+end_src
+* Exercise 2.76
+** Prompt
+As a large system with generic operations evolves, new types of data objects or new operations may be needed. For each of the three strategies: generic operations with explicit dispatch, data-directed style, and message passing, describe the changes that must be made to a system in order to add new types or new operations. Which organization would be most appropriate for a system in which new types must often be added? Which would be most appropriate for a system in which new operations must often be added?
+** Solution
+This is a good question, it's making us think about the tradeoff of each of the design decisions.
+
+*** Explicit Dispatch
+Explicit dispatch is the most expensive method to extend with new types and new operations. Adding a new type in explicit dispatching entails that a new branch in the dispatch conditional logic must be added for the new type. This must be done for all the explicit dispatch operations that are supported. Added a new operation for explicit dispatching means that a new procedure must be written that has a dispatch handling for all the supported types.
+
+*** Data-driven Dispatch
+This strategy requires that each of the types are stored in packages that are installed when used. Operations are stored in a lookup table that takes the type tag and operation as the index parameter, and return the correct procedure that could correctly act on the data. A big benefit of this strategy is that the data being passed around only needs to hold the type tag, and not the actual behaviors of the object. Therefore, I argue that this strategy gives us cheaper representations.
+**** Adding a new type
+In data-driven dispatch, to add a new type, a package for that type must be built that defines the procedure that will enact the different operations on the new type, along with the definition of the representation of the new type. To use the new type representation, these procedures must be installed in an operation and type lookup table, allowing the generic apply procedure to find the correct procedure for a given type and operation. Note that this strategy requires the additional process of installing a type into the system.
+
+**** Adding a new operation
+To define a new operation, a new generic procedure must be defined in the module for the type. The real main benefit here is that these operations can be implemented independently, and that the implementation that was shown up until now gives this strategy the ability for the stored procedure to take multiple arguments. The types must still implement their version of this new operation for it to participate.
+
+*** Message Passing
+Representations hold behavior in this implementation. This makes it really easy to apply an operation on a type, but it is more expensive to instantiate an object, as it is holding the procedures that would operate on it. The different types in this strategy encapsulates the behaviors that it supports.
+
+**** Adding a new type
+In message passing, the new type is also holding the implementation of the operation. When making a new type, we are actually returning a dispatch method, so all implementation of the supported operation must be added with the new type. A major note here is that registering this new type does not require type tag, and procedure table registration.
+**** Adding a new operation
+Adding a new operation requires two things. Adding a new generic procedure wrapper that will submit the new operation to its arguments, and implementing the operation in the type itself. In this strategy, there isn't a need to pass around a type tag, since the types actually just control the dispatch themselves.
+
+*** Appropriate strategies
+**** Adding a new type
+In terms of ease of adding a new type with the least amount of resistance, message passing seems to be the most appropriate strategy, since there is minimal changes required to the system when adding a new type.
+**** Adding a new operation
+Both message passing and data-driven dispatch would require that the type implement the operation, causing around the same amount of code changes (data-driven also requires registration, adding slightly more word to be done on the data-driven implementation). The major tradeoff we should look is how memory scale in each strategies. When adding more operations, the message passing strategy would cause all the type representation to become more expensive, as they would have to store the new dispatch handling for that type, for every instance of the type. The data-driven dispatch method would scale better, as only one instance of the operation handler for all the types would need to be stored in the lookup table.
