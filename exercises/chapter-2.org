@@ -4465,3 +4465,44 @@ Adding a new operation requires two things. Adding a new generic procedure wrapp
 In terms of ease of adding a new type with the least amount of resistance, message passing seems to be the most appropriate strategy, since there is minimal changes required to the system when adding a new type.
 **** Adding a new operation
 Both message passing and data-driven dispatch would require that the type implement the operation, causing around the same amount of code changes (data-driven also requires registration, adding slightly more word to be done on the data-driven implementation). The major tradeoff we should look is how memory scale in each strategies. When adding more operations, the message passing strategy would cause all the type representation to become more expensive, as they would have to store the new dispatch handling for that type, for every instance of the type. The data-driven dispatch method would scale better, as only one instance of the operation handler for all the types would need to be stored in the lookup table.
+* Exercise 2.77
+** Prompt
+We are working with an object that is shaped like the following:
+
+#+name: 2.77-object
+#+begin_src racket :exports code
+('complex ('rectangular (3 . 4)))
+#+end_src
+
+Which is really just to say that we are working on two layers of tagged typing, one for the different number representation for generic arithmetic, and the other for different representation of complex values.
+
+Louis Reasoner, the fictional character, wanted to evaluate src_racket{(magnitude z)} where z is the complex object we just described in [[2.77-object]]. The src_racket{apply-generic} method threw an error saying that there is no method for the operation src_racket{magnitude} on the type ~(complex)~. Alyssa P. Hacker solved this problem by saying that the src_racket{magnitude} selector was not defined for the ~complex~ type yet, only for the types in the complex arithmetic implementation, which includes ~rectangular~ and ~polar~. She gave the following fix and told Louis to put it into the complex arithmetic package.
+
+#+begin_src racket :exports code
+(put 'real-part '(complex) real-part)
+(put 'imag-part '(complex) imag-part)
+(put 'magnitude '(complex) magnitude)
+(put 'angle '(complex) angle)
+#+end_src
+
+Describe the detail of why this works, and trace through all the procedures called in evaluating the expression of src_racket{(magnitude z)}. Also state how many times that ~apply-generic~ is invoked, along with what procedure is dispatched.
+** Solution
+*** Why does this work
+The problem that was there before was that by bringing the different number systems together into a generic arithmetic library, another layer of type tagging was applied. The initial implementation of this additional type tag only registered the basic operations of adding, subtracting, multiplying, and dividing. It does not add the special selectors that are present in the other implementations. To make those selectors available again in this level of abstraction, we simply have to register handling on the data after it has been dispatched by the data-driven dispatcher, that is, once the system has detected the higher level type that points to the number representation, call the correct generic selector again. This is very much like what we could do with single dispatch on python, when handling a list by mapping on the elements of the list with the same function.
+*** Trace through the procedure called on (magnitude z)
+The following code snippet is the trace of the evaluation of src_racket{(magnitude z)} after registering the complex value implementation to the data-driven dispatch.
+#+begin_src racket :exports code
+('complex ('rectangular (3 . 4)))
+(magnitude ('complex ('rectangular (3 . 4))))
+(apply-generic 'magnitude ('complex ('rectangular (3 . 4))))
+(apply (get op '(complex)) (('rectangular (3 . 4))))
+(apply-generic 'magnitude ('rectangular (3 . 4)))
+(apply (get op '(rectangular)) ((3 . 4)))
+(sqrt (+ (square (real-part (3 . 4)))
+         (square (imag-part (3 . 4)))))
+(sqrt (+ (square 3)
+         (square 4)))
+5
+#+end_src
+
+We see that ~apply-generic~ is invoked twice, the first time calling itself on the content of the ~'complex~ type, which is the ~'retangular~ type from the complex arithmetic library. The second time, it finds the implementation for the ~'retangular~ type, ~magnitude~, which does the square root calculations.
