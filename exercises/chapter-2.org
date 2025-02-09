@@ -5292,5 +5292,104 @@ done
 #t
 #+end_example
 
-
 Another exercise done, this time because we just needed to add four procedures in total, with pretty minimal bindings to make it generic.
+* Exercise 2.81
+** Prompt
+Louis Reasoner has found that the latest implementation of ~apply-generic~ would try to coerce a type into its own type if there are two arguments of different types. This guy reaons that we should therefore put procedures that does identity coercion into the coercion table. He would do the following:
+#+begin_src racket :exports code
+(define (scheme-number->scheme-number n)
+  n)
+(define (complex->complex z)
+  z)
+(put-coercion 'scheme-number 'scheme-number scheme-number->scheme-number)
+(put-coercion 'complex 'complex complex->complex)
+#+end_src
+
+For reference, the new ~apply-generic~ looks like this:
+
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args)) ; This line happens when
+          ; there is a registered type operation
+          (if (= (length args) 2) ; This is where we
+              ; try to coerce. It is a fallback
+              (let ([type1 (car type-tags)]
+                    [type2 (cadr type-tags)]
+                    [a1 (car args)]
+                    [a2 (cadr args)])
+                ;; The next steps here is to make the coercion occur on a list
+                ;; of arbitrary length
+                (let ([t1->t2 (get-coercion type1 type2)]
+                      [t2->t1 (get-coercion type2 type1)])
+                  (cond ; This is using the semantic that everything but false
+                        ; is truthy
+                    [t1->t2 (apply-generic op (t1->t2 a1) a2)]
+                    [t2->t1 (apply-generic op a1 (t2->t1 a2))]
+                    [else (error "No method for these types" (list op type-tags))])))
+              (error "No method for these types" (list op type-tags)))))))
+#+end_src
+
+Answer the following:
+
+a. With Louis’s coercion procedures installed, what happens if apply-generic is called with two arguments of type scheme-number or two arguments of type complex for an operation that is not found in the table for those types? For example, assume that we’ve defined a generic exponentiation operation:
+   #+begin_src racket :exports code
+(define (exp x y) (apply-generic 'exp x y))
+   #+end_src
+   and have put a procedure for exponentiation in the
+   Scheme-number package but not in any other package:
+   #+begin_src racket :exports code
+;; following added to Scheme-number package
+(put 'exp '(scheme-number scheme-number)
+(lambda (x y) (tag (expt x y))))
+; using primitive expt
+   #+end_src
+   What happens if we call exp with two complex numbers as arguments?
+b. Is Louis correct that something had to be done about
+   coercion with arguments of the same type, or does
+   apply-generic work correctly as is?
+c. Modify apply-generic so that it doesn’t try coercion
+   if the two arguments have the same type.
+** Solution
+*** Part a
+**** High level
+Due to the nature of the implementation, if we give an identity coercion, we would lose the base case that would end the apply-generic recursive call to the coerced type. This would cause infinite recursion, hanging the program.
+**** Step by step
+#+begin_src racket :exports code
+(exp a b)
+(apply-generic 'exp a b)
+(apply-generic 'exp (t1->t2 a) b)
+(apply-generic 'exp (t1->t2 (t1->t2 a)) b)
+(apply-generic 'exp (t1->t2 (t1->t2 (t1->t2 a))) b)
+...
+#+end_src
+
+Since we would always be finding an identity coercion, the current implementation of the ~apply-generic~ procedure will always call itself with the same parameters, therefore causing infinite recursion, halting the program.
+*** Part b
+Louis was not correct that something had to be done about the coercion with arguments of the same type. This version of ~apply-generic~ is all about type conversion, and for the branch where the type conversion attempt was occurring, we could reason about that the required procedure is missing, and that we do not have the facility to search for more potential procedures (without having type raises). Maybe a more fail-safe way to write the ~apply-generic~ in a way that would stop attempts to coerce the types if they are already the same type.
+*** Part c
+#+name: updated-coerced-apply-generic
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args))
+          (if (= (length args) 2)
+              (let ([type1 (car type-tags)]
+                    [type2 (cadr type-tags)]
+                    [a1 (car args)]
+                    [a2 (cadr args)])
+                (let ([t1->t2 (get-coercion type1 type2)]
+                      [t2->t1 (get-coercion type2 type1)])
+                  (cond
+                    [(eq? type1 type2) (error "No method for this operation" (list op type-tags))]
+                    [t1->t2 (apply-generic op (t1->t2 a1) a2)]
+                    [t2->t1 (apply-generic op a1 (t2->t1 a2))]
+                    [else (error "No method for these types" (list op type-tags))])))
+              (error "No method for these types" (list op type-tags)))))))
+#+end_src
+
+This took one branch in a conditional to solve.
