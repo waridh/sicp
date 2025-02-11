@@ -5648,3 +5648,56 @@ done
 (complex rectangular 7 . 4)
 (complex rectangular 4.363365184990673 . -8.97745487943649)
 #+end_example
+
+This is working as we expect it to. Now to the discussions of the weakness of the method we have implemented. There are cases where there are legal, or even preferred mixed type operations. A notable one is exponentiation. Say we implement exponentiation for base as a rational number, and the exponent as a ~scheme-number~. In the instance that we call the exponentiation procedure with the base as a rational number, but the exponent as a complex number that is convertable to a scheme number, the specific operation of not converting the rational number, but attempting to convert the exponent argument to a scheme number will never occur.
+
+** Exercise 2.83
+*** Prompt
+Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex).
+*** Solution
+
+#+name: raise-tower-of-types
+#+begin_src racket :exports code
+(define (install-raise-coercion)
+  (define (real->complex n)
+    (make-complex-from-real-imag (contents n) 0))
+  ;; Where reals are also represented as scheme-numbers
+  (define (rational->real n)
+    (let ([rat-content (contents n)])
+      (make-scheme-number (numer rat-content) (denom rat-content))))
+  ;; Where integers are represented as scheme-numbers
+  (define (integer->rational n)
+    (make-rational (contents n) 1))
+
+  (put-coercion 'scheme-number 'complex scheme-number->complex)
+  (put-coercion 'scheme-number 'rational scheme-number->rational))
+
+#+end_src
+
+#+caption: Testing that the type raising system is working as intended.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.81-scheme-implementation>>
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.82-coerced-apply-generic>>
+<<2.80-complex-implementation>>
+<<2.80-rational-implementation>>
+<<2.81-generic-arithmetic>>
+<<basic-coercions-package>>
+
+(install-scheme-number-package)
+(install-rational-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-base-coercion)
+
+(exp 2 3)
+(add 2 3)
+(add (make-complex-from-real-imag 4 4) 3)
+(add 3 (make-complex-from-real-imag 4 4))
+(sub 5 (make-complex-from-mag-ang 9 1.5))
+(exp (make-complex-from-real-imag 2 0) 4)
+#+end_src
