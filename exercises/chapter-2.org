@@ -5385,11 +5385,266 @@ Louis was not correct that something had to be done about the coercion with argu
                 (let ([t1->t2 (get-coercion type1 type2)]
                       [t2->t1 (get-coercion type2 type1)])
                   (cond
-                    [(eq? type1 type2) (error "No method for this operation" (list op type-tags))]
-                    [t1->t2 (apply-generic op (t1->t2 a1) a2)]
-                    [t2->t1 (apply-generic op a1 (t2->t1 a2))]
+                    [(and t1->t2 (get op (list type2 type2))) (apply-generic op (t1->t2 a1) a2)]
+                    [(and t2->t1 (get op (list type1 type1))) (apply-generic op a1 (t2->t1 a2))]
                     [else (error "No method for these types" (list op type-tags))])))
               (error "No method for these types" (list op type-tags)))))))
 #+end_src
 
-This took one branch in a conditional to solve.
+We needed the next conditional to be tested if there is no operation with one type coercion, therefore, the conditional check has to now include an attempt to see if the coercion would even result in a viable operation.
+
+#+name: 2.81-rational-implementation
+#+begin_src racket :exports code
+(define (install-rational-package)
+  ;; internal procedures
+  (define (numer x)
+    (car x))
+  (define (denom x)
+    (cdr x))
+  (define (make-rat n d)
+    (let ([g (gcd n d)]) (cons (/ n g) (/ d g))))
+  (define (add-rat x y)
+    (make-rat (+ (* (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (sub-rat x y)
+    (make-rat (- (* (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (mul-rat x y)
+    (make-rat (* (numer x) (numer y)) (* (denom x) (denom y))))
+  (define (div-rat x y)
+    (make-rat (* (numer x) (denom y)) (* (denom x) (numer y))))
+  (define (equ? x y)
+    (and (= (numer x) (numer y)) (= (denom x) (denom y))))
+  (define (=zero? x)
+    (= (numer x) 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'rational x))
+  (put 'add '(rational rational) (lambda (x y) (tag (add-rat x y))))
+  (put 'sub '(rational rational) (lambda (x y) (tag (sub-rat x y))))
+  (put 'mul '(rational rational) (lambda (x y) (tag (mul-rat x y))))
+  (put 'div '(rational rational) (lambda (x y) (tag (div-rat x y))))
+  (put '=zero? '(rational) =zero?)
+  (put 'equ? '(rational rational) equ?)
+  (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
+  'done)
+(define (make-rational n d)
+  ((get 'make 'rational) n d))
+#+end_src
+
+#+name: coercion-put-get-implementation
+#+begin_src racket :exports code
+(define *coercion-table* '())
+
+(define (make-coercion-entry k v)
+  (list k v))
+(define (coercion-key entry)
+  (car entry))
+(define (coercion-value entry)
+  (cadr entry))
+;; Checks if the entry of the table has a matching parameter key
+(define (coercion-key? k entry)
+  (equal? (coercion-key entry) k))
+
+(define (put-coercion t1 t2 item)
+  (define (putter k array)
+    (cond
+      [(null? array) (list (make-coercion-entry k item))]
+      [(coercion-key? k (car array)) array]
+      [else (cons (car array) (putter k (cdr array)))]))
+  (set! *coercion-table* (putter (list t1 t2) *coercion-table*)))
+
+(define (get-coercion t1 t2)
+  (define (getter k array)
+    (cond
+      [(null? array) #f]
+      [(coercion-key? k (car array)) (coercion-value (car array))]
+      [else (getter k (cdr array))]))
+  (getter (list t1 t2) *coercion-table*))
+#+end_src
+
+#+name: 2.81-generic-arithmetic
+#+begin_src racket :exports code
+(define (add x y) (apply-generic 'add x y))
+(define (sub x y) (apply-generic 'sub x y))
+(define (mul x y) (apply-generic 'mul x y))
+(define (div x y) (apply-generic 'div x y))
+(define (equ? x y) (apply-generic 'equ? x y))
+(define (exp x y) (apply-generic 'exp x y))
+(define (=zero? x) (apply-generic '=zero? x))
+#+end_src
+
+#+name: basic-coercions-package
+#+begin_src racket :exports code
+(define (install-base-coercion)
+  (define (scheme-number->complex n)
+    (make-complex-from-real-imag (contents n) 0))
+  (define (scheme-number->rational n)
+    (make-rational (contents n) 1))
+
+  (put-coercion 'scheme-number 'complex scheme-number->complex)
+  (put-coercion 'scheme-number 'rational scheme-number->rational))
+
+#+end_src
+
+#+name: 2.81-scheme-implementation
+#+begin_src racket :exports code
+(define (install-scheme-number-package)
+  (define (tag x)
+    (attach-tag 'scheme-number x))
+  (put 'add '(scheme-number scheme-number) (lambda (x y) (tag (+ x y))))
+  (put 'sub '(scheme-number scheme-number) (lambda (x y) (tag (- x y))))
+  (put 'mul '(scheme-number scheme-number) (lambda (x y) (tag (* x y))))
+  (put 'div '(scheme-number scheme-number) (lambda (x y) (tag (/ x y))))
+  (put 'exp '(scheme-number scheme-number) (lambda (x y) (tag (expt x y))))
+  (put 'equ? '(scheme-number scheme-number) (lambda (x y) (= x y)))
+  (put '=zero? '(scheme-number) (lambda (x) (= x 0)))
+  (put 'make 'scheme-number (lambda (x) (tag x)))
+  'done)
+(define (make-scheme-number n)
+  ((get 'make 'scheme-number) n))
+#+end_src
+
+#+caption: Testing that the exp and coercion is working as expected
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.81-scheme-implementation>>
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<updated-coerced-apply-generic>>
+<<2.80-complex-implementation>>
+<<2.80-rational-implementation>>
+<<2.81-generic-arithmetic>>
+<<basic-coercions-package>>
+
+(install-scheme-number-package)
+(install-rational-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-base-coercion)
+
+(exp 2 3)
+(add 2 3)
+(add (make-complex-from-real-imag 4 4) 3)
+(add 3 (make-complex-from-real-imag 4 4))
+(exp (make-complex-from-real-imag 2 0) 4)
+#+end_src
+
+#+RESULTS:
+: done
+: done
+: done
+: done
+: done
+: 8
+: 5
+: (complex rectangular 7 . 4)
+: (complex rectangular 7 . 4)
+
+** Exercise 2.82
+*** Prompt
+Show how to generalize apply-generic to
+handle coercion in the general case of multiple arguments.
+One strategy is to attempt to coerce all the arguments to
+the type of the first argument, then to the type of the second argument, and so on. Give an example of a situation
+where this strategy (and likewise the two-argument version given above) is not sufficiently general. (Hint: Consider the case where there are some suitable mixed-type
+operations present in the table that will not be tried.)
+*** Solution
+So here is what needs to happen. We need to know when two things fail: looking up the procedure with those types, and coercing to that type. We could make a procedure that tries to convert all the arguments passed to it to the type and either return that converted list, or false as a sentinel value. Then, we need to make a predicate that checks if a procedure with an arbitrary type tag exists. Actually, one more helper, we need to make a procedure that duplicates a listed type tag to a certain length list.
+
+#+name: 2.82-coerced-apply-generic
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  ;; returns #f if not all the types could be coerced to the target, else it is
+  ;; all the targets, but coerced into the type t
+  (define (coerce-to-type t targets)
+    (define (reverse items)
+      (define (inner acc res)
+        (if (null? res)
+            acc
+            (inner (cons (car res) acc) (cdr res))))
+      (if items
+          (inner '() items)
+          #f))
+    (define (iter acc tail)
+      (if (null? tail)
+          acc
+          (let ([curr (car tail)]
+                [curr-type (type-tag (car tail))])
+            (if (eq? curr-type t)
+                (iter (cons curr acc) (cdr tail))
+                (let ([coer-proc (get-coercion curr-type t)])
+                  (if coer-proc
+                      (iter (cons (coer-proc curr) acc) (cdr tail))
+                      #f))))))
+    (reverse (iter '() targets)))
+  ;; This procedure will go through all the arguments and try to convert the
+  ;; entire list of arguments into one type, starting with the first type, else
+  ;; return #f
+  (define (attempt-mass-coercion-for-op op args)
+    (define (inner tail)
+      (if (null? tail)
+          #f
+          (let ([head (car tail)])
+            (let ([coer (coerce-to-type (type-tag head) args)])
+              (if coer
+                  (let ([found-op (get op (map type-tag coer))])
+                    (if found-op
+                        coer
+                        (inner (cdr tail))))
+                  (inner (cdr tail)))))))
+    (inner args))
+  ;; Actual implementation
+  (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args))
+          (let ([coerced (attempt-mass-coercion-for-op op args)])
+            (if coerced
+                (apply (get op (map type-tag coerced)) (map contents coerced))
+                (error "no method found for following args" (list op args))))))))
+#+end_src
+
+The idea here is that without some sort of a test, you don't know if your implementation is working or not. Since it's an exercise, we are not going to use real automated testing.
+
+#+caption: Testing that the generic coercion implementation is working.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.81-scheme-implementation>>
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.82-coerced-apply-generic>>
+<<2.80-complex-implementation>>
+<<2.80-rational-implementation>>
+<<2.81-generic-arithmetic>>
+<<basic-coercions-package>>
+
+(install-scheme-number-package)
+(install-rational-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-base-coercion)
+
+(exp 2 3)
+(add 2 3)
+(add (make-complex-from-real-imag 4 4) 3)
+(add 3 (make-complex-from-real-imag 4 4))
+(sub 5 (make-complex-from-mag-ang 9 1.5))
+(exp (make-complex-from-real-imag 2 0) 4)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+8
+5
+(complex rectangular 7 . 4)
+(complex rectangular 7 . 4)
+(complex rectangular 4.363365184990673 . -8.97745487943649)
+#+end_example
