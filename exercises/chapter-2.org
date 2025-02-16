@@ -20,6 +20,38 @@
     (< (abs (- left right)) dx))
   (assert-predicate almost-eq? test-name value expected))
 #+end_src
+
+#+name: functional-interface
+#+begin_src racket :exports code
+;; com-proc is the combination procedure where the acc is the left arg, and the
+;; next ele in the list is the right arg
+(define (left-fold com-proc initial iterable)
+  (define (iter acc tail)
+    (if (null? tail)
+        acc
+        (iter (com-proc acc (car tail)) (cdr tail))))
+  (iter initial iterable))
+
+(define (right-fold com-proc initial iterable)
+  (if (null? iterable)
+      initial
+      (com-proc (right-fold com-proc initial (cdr iterable)) (car iterable))))
+
+;; Apply a procedure on all elements of a list
+(define (map proc iterable)
+  (define (reverse itera)
+    (define (reverse-iter acc tail)
+      (if (null? tail)
+          acc
+          (reverse-iter (cons (car tail) acc) (cdr tail))))
+    (reverse-iter '() itera))
+  (define (iter acc tail)
+    (if (null? tail)
+        acc
+        (iter (cons (proc (car tail)) acc) (cdr tail))))
+  (reverse (iter '() iterable)))
+
+#+end_src
 * Exercise 2.1
 Make an improved ~make-rat~ that will normalize the signage of the rational number.
 #+begin_src racket :exports code
@@ -5463,13 +5495,20 @@ We needed the next conditional to be tested if there is no operation with one ty
 
 #+name: 2.81-generic-arithmetic
 #+begin_src racket :exports code
-(define (add x y) (apply-generic 'add x y))
-(define (sub x y) (apply-generic 'sub x y))
-(define (mul x y) (apply-generic 'mul x y))
-(define (div x y) (apply-generic 'div x y))
-(define (equ? x y) (apply-generic 'equ? x y))
-(define (exp x y) (apply-generic 'exp x y))
-(define (=zero? x) (apply-generic '=zero? x))
+(define (add x y)
+  (apply-generic 'add x y))
+(define (sub x y)
+  (apply-generic 'sub x y))
+(define (mul x y)
+  (apply-generic 'mul x y))
+(define (div x y)
+  (apply-generic 'div x y))
+(define (equ? x y)
+  (apply-generic 'equ? x y))
+(define (exp x y)
+  (apply-generic 'exp x y))
+(define (=zero? x)
+  (apply-generic '=zero? x))
 #+end_src
 
 #+name: basic-coercions-package
@@ -5655,6 +5694,9 @@ This is working as we expect it to. Now to the discussions of the weakness of th
 *** Prompt
 Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex).
 *** Solution
+:LOGBOOK:
+CLOCK: [2025-02-16 Sun 16:16]
+:END:
 #+name: raise-tower-of-types
 #+begin_src racket :exports code
 (define (install-raise-coercion)
@@ -5871,11 +5913,6 @@ We are going to have to remove ~scheme-number~ from the old implementation of th
 ((double-up raise) 3)
 (raise ((double-up raise) 3))
 ((quad-up raise) 3)
-;; (add 2.5 6.4)
-;; (add (make-complex-from-real-imag 4 4) 3)
-;; (add 3 (make-complex-from-real-imag 4 4))
-;; (sub 5 (make-complex-from-mag-ang 9 1.5))
-;; (exp (make-complex-from-real-imag 2 0) 4)
 #+end_src
 
 #+RESULTS:
@@ -5895,4 +5932,182 @@ done
 
 ** Exercise 2.84
 *** Prompt
-Using the ~raise~ operation from the previous exercise,
+Using the ~raise~ operation from the previous exercise, modify the ~apply-generic~ procedure so that it coerces its arguments to have the same type by the method of successive raising, as discussed in this section. You will need to devise a way to test which of two types is higher in the tower. Do this in a manner that is "compatible" with the rest of the system and will not lead to problems in adding new levels to the tower.
+
+*** Solution
+:LOGBOOK:
+CLOCK: [2025-02-16 Sun 15:16]--[2025-02-16 Sun 16:06] =>  0:50
+CLOCK: [2025-02-16 Sun 13:42]--[2025-02-16 Sun 14:32] =>  0:50
+CLOCK: [2025-02-16 Sun 12:49]--[2025-02-16 Sun 13:14] =>  0:25
+CLOCK: [2025-02-16 Sun 12:09]--[2025-02-16 Sun 12:34] =>  0:25
+:END:
+
+Right, we are thinking about making the type tower system easy to add to. Luckily for us, we already did that. We needed a way of checking which type is higher in the tower, so we have to implement that here. The specifics of the implementation is our decision, but here are the things I would like to be able to check from this comparison procedure. We need to know if the left type is lower, higher or equal. There are three states that could be checked, and we could make one function that returns the three state, but actually, we will choose to go with a few set of predicates.
+
+#+name: 2.84-type-comparison
+#+begin_src racket :exports code
+;; procedure that checks if the left parameter is of a higher type in the type
+;; hierarchy than the right. This procedure operates on the type tag, and not
+;; on the object itself.
+(define (higher-type? left right)
+  (define (iter tail)
+    (if (null? tail)
+        false
+        (let ([curr-type (car tail)])
+          (cond
+            [(eq? right curr-type) true]
+            [(eq? left curr-type) false]
+            [else (iter (cdr tail))]))))
+  (if (eq? left right)
+      false
+      (iter type-tower-list)))
+
+;; This procedure will raise a datum to the specified type. Returns false if
+;; this operation fails
+(define (consecutive-raise datum target-type)
+  (let ([curr-type (type-tag datum)])
+    (cond [(higher-type? target-type curr-type) (consecutive-raise (raise datum) target-type)]
+          [(eq? target-type curr-type) datum]
+          [else false])))
+#+end_src
+
+Time to change apply generic. In this change, we are now coupling the implementation of apply generic with the tower of type system that we built. What does this mean? It means that we are now detecting the highest type in the group of arguments, and then we are doing consecutive raising until we brought the content to the desired type.
+
+#+name: 2.84-raise-apply-generic
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  ;; accumulation procedure to find the highest type in the input args.
+  ;; Takes in datum args and not just the type args
+  (define (highest-type args)
+    (let ([lowest-type (car type-tower-list)])
+      (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
+                 lowest-type
+                 (map type-tag args))))
+  ;; This brings all the input args to a target type
+  (define (raise-args-to-type target-type args)
+    (map (lambda (x) (consecutive-raise x target-type)) args))
+  (define (validate args)
+    (define (iter left)
+      (cond
+        [(null? left) args]
+        [(not (car left)) false]
+        [else (iter (cdr left))]))
+    (iter args))
+  ;; procedure that attempts to raise the input datum args to the
+  ;; highest type. If this fails, then return false
+  (define (raise-args-to-highest args)
+    (validate (raise-args-to-type (highest-type args) args)))
+  ;; Actual implementation
+  (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args))
+          (let ([coerced (raise-args-to-highest args)])
+            (if (not coerced)
+                (error "unable to coerce all args to highest type" (list op args type-tags))
+                (let ([coerced-proc (get op (map type-tag coerced))])
+                  (if (not coerced-proc)
+                      (error "unable to find method for arguments" (list op args))
+                      (apply coerced-proc (map contents coerced))))))))))
+#+end_src
+
+We stopped using the testing frameworks since we keep on building many throwaway code, which don't really regress, since we are just making new ones.
+#+caption: Testing that the type raising system is working as intended.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.83-tag-system>>
+<<2.84-raise-apply-generic>>
+<<2.80-complex-implementation>>
+<<2.83-rational-implementation>>
+<<2.81-generic-arithmetic>>
+<<2.83-integer-type-package>>
+<<2.83-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise-coercion)
+
+(define (double-up proc)
+  (lambda (x) (proc (proc x))))
+(define quad-up (double-up double-up))
+
+(raise 3)
+((double-up raise) 3)
+(raise ((double-up raise) 3))
+((quad-up raise) 3)
+
+;; Testing if we could test if a type is higher or lower on the type tower
+(higher-type? 'integer 'real)
+(higher-type? 'integer 'integer)
+(higher-type? 'rational 'integer)
+(higher-type? 'complex 'integer)
+
+;; testing if we could consecutively raise the type
+(consecutive-raise 2 'complex)
+(consecutive-raise 2 'rational)
+(consecutive-raise (make-rational 3 5) 'real)
+(consecutive-raise 3.4 'complex)
+
+(newline)
+(display "testing apply generic now")
+(newline)
+(newline)
+(add 2.5 6.4)
+(add (make-complex-from-real-imag 4 4) 3)
+(add (make-rational 8 3) 2)
+(add (make-rational 7 3) (make-complex-from-real-imag 4 4))
+(add (make-complex-from-real-imag 4 4) (make-rational 7 3))
+(add (make-complex-from-real-imag 4 4) 3.7)
+(add 3 (make-complex-from-real-imag 4 4))
+(add 3.7 (make-complex-from-real-imag 4 4))
+(add (make-rational 8 1) (make-complex-from-real-imag 4 4))
+
+(sub (make-complex-from-real-imag 4 4) 4.7)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+(rational 3 . 1)
+(real . 3)
+(complex rectangular 3 . 0)
+()
+#f
+#f
+#t
+#t
+(complex rectangular 2 . 0)
+(rational 2 . 1)
+(real . 3/5)
+(complex rectangular 3.4 . 0)
+
+testing apply generic now
+
+(real . 8.9)
+(complex rectangular 7 . 4)
+(rational 14 . 3)
+(complex rectangular 19/3 . 4)
+(complex rectangular 19/3 . 4)
+(complex rectangular 7.7 . 4)
+(complex rectangular 7 . 4)
+(complex rectangular 7.7 . 4)
+(complex rectangular 12 . 4)
+(complex rectangular -0.7000000000000002 . 4)
+#+end_example
+
+From this result, we show that we are able to consecutively raise the types of the different parameters to those of the highest type in the arguments. Now, we can move to the next exercise.
