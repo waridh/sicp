@@ -5655,7 +5655,6 @@ This is working as we expect it to. Now to the discussions of the weakness of th
 *** Prompt
 Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex).
 *** Solution
-
 #+name: raise-tower-of-types
 #+begin_src racket :exports code
 (define (install-raise-coercion)
@@ -5664,40 +5663,236 @@ Suppose you are designing a generic arithmetic system for dealing with the tower
   ;; Where reals are also represented as scheme-numbers
   (define (rational->real n)
     (let ([rat-content (contents n)])
-      (make-scheme-number (numer rat-content) (denom rat-content))))
+      (make-real (/ (numer rat-content) (denom rat-content)))))
   ;; Where integers are represented as scheme-numbers
   (define (integer->rational n)
     (make-rational (contents n) 1))
 
-  (put-coercion 'scheme-number 'complex scheme-number->complex)
-  (put-coercion 'scheme-number 'rational scheme-number->rational))
+  (put-coercion 'real 'complex real->complex)
+  (put-coercion 'rational 'real rational->real)
+  (put-coercion 'integer 'rational integer->rational))
 
+;; We need to define a way to get the type that is above a certain type
+(define type-tower-list '(integer rational real complex))
+
+;; return nil if the given type is at the top of the tower, and return false
+;; if the type is not in the tower at all.
+(define (get-upper-type t)
+  (define (parse-output out)
+    (if (pair? out)
+        (car out)
+        out))
+  (define (iter tail)
+    (if (null? tail)
+        false
+        (let ([curr (car tail)])
+          (if (eq? curr t)
+              (parse-output (cdr tail))
+              (iter (cdr tail))))))
+  (iter type-tower-list))
+
+(define (raise n)
+  (let ([para-type (type-tag n)])
+    (let ([next-type (get-upper-type para-type)])
+      (cond [(null? next-type) next-type]
+            [(not next-type) next-type]
+            [else (let ([coercion-proc (get-coercion para-type next-type)])
+                    (if (not coercion-proc)
+                        (error "coercion procedure not found for the following type" (list para-type next-type))
+                        (coercion-proc n)))]))))
 #+end_src
+
+We are literally missing integers and reals as a type. We could rearchitect our system so that we have a type for ~integer~ and ~real~. Let's just implement something quick so that we could prove that our type tower system is working.
+
+#+name: 2.83-integer-type-package
+#+begin_src racket :exports code
+(define (install-integer-package)
+  ;; internal procedures
+  (define (make-int n)
+    (cond [(integer? n) n]
+          [(number? n) (floor n)]
+          [else (error "bad argument: MAKE-INT" n)]))
+  (define (add-int x y)
+    (make-int (+ x y)))
+  (define (sub-int x y)
+    (make-int (- x y)))
+  (define (mul-int x y)
+    (make-int (* x y)))
+  (define (div-int x y)
+    (make-int (* x y)))
+  (define (equ? x y)
+    (= x y))
+  (define (=zero? x)
+    (= x 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'integer x))
+  (put 'add '(integer integer) (lambda (x y) (tag (add-int x y))))
+  (put 'sub '(integer integer) (lambda (x y) (tag (sub-int x y))))
+  (put 'mul '(integer integer) (lambda (x y) (tag (mul-int x y))))
+  (put 'div '(integer integer) (lambda (x y) (tag (div-int x y))))
+  (put '=zero? '(integer) =zero?)
+  (put 'equ? '(integer integer) equ?)
+  (put 'make 'integer (lambda (n) (tag (make-int n))))
+  'done)
+(define (make-integer n)
+  ((get 'make 'integer) n))
+#+end_src
+
+We are going to make the real numbers just a scheme number in this representation, just so that we could focus on the type tower.
+#+name: 2.83-real-type-package
+#+begin_src racket :exports code
+(define (install-real-package)
+  ;; internal procedures
+  (define (make-real n)
+    (cond [(number? n) n]
+          [else (error "bad argument: MAKE-REAL" n)]))
+  (define (add-real x y)
+    (make-real (+ x y)))
+  (define (sub-real x y)
+    (make-real (- x y)))
+  (define (mul-real x y)
+    (make-real (* x y)))
+  (define (div-real x y)
+    (make-real (* x y)))
+  (define (equ? x y)
+    (= x y))
+  (define (=zero? x)
+    (= x 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'real x))
+  (put 'add '(real real) (lambda (x y) (tag (add-real x y))))
+  (put 'sub '(real real) (lambda (x y) (tag (sub-real x y))))
+  (put 'mul '(real real) (lambda (x y) (tag (mul-real x y))))
+  (put 'div '(real real) (lambda (x y) (tag (div-real x y))))
+  (put '=zero? '(real) =zero?)
+  (put 'equ? '(real real) equ?)
+  (put 'make 'real (lambda (n) (tag (make-real n))))
+  'done)
+(define (make-real n)
+  ((get 'make 'real) n))
+#+end_src
+
+#+name: 2.83-rational-implementation
+#+begin_src racket :exports code
+(define (install-rational-package)
+  ;; internal procedures
+  (define (numer x)
+    (car x))
+  (define (denom x)
+    (cdr x))
+  (define (make-rat n d)
+    (let ([g (gcd n d)]) (cons (/ n g) (/ d g))))
+  (define (add-rat x y)
+    (make-rat (+ (* (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (sub-rat x y)
+    (make-rat (- (* (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (mul-rat x y)
+    (make-rat (* (numer x) (numer y)) (* (denom x) (denom y))))
+  (define (div-rat x y)
+    (make-rat (* (numer x) (denom y)) (* (denom x) (numer y))))
+  (define (equ? x y)
+    (and (= (numer x) (numer y)) (= (denom x) (denom y))))
+  (define (=zero? x)
+    (= (numer x) 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'rational x))
+  (put 'add '(rational rational) (lambda (x y) (tag (add-rat x y))))
+  (put 'sub '(rational rational) (lambda (x y) (tag (sub-rat x y))))
+  (put 'mul '(rational rational) (lambda (x y) (tag (mul-rat x y))))
+  (put 'div '(rational rational) (lambda (x y) (tag (div-rat x y))))
+  (put '=zero? '(rational) =zero?)
+  (put 'equ? '(rational rational) equ?)
+  (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
+  (put 'numer 'rational (lambda (n) (numer n)))
+  (put 'denom 'rational (lambda (n) (denom n)))
+  'done)
+(define (make-rational n d)
+  ((get 'make 'rational) n d))
+(define (numer x)
+  ((get 'numer 'rational) x))
+(define (denom x)
+  ((get 'denom 'rational) x))
+#+end_src
+
+We are going to have to remove ~scheme-number~ from the old implementation of the thing, and integrate integers and reals.
+
+#+name: 2.83-tag-system
+#+begin_src racket :exports code
+(define (attach-tag type-tag contents)
+  (if (eq? type-tag 'scheme-number)
+      contents
+      (cons type-tag contents)))
+(define (type-tag datum)
+  (cond
+    [(pair? datum) (car datum)]
+    [(integer? datum) 'integer]
+    [(number? datum) 'real]
+    [else (error "Bad tagged datum: TYPE-TAG" datum)]))
+(define (contents datum)
+  (cond
+    [(pair? datum) (cdr datum)]
+    [(number? datum) datum]
+    [else (error "Bad tagged datum: CONTENTS" datum)]))
+#+end_src
+
 
 #+caption: Testing that the type raising system is working as intended.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
-<<2.81-scheme-implementation>>
 <<put-get-implementation>>
 <<coercion-put-get-implementation>>
-<<2.80-tag-system>>
+<<2.83-tag-system>>
 <<2.82-coerced-apply-generic>>
 <<2.80-complex-implementation>>
-<<2.80-rational-implementation>>
+<<2.83-rational-implementation>>
 <<2.81-generic-arithmetic>>
+<<2.83-integer-type-package>>
+<<2.83-real-type-package>>
 <<basic-coercions-package>>
+<<raise-tower-of-types>>
 
-(install-scheme-number-package)
 (install-rational-package)
+(install-integer-package)
+(install-real-package)
 (install-complex-package)
 (install-rectangular-package)
 (install-polar-package)
 (install-base-coercion)
+(install-raise-coercion)
 
-(exp 2 3)
-(add 2 3)
-(add (make-complex-from-real-imag 4 4) 3)
-(add 3 (make-complex-from-real-imag 4 4))
-(sub 5 (make-complex-from-mag-ang 9 1.5))
-(exp (make-complex-from-real-imag 2 0) 4)
+(define (double-up proc)
+  (lambda (x) (proc (proc x))))
+(define quad-up (double-up double-up))
+
+(raise 3)
+((double-up raise) 3)
+(raise ((double-up raise) 3))
+((quad-up raise) 3)
+;; (add 2.5 6.4)
+;; (add (make-complex-from-real-imag 4 4) 3)
+;; (add 3 (make-complex-from-real-imag 4 4))
+;; (sub 5 (make-complex-from-mag-ang 9 1.5))
+;; (exp (make-complex-from-real-imag 2 0) 4)
 #+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+(rational 3 . 1)
+(real . 3)
+(complex rectangular 3 . 0)
+()
+#+end_example
+
+
+** Exercise 2.84
+*** Prompt
+Using the ~raise~ operation from the previous exercise,
