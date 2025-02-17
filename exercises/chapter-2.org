@@ -5695,20 +5695,17 @@ This is working as we expect it to. Now to the discussions of the weakness of th
 Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex).
 *** Solution
 :LOGBOOK:
-CLOCK: [2025-02-16 Sun 16:16]
+CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
 :END:
 #+name: raise-tower-of-types
 #+begin_src racket :exports code
 (define (install-raise-coercion)
   (define (real->complex n)
-    (make-complex-from-real-imag (contents n) 0))
-  ;; Where reals are also represented as scheme-numbers
+    (make-complex-from-real-imag n 0))
   (define (rational->real n)
-    (let ([rat-content (contents n)])
-      (make-real (/ (numer rat-content) (denom rat-content)))))
-  ;; Where integers are represented as scheme-numbers
+    (make-real (/ (numer n) (denom n))))
   (define (integer->rational n)
-    (make-rational (contents n) 1))
+    (make-rational n 1))
 
   (put-coercion 'real 'complex real->complex)
   (put-coercion 'rational 'real rational->real)
@@ -5736,12 +5733,15 @@ CLOCK: [2025-02-16 Sun 16:16]
 (define (raise n)
   (let ([para-type (type-tag n)])
     (let ([next-type (get-upper-type para-type)])
-      (cond [(null? next-type) next-type]
-            [(not next-type) next-type]
-            [else (let ([coercion-proc (get-coercion para-type next-type)])
-                    (if (not coercion-proc)
-                        (error "coercion procedure not found for the following type" (list para-type next-type))
-                        (coercion-proc n)))]))))
+      (cond
+        [(null? next-type) n]
+        [(not next-type) (error "could not find the given type in the type tower" (list n type-tag type-tower-list))]
+        [else
+         (let ([coercion-proc (get-coercion para-type next-type)])
+           (if (not coercion-proc)
+               (error "coercion procedure not found for the following type"
+                      (list para-type next-type))
+               (coercion-proc (contents n))))]))))
 #+end_src
 
 We are literally missing integers and reals as a type. We could rearchitect our system so that we have a type for ~integer~ and ~real~. Let's just implement something quick so that we could prove that our type tower system is working.
@@ -5926,7 +5926,7 @@ done
 (rational 3 . 1)
 (real . 3)
 (complex rectangular 3 . 0)
-()
+(complex rectangular 3 . 0)
 #+end_example
 
 
@@ -6037,15 +6037,6 @@ We stopped using the testing frameworks since we keep on building many throwaway
 (install-polar-package)
 (install-raise-coercion)
 
-(define (double-up proc)
-  (lambda (x) (proc (proc x))))
-(define quad-up (double-up double-up))
-
-(raise 3)
-((double-up raise) 3)
-(raise ((double-up raise) 3))
-((quad-up raise) 3)
-
 ;; Testing if we could test if a type is higher or lower on the type tower
 (higher-type? 'integer 'real)
 (higher-type? 'integer 'integer)
@@ -6086,7 +6077,7 @@ done
 (rational 3 . 1)
 (real . 3)
 (complex rectangular 3 . 0)
-()
+(complex rectangular 3 . 0)
 #f
 #f
 #t
@@ -6111,3 +6102,166 @@ testing apply generic now
 #+end_example
 
 From this result, we show that we are able to consecutively raise the types of the different parameters to those of the highest type in the arguments. Now, we can move to the next exercise.
+** Exercise 2.85
+*** Prompt
+This section mentioned a method for "simplifying" a data object by lowering it in the tower of types as far as possible. Design a procedure ~drop~ that accomplishes this for the tower we have been working on. The key is to decide, in some general way, whether an object can be lowered. For example, the complex number 1.5 + 0i can be lowered as far as ~real~, the complex number 1 + 0i can be lowered as far as ~integer~, and the complex number 2 + 3i cannot be lowered at all. Here is a plan for determining whether an object can be lowered: Begin by defining a generic operation ~project~ that "pushes" an object down in the tower. For example, projecting a complex number would involve throwing away the imaginary part. then a number can be dropped if, when we ~project~ it and ~raise~ the result back to the type we started with, we end up with something equal to what we started with (making sure it is not lossless). Show how to implement this idea in detail, by writing a ~drop~ procedure that drops an object as far as possible. You will need to design the various projection operations and install ~project~ as a generic operation in the system. You will also need to make use of a generic equality predicate, such as described in Exercise 2.79. Finally, use ~drop~ to rewrite ~apply-generic~ from Exercise 2.84 so it "simplifies" its answers.
+*** Solution
+:LOGBOOK:
+CLOCK: [2025-02-16 Sun 19:13]--[2025-02-16 Sun 20:03] =>  0:50
+:END:
+
+We can design ~drop~, but we would have to define all the one step conversion downwards. Using the architecture defined by the book, we could define the conversion method in a lossy way, as there will be a generic procedure that handles the case that we lost information in the conversion.
+
+#+name: 2.85-drop
+#+begin_src racket :exports code
+(define (install-drop-coercion)
+  (define (complex->real n)
+    (make-real (real-part n)))
+  (define (real->rational n)
+    (make-rational n 1))
+  (define (rational->integer n)
+    (make-integer (/ (numer n) (demon n))))
+
+  (put-coercion 'complex 'real complex->real)
+  (put-coercion 'real 'rational real->rational)
+  (put-coercion 'rational 'integer rational->integer)
+  'done)
+
+;; return nil if the given type is at the bottom of the tower, and return false
+;; if the type is not in the tower at all.
+(define (lower-type t)
+  (define (iter tail)
+    (if (null? tail)
+        false
+        (let ([curr (car tail)]
+              [next (cdr tail)])
+          (cond
+            [(null? next) false]
+            [(eq? (car next) t) curr]
+            [else (iter tail)]))))
+  (iter type-tower-list))
+
+;; Project allows for lossy downward coercion of the type
+(define (project n)
+  (let ([para-type (type-tag n)])
+    (let ([target-type (lower-type (type-tag n))])
+      (cond
+        [(not target-type) (error "could not find the parameter type in the type tower" (list n type-tag type-tower-list))]
+        [(null? target-type) n]
+        [else (let ([proj-proc (get-coercion para-type target-type)])
+                (if (not proj-proc)
+                    (error "could not find the coercion procedure for the following type conversion" (list para-type target-type))
+                    (proj-proc (contents n))))]))))
+
+(define (drop n)
+  (let ([para-type (type-tag n)])
+    (let ([lower-type (get-upper-type para-type)])
+      (cond
+        [(null? next-type) next-type]
+        [(not next-type) next-type]
+        [else
+         (let ([coercion-proc (get-coercion para-type next-type)])
+           (if (not coercion-proc)
+               (error "coercion procedure not found for the following type"
+                      (list para-type next-type))
+               (coercion-proc n)))]))))
+#+end_src
+
+#+RESULTS: 2.85-drop
+
+
+To test our implementation, we can use the set of tests from the previous exercise with updated imports.
+#+caption: Testing that the type raising system is working as intended.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.83-tag-system>>
+<<2.84-raise-apply-generic>>
+<<2.80-complex-implementation>>
+<<2.83-rational-implementation>>
+<<2.81-generic-arithmetic>>
+<<2.83-integer-type-package>>
+<<2.83-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise-coercion)
+
+;; Testing if we could test if a type is higher or lower on the type tower
+(higher-type? 'integer 'real)
+(higher-type? 'integer 'integer)
+(higher-type? 'rational 'integer)
+(higher-type? 'complex 'integer)
+
+;; testing if we could consecutively raise the type
+(consecutive-raise 2 'complex)
+(consecutive-raise 2 'rational)
+(consecutive-raise (make-rational 3 5) 'real)
+(consecutive-raise 3.4 'complex)
+
+(newline)
+(display "testing apply generic now")
+(newline)
+(newline)
+(add 2.5 6.4)
+(add (make-complex-from-real-imag 4 4) 3)
+(add (make-rational 8 3) 2)
+(add (make-rational 7 3) (make-complex-from-real-imag 4 4))
+(add (make-complex-from-real-imag 4 4) (make-rational 7 3))
+(add (make-complex-from-real-imag 4 4) 3.7)
+(add 3 (make-complex-from-real-imag 4 4))
+(add 3.7 (make-complex-from-real-imag 4 4))
+(add (make-rational 8 1) (make-complex-from-real-imag 4 4))
+(sub (make-complex-from-real-imag 4 4) 4.7)
+
+(make-rational 1.5 3)
+(raise (make-rational 1.5 3))
+(make-rational (contents (raise (make-rational 1.5 3)) ) 1)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+(rational 3 . 1)
+(real . 3)
+(complex rectangular 3 . 0)
+(complex rectangular 3 . 0)
+#f
+#f
+#t
+#t
+(complex rectangular 2 . 0)
+(rational 2 . 1)
+(real . 3/5)
+(complex rectangular 3.4 . 0)
+
+testing apply generic now
+
+(real . 8.9)
+(complex rectangular 7 . 4)
+(rational 14 . 3)
+(complex rectangular 19/3 . 4)
+(complex rectangular 19/3 . 4)
+(complex rectangular 7.7 . 4)
+(complex rectangular 7 . 4)
+(complex rectangular 7.7 . 4)
+(complex rectangular 12 . 4)
+(complex rectangular -0.7000000000000002 . 4)
+(rational 1.0 . 2.0)
+(real . 0.5)
+(rational 1.0 . 2.0)
+#+end_example
