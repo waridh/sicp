@@ -5964,8 +5964,8 @@ done
 done
 3
 (rational 3 . 1)
-(complex rectangular 3 . 0)
 (real . 3)
+(complex rectangular 3 . 0)
 (complex rectangular 3 . 0)
 (complex rectangular 3 . 0)
 #+end_example
