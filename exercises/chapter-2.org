@@ -5692,59 +5692,115 @@ This is working as we expect it to. Now to the discussions of the weakness of th
 
 ** Exercise 2.83
 *** Prompt
-Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex).
+Suppose you are designing a generic arithmetic system for dealing with the tower of types shown in the previous chapter, where the types are integer, rational, real, complex. For each type except complex, design a procedure that raises objects of that type one level in the tower. Show how to install a generic ~raise~ operation that will work for each type (except complex). Also, and an added challenge, keep the scheme numbers in the system.
 *** Solution
 :LOGBOOK:
 CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
 :END:
 #+name: raise-tower-of-types
 #+begin_src racket :exports code
-(define (install-raise-coercion)
+;; Making raise an operation, and then installing it into a generic application
+(define (install-raise)
   (define (real->complex n)
     (make-complex-from-real-imag n 0))
   (define (rational->real n)
     (make-real (/ (numer n) (denom n))))
   (define (integer->rational n)
     (make-rational n 1))
-
+  (define (scheme-number->real n)
+    (make-real n))
   (put-coercion 'real 'complex real->complex)
+  (put-coercion 'scheme-number 'complex real->complex)
   (put-coercion 'rational 'real rational->real)
-  (put-coercion 'integer 'rational integer->rational))
+  (put-coercion 'integer 'rational integer->rational)
+  (put-coercion 'scheme-number 'real scheme-number->real)
+  'done)
 
-;; We need to define a way to get the type that is above a certain type
-(define type-tower-list '(integer rational real complex))
+(define default-ranks '(integer rational real complex))
 
-;; return nil if the given type is at the top of the tower, and return false
-;; if the type is not in the tower at all.
-(define (get-upper-type t)
-  (define (parse-output out)
-    (if (pair? out)
-        (car out)
-        out))
-  (define (iter tail)
+(define (lowest-rank)
+  0)
+(define (highest-rank)
+  (define (iter acc tail)
     (if (null? tail)
-        false
-        (let ([curr (car tail)])
-          (if (eq? curr t)
-              (parse-output (cdr tail))
-              (iter (cdr tail))))))
-  (iter type-tower-list))
+        (- acc 1) ;; the highest rank was the prev element
+        (iter (+ acc 1) (cdr tail))))
+  (iter 0 default-ranks))
 
+;; currently operates on types and rank
+(define (lowest-rank? n)
+  (cond
+    [(number? n) (= n (lowest-rank))]
+    [else (= (lowest-rank) (rank-of-type n))]))
+
+;; currently operates on types and rank
+(define (highest-rank? n)
+  (cond
+    [(number? n) (>= n (highest-rank))]
+    [else (>= (rank-of-type n) (highest-rank))]))
+
+;; where n is the rank as a number. If the value provided does not fall into the
+;; available rank, then return false. This procedure returns the default rank
+(define (type-of-rank n)
+  (define (iter acc tail)
+    (cond
+      [(null? tail) false]
+      [(= acc n) (car tail)]
+      [else (iter (+ acc 1) (cdr tail))]))
+  (iter 0 default-ranks))
+
+(define (rank-of-type n)
+  (cond
+    [(eq? n 'integer) 0]
+    [(eq? n 'rational) 1]
+    [(eq? n 'real) 2]
+    [(eq? n 'scheme-number) 2]
+    [(eq? n 'complex) 3]
+    [else false]))
+
+;; get the default type for a given type
+(define (default-type-of-type t)
+  (type-of-rank (rank-of-type t)))
+
+;; coerce an actual datum to their default type
+(define (to-default-type datum)
+  (let ([curr-type (type-tag datum)])
+    (let ([target-type (default-type-of-type curr-type)])
+      (if (eq? curr-type target-type)
+          datum
+          (let ([coer-proc (get-coercion curr-type target-type)])
+            (if (not coer-proc)
+                (error "missing coercion procedure for the following type"
+                       (list curr-type target-type datum))
+                (coer-proc (contents datum))))))))
+
+;; The idea behind this one is that we are trying to look for the correct type
+;; to coerce to that is of a higher rank. If we are already at the highest rank
+;; then we cannot raise, and we will return the same type
+;;
+;; Highest rank -> return itself
+;; if not the highest rank, and also not the default type of the rank, ->
+;; convert to the default type of rank
+;; failed to get coercion procedure -> raise error
+;; else -> return coerced value
 (define (raise n)
   (let ([para-type (type-tag n)])
-    (let ([next-type (get-upper-type para-type)])
-      (cond
-        [(null? next-type) n]
-        [(not next-type) (error "could not find the given type in the type tower" (list n type-tag type-tower-list))]
-        [else
-         (let ([coercion-proc (get-coercion para-type next-type)])
-           (if (not coercion-proc)
-               (error "coercion procedure not found for the following type"
-                      (list para-type next-type))
-               (coercion-proc (contents n))))]))))
+    (let ([para-rank (rank-of-type para-type)])
+      (if (highest-rank? para-rank)
+          n
+          (let ([safe-curr-datum (if (eq? (default-type-of-type para-type) para-type)
+                                     n
+                                     (to-default-type n))]
+                [next-type (type-of-rank (+ para-rank 1))])
+            (let ([coer-proc (get-coercion (type-tag safe-curr-datum) next-type)])
+              (if (not coer-proc)
+                  (error "could not find coercion procedure for the following type"
+                         (list (type-tag safe-curr-datum) next-type safe-curr-datum n))
+                  (coer-proc (contents safe-curr-datum)))))))))
 #+end_src
 
-We are literally missing integers and reals as a type. We could rearchitect our system so that we have a type for ~integer~ and ~real~. Let's just implement something quick so that we could prove that our type tower system is working.
+
+For the sake of reusing our rational number type, and making our own number typing system, we will implement integer and reals, and add scheme-numbers as the same type ranking as real numbers. Really, we could have gone through this in many ways, such as not even making our own integer and reals, and using the built in scheme types, since they are able to identify if the value is an integer, rational number or real number.
 
 #+name: 2.83-integer-type-package
 #+begin_src racket :exports code
@@ -5848,7 +5904,7 @@ We are going to make the real numbers just a scheme number in this representatio
   (put '=zero? '(rational) =zero?)
   (put 'equ? '(rational rational) equ?)
   (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
-  (put 'numer 'rational (lambda (n) (numer n)))
+  (put 'numer 'rational (lambda (n) (numer n))) ;; numerator and denominator
   (put 'denom 'rational (lambda (n) (denom n)))
   'done)
 (define (make-rational n d)
@@ -5859,40 +5915,19 @@ We are going to make the real numbers just a scheme number in this representatio
   ((get 'denom 'rational) x))
 #+end_src
 
-We are going to have to remove ~scheme-number~ from the old implementation of the thing, and integrate integers and reals.
-
-#+name: 2.83-tag-system
-#+begin_src racket :exports code
-(define (attach-tag type-tag contents)
-  (if (eq? type-tag 'scheme-number)
-      contents
-      (cons type-tag contents)))
-(define (type-tag datum)
-  (cond
-    [(pair? datum) (car datum)]
-    [(integer? datum) 'integer]
-    [(number? datum) 'real]
-    [else (error "Bad tagged datum: TYPE-TAG" datum)]))
-(define (contents datum)
-  (cond
-    [(pair? datum) (cdr datum)]
-    [(number? datum) datum]
-    [else (error "Bad tagged datum: CONTENTS" datum)]))
-#+end_src
-
-
 #+caption: Testing that the type raising system is working as intended.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
 <<put-get-implementation>>
 <<coercion-put-get-implementation>>
-<<2.83-tag-system>>
+<<2.80-tag-system>>
 <<2.82-coerced-apply-generic>>
 <<2.80-complex-implementation>>
 <<2.83-rational-implementation>>
 <<2.81-generic-arithmetic>>
 <<2.83-integer-type-package>>
 <<2.83-real-type-package>>
+<<2.83-type-rank>>
 <<basic-coercions-package>>
 <<raise-tower-of-types>>
 
@@ -5903,16 +5938,19 @@ We are going to have to remove ~scheme-number~ from the old implementation of th
 (install-rectangular-package)
 (install-polar-package)
 (install-base-coercion)
-(install-raise-coercion)
+(install-raise)
 
 (define (double-up proc)
   (lambda (x) (proc (proc x))))
 (define quad-up (double-up double-up))
 
+(highest-rank)
+
+(raise (make-integer 3))
+((double-up raise) (make-integer 3))
+(raise ((double-up raise) (make-integer 3)))
+((quad-up raise) (make-integer 3))
 (raise 3)
-((double-up raise) 3)
-(raise ((double-up raise) 3))
-((quad-up raise) 3)
 #+end_src
 
 #+RESULTS:
@@ -5923,7 +5961,10 @@ done
 done
 done
 done
+done
+3
 (rational 3 . 1)
+(complex rectangular 3 . 0)
 (real . 3)
 (complex rectangular 3 . 0)
 (complex rectangular 3 . 0)
@@ -5946,30 +5987,30 @@ Right, we are thinking about making the type tower system easy to add to. Luckil
 
 #+name: 2.84-type-comparison
 #+begin_src racket :exports code
-;; procedure that checks if the left parameter is of a higher type in the type
-;; hierarchy than the right. This procedure operates on the type tag, and not
-;; on the object itself.
+;; the higher-type predicate could now find out if higher type by looking at the
+;; type-rank
 (define (higher-type? left right)
-  (define (iter tail)
-    (if (null? tail)
-        false
-        (let ([curr-type (car tail)])
-          (cond
-            [(eq? right curr-type) true]
-            [(eq? left curr-type) false]
-            [else (iter (cdr tail))]))))
-  (if (eq? left right)
-      false
-      (iter type-tower-list)))
+  (let ([left-t-rank (type-rank left)]
+        [right-t-rank (type-rank right)])
+    (cond
+      [(not left-t-rank)
+       (error "left type is not registered in the type rank system" (list left right))]
+      [(not right-t-rank)
+       (error "right type rank is not registered in the type rank system" (list left right))]
+      [else (> left-t-rank right-t-rank)])))
 
 ;; This procedure will raise a datum to the specified type. Returns false if
 ;; this operation fails
 (define (consecutive-raise datum target-type)
   (let ([curr-type (type-tag datum)])
-    (cond [(higher-type? target-type curr-type) (consecutive-raise (raise datum) target-type)]
-          [(eq? target-type curr-type) datum]
-          [else false])))
+    (cond
+      [(higher-type? target-type curr-type) (consecutive-raise (raise datum) target-type)]
+      ;; We need to make it so that types of the same rank will convert itself
+      ;; to a default rank when about to interact with another type.
+      [(= (type-rank target-type ) (type-rank curr-type )) (if (eq? target-type curr-type) datum (to-rank-default datum))]
+      [else false])))
 #+end_src
+
 
 Time to change apply generic. In this change, we are now coupling the implementation of apply generic with the tower of type system that we built. What does this mean? It means that we are now detecting the highest type in the group of arguments, and then we are doing consecutive raising until we brought the content to the desired type.
 
@@ -5979,10 +6020,9 @@ Time to change apply generic. In this change, we are now coupling the implementa
   ;; accumulation procedure to find the highest type in the input args.
   ;; Takes in datum args and not just the type args
   (define (highest-type args)
-    (let ([lowest-type (car type-tower-list)])
-      (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
-                 lowest-type
-                 (map type-tag args))))
+    (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
+               lowest-type
+               (map type-tag args)))
   ;; This brings all the input args to a target type
   (define (raise-args-to-type target-type args)
     (map (lambda (x) (consecutive-raise x target-type)) args))
@@ -5996,7 +6036,7 @@ Time to change apply generic. In this change, we are now coupling the implementa
   ;; procedure that attempts to raise the input datum args to the
   ;; highest type. If this fails, then return false
   (define (raise-args-to-highest args)
-    (validate (raise-args-to-type (highest-type args) args)))
+    (validate (raise-args-to-type (rank-default-of-type (highest-type args)) args)))
   ;; Actual implementation
   (let ([type-tags (map type-tag args)])
     (let ([proc (get op type-tags)])
@@ -6007,7 +6047,7 @@ Time to change apply generic. In this change, we are now coupling the implementa
                 (error "unable to coerce all args to highest type" (list op args type-tags))
                 (let ([coerced-proc (get op (map type-tag coerced))])
                   (if (not coerced-proc)
-                      (error "unable to find method for arguments" (list op args))
+                      (error "unable to find method for arguments" (list op coerced))
                       (apply coerced-proc (map contents coerced))))))))))
 #+end_src
 
@@ -6017,7 +6057,7 @@ We stopped using the testing frameworks since we keep on building many throwaway
 #lang sicp
 <<put-get-implementation>>
 <<coercion-put-get-implementation>>
-<<2.83-tag-system>>
+<<2.80-tag-system>>
 <<2.84-raise-apply-generic>>
 <<2.80-complex-implementation>>
 <<2.83-rational-implementation>>
@@ -6025,7 +6065,10 @@ We stopped using the testing frameworks since we keep on building many throwaway
 <<2.83-integer-type-package>>
 <<2.83-real-type-package>>
 <<basic-coercions-package>>
+<<2.81-scheme-implementation>>
 <<raise-tower-of-types>>
+<<2.83-default-rank-type>>
+<<2.83-type-rank>>
 <<2.84-type-comparison>>
 <<functional-interface>>
 
@@ -6035,35 +6078,33 @@ We stopped using the testing frameworks since we keep on building many throwaway
 (install-complex-package)
 (install-rectangular-package)
 (install-polar-package)
-(install-raise-coercion)
-
-;; Testing if we could test if a type is higher or lower on the type tower
-(higher-type? 'integer 'real)
-(higher-type? 'integer 'integer)
-(higher-type? 'rational 'integer)
-(higher-type? 'complex 'integer)
+(install-raise)
+(install-type-rank)
+(install-scheme-number-package)
 
 ;; testing if we could consecutively raise the type
-(consecutive-raise 2 'complex)
-(consecutive-raise 2 'rational)
+(consecutive-raise (make-real 2) 'complex)
+(consecutive-raise (make-integer 2) 'rational)
 (consecutive-raise (make-rational 3 5) 'real)
+(consecutive-raise (make-real 3.4) 'complex)
 (consecutive-raise 3.4 'complex)
 
 (newline)
 (display "testing apply generic now")
 (newline)
 (newline)
-(add 2.5 6.4)
+(add (make-real 2.5) (make-real 6.4))
 (add (make-complex-from-real-imag 4 4) 3)
-(add (make-rational 8 3) 2)
+(add (make-rational 4 4) 3)
+(add (make-complex-from-real-imag 4 4) (make-integer 3))
+(add (make-rational 8 3) (make-integer 2))
 (add (make-rational 7 3) (make-complex-from-real-imag 4 4))
 (add (make-complex-from-real-imag 4 4) (make-rational 7 3))
-(add (make-complex-from-real-imag 4 4) 3.7)
-(add 3 (make-complex-from-real-imag 4 4))
-(add 3.7 (make-complex-from-real-imag 4 4))
+(add (make-complex-from-real-imag 4 4) (make-real 3.7))
+(add (make-integer 3) (make-complex-from-real-imag 4 4))
+(add (make-real 3.7) (make-complex-from-real-imag 4 4))
 (add (make-rational 8 1) (make-complex-from-real-imag 4 4))
-
-(sub (make-complex-from-real-imag 4 4) 4.7)
+(sub (make-complex-from-real-imag 4 4) (make-real 4.7))
 #+end_src
 
 #+RESULTS:
@@ -6074,22 +6115,20 @@ done
 done
 done
 done
-(rational 3 . 1)
-(real . 3)
-(complex rectangular 3 . 0)
-(complex rectangular 3 . 0)
-#f
-#f
-#t
-#t
+done
+done
+done
 (complex rectangular 2 . 0)
 (rational 2 . 1)
 (real . 3/5)
+(complex rectangular 3.4 . 0)
 (complex rectangular 3.4 . 0)
 
 testing apply generic now
 
 (real . 8.9)
+(complex rectangular 7 . 4)
+(real . 4)
 (complex rectangular 7 . 4)
 (rational 14 . 3)
 (complex rectangular 19/3 . 4)
@@ -6114,61 +6153,80 @@ We can design ~drop~, but we would have to define all the one step conversion do
 
 #+name: 2.85-drop
 #+begin_src racket :exports code
-(define (install-drop-coercion)
+(define (install-project)
   (define (complex->real n)
     (make-real (real-part n)))
   (define (real->rational n)
-    (make-rational n 1))
+    (make-rational (* n 10) 10))
   (define (rational->integer n)
-    (make-integer (/ (numer n) (demon n))))
+    (make-integer (/ (numer n) (denom n))))
 
-  (put-coercion 'complex 'real complex->real)
-  (put-coercion 'real 'rational real->rational)
-  (put-coercion 'rational 'integer rational->integer)
+  (put 'project '(complex) complex->real)
+  (put 'project '(real) real->rational)
+  (put 'project '(rational) rational->integer)
+  (put 'project '(integer) (lambda (x) (make-integer x)))
   'done)
 
-;; return nil if the given type is at the bottom of the tower, and return false
-;; if the type is not in the tower at all.
-(define (lower-type t)
-  (define (iter tail)
-    (if (null? tail)
-        false
-        (let ([curr (car tail)]
-              [next (cdr tail)])
-          (cond
-            [(null? next) false]
-            [(eq? (car next) t) curr]
-            [else (iter tail)]))))
-  (iter type-tower-list))
-
-;; Project allows for lossy downward coercion of the type
+;; Project allows for lossy downward coercion of the type. Project will return
+;; the same item if we are at the bottom of the type tower.
 (define (project n)
-  (let ([para-type (type-tag n)])
-    (let ([target-type (lower-type (type-tag n))])
-      (cond
-        [(not target-type) (error "could not find the parameter type in the type tower" (list n type-tag type-tower-list))]
-        [(null? target-type) n]
-        [else (let ([proj-proc (get-coercion para-type target-type)])
-                (if (not proj-proc)
-                    (error "could not find the coercion procedure for the following type conversion" (list para-type target-type))
-                    (proj-proc (contents n))))]))))
+  (apply-generic 'project n))
 
+;; Drop will prevent lossy dropping of the value, but it will also drop it as far as possible
 (define (drop n)
-  (let ([para-type (type-tag n)])
-    (let ([lower-type (get-upper-type para-type)])
-      (cond
-        [(null? next-type) next-type]
-        [(not next-type) next-type]
-        [else
-         (let ([coercion-proc (get-coercion para-type next-type)])
-           (if (not coercion-proc)
-               (error "coercion procedure not found for the following type"
-                      (list para-type next-type))
-               (coercion-proc n)))]))))
+  (define (iter prev)
+    (let ([projected (project prev)])
+      (if (or (= (type-rank (type-tag projected )) (type-rank (type-tag prev ))) (not (equ? (raise projected) prev)))
+          prev
+          (iter projected))))
+  (iter n))
 #+end_src
 
-#+RESULTS: 2.85-drop
+#+name: 2.85-raise-drop-apply-generic
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  (define (typed? datum)
+    (if (pair? datum) true false))
+  ;; Need to check if the result is even a typed value
+  (define (drop-result value)
+    (if (and (typed? value) (not (or (eq? op 'project) (eq? op 'raise))))
+        (drop value)
+        value))
+  ;; accumulation procedure to find the highest type in the input args.
+  ;; Takes in datum args and not just the type args
+  (define (highest-type args)
+    (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
+               lowest-type
+               (map type-tag args)))
+  ;; This brings all the input args to a target type
+  (define (raise-args-to-type target-type args)
+    (map (lambda (x) (consecutive-raise x target-type)) args))
+  (define (validate args)
+    (define (iter left)
+      (cond
+        [(null? left) args]
+        [(not (car left)) false]
+        [else (iter (cdr left))]))
+    (iter args))
+  ;; procedure that attempts to raise the input datum args to the
+  ;; highest type. If this fails, then return false
+  (define (raise-args-to-highest args)
+    (validate (raise-args-to-type (rank-default-of-type (highest-type args)) args)))
+  ;; Actual implementation
+  (drop-result (let ([type-tags (map type-tag args)])
+    (let ([proc (get op type-tags)])
+      (if proc
+          (apply proc (map contents args))
+          (let ([coerced (raise-args-to-highest args)])
+            (if (not coerced)
+                (error "unable to coerce all args to highest type" (list op args type-tags))
+                (let ([coerced-proc (get op (map type-tag coerced))])
+                  (if (not coerced-proc)
+                      (error "unable to find method for arguments" (list op coerced))
+                      (apply coerced-proc (map contents coerced))))))))) ))
+#+end_src
 
+#+RESULTS: 2.85-raise-drop-apply-generic
 
 To test our implementation, we can use the set of tests from the previous exercise with updated imports.
 #+caption: Testing that the type raising system is working as intended.
@@ -6176,8 +6234,8 @@ To test our implementation, we can use the set of tests from the previous exerci
 #lang sicp
 <<put-get-implementation>>
 <<coercion-put-get-implementation>>
-<<2.83-tag-system>>
-<<2.84-raise-apply-generic>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
 <<2.80-complex-implementation>>
 <<2.83-rational-implementation>>
 <<2.81-generic-arithmetic>>
@@ -6187,26 +6245,42 @@ To test our implementation, we can use the set of tests from the previous exerci
 <<raise-tower-of-types>>
 <<2.84-type-comparison>>
 <<functional-interface>>
+<<2.81-scheme-implementation>>
+<<2.85-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
 
 (install-rational-package)
 (install-integer-package)
+(install-type-rank)
 (install-real-package)
 (install-complex-package)
 (install-rectangular-package)
 (install-polar-package)
-(install-raise-coercion)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
 
-;; Testing if we could test if a type is higher or lower on the type tower
-(higher-type? 'integer 'real)
-(higher-type? 'integer 'integer)
-(higher-type? 'rational 'integer)
-(higher-type? 'complex 'integer)
+(newline)
+(display "testing project")
+(newline)
 
-;; testing if we could consecutively raise the type
-(consecutive-raise 2 'complex)
-(consecutive-raise 2 'rational)
-(consecutive-raise (make-rational 3 5) 'real)
-(consecutive-raise 3.4 'complex)
+(project (make-complex-from-real-imag 8 0))
+(project (project (make-complex-from-real-imag 8 0)))
+(project (project (project (make-complex-from-real-imag 8 0))))
+
+(newline)
+(display "testing drop, and its limits")
+(newline)
+
+(drop (make-complex-from-real-imag 8 0))
+(drop 64)
+(drop (drop (make-complex-from-real-imag 8 0)))
+(drop (drop (drop (make-complex-from-real-imag 8 0))))
+
+(drop (make-complex-from-real-imag 8.5 0))
+(drop (drop (make-complex-from-real-imag 8.5 0)))
+(drop (drop (drop (make-complex-from-real-imag 8.5 0)))) ;; This should still be stuck at rational
 
 (newline)
 (display "testing apply generic now")
@@ -6214,18 +6288,16 @@ To test our implementation, we can use the set of tests from the previous exerci
 (newline)
 (add 2.5 6.4)
 (add (make-complex-from-real-imag 4 4) 3)
+(add (make-complex-from-real-imag 4 0) (make-complex-from-real-imag 7.4314 0))
+(add (make-complex-from-real-imag 4 0) (make-complex-from-real-imag 7 0))
 (add (make-rational 8 3) 2)
-(add (make-rational 7 3) (make-complex-from-real-imag 4 4))
+(add (make-rational 7 3) (make-complex-from-real-imag 4 0))
 (add (make-complex-from-real-imag 4 4) (make-rational 7 3))
 (add (make-complex-from-real-imag 4 4) 3.7)
-(add 3 (make-complex-from-real-imag 4 4))
+(add 3 (make-complex-from-real-imag 4 0))
 (add 3.7 (make-complex-from-real-imag 4 4))
 (add (make-rational 8 1) (make-complex-from-real-imag 4 4))
-(sub (make-complex-from-real-imag 4 4) 4.7)
-
-(make-rational 1.5 3)
-(raise (make-rational 1.5 3))
-(make-rational (contents (raise (make-rational 1.5 3)) ) 1)
+(sub (make-complex-from-real-imag 4 0) 4.7)
 #+end_src
 
 #+RESULTS:
@@ -6236,32 +6308,18 @@ done
 done
 done
 done
-(rational 3 . 1)
-(real . 3)
-(complex rectangular 3 . 0)
-(complex rectangular 3 . 0)
-#f
-#f
-#t
-#t
-(complex rectangular 2 . 0)
-(rational 2 . 1)
-(real . 3/5)
-(complex rectangular 3.4 . 0)
+done
+done
+done
+done
 
-testing apply generic now
+testing project
+(real . 8)
+(rational 8 . 1)
+(integer . 8)
 
-(real . 8.9)
-(complex rectangular 7 . 4)
-(rational 14 . 3)
-(complex rectangular 19/3 . 4)
-(complex rectangular 19/3 . 4)
-(complex rectangular 7.7 . 4)
-(complex rectangular 7 . 4)
-(complex rectangular 7.7 . 4)
-(complex rectangular 12 . 4)
-(complex rectangular -0.7000000000000002 . 4)
-(rational 1.0 . 2.0)
-(real . 0.5)
-(rational 1.0 . 2.0)
+testing drop, and its limits
+(integer . 8)
 #+end_example
+
+Yep, we were able to satisfy the requirements set by the exercise. Types are getting dropped as expected now (with the exception of make-rational being a little funny, but that is not the spirit of the exercise.)
