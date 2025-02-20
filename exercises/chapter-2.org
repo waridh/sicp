@@ -51,6 +51,15 @@
         (iter (cons (proc (car tail)) acc) (cdr tail))))
   (reverse (iter '() iterable)))
 
+;; This procedure checks if the target value is contained inside the sequence
+;; Currently only comparing numerical contents
+(define (contain? target seq)
+  (right-fold (lambda (left right)
+                (cond
+                  [(equal? left target) true]
+                  [else right]))
+              false
+              seq))
 #+end_src
 * Exercise 2.1
 Make an improved ~make-rat~ that will normalize the signage of the rational number.
@@ -5758,6 +5767,9 @@ CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
     [(eq? n 'complex) 3]
     [else false]))
 
+(define (rank-of-datum n)
+  (rank-of-type (type-tag n)))
+
 ;; get the default type for a given type
 (define (default-type-of-type t)
   (type-of-rank (rank-of-type t)))
@@ -5989,9 +6001,9 @@ Right, we are thinking about making the type tower system easy to add to. Luckil
 #+begin_src racket :exports code
 ;; the higher-type predicate could now find out if higher type by looking at the
 ;; type-rank
-(define (higher-type? left right)
-  (let ([left-t-rank (type-rank left)]
-        [right-t-rank (type-rank right)])
+(define (higher-rank? left right)
+  (let ([left-t-rank (rank-of-type left)]
+        [right-t-rank (rank-of-type right)])
     (cond
       [(not left-t-rank)
        (error "left type is not registered in the type rank system" (list left right))]
@@ -6002,13 +6014,17 @@ Right, we are thinking about making the type tower system easy to add to. Luckil
 ;; This procedure will raise a datum to the specified type. Returns false if
 ;; this operation fails
 (define (consecutive-raise datum target-type)
-  (let ([curr-type (type-tag datum)])
-    (cond
-      [(higher-type? target-type curr-type) (consecutive-raise (raise datum) target-type)]
-      ;; We need to make it so that types of the same rank will convert itself
-      ;; to a default rank when about to interact with another type.
-      [(= (type-rank target-type ) (type-rank curr-type )) (if (eq? target-type curr-type) datum (to-rank-default datum))]
-      [else false])))
+  (define (raise-to-rank acc rank)
+    (let ([curr-rank (rank-of-datum acc)])
+      (cond
+        [(> rank curr-rank) (raise-to-rank (raise acc) rank)]
+        [(= rank curr-rank) (to-default-type acc)]
+        [else false])))
+  (let ([target-rank (rank-of-type target-type)])
+    (if (> target-rank (highest-rank))
+        (error "rank of the target type is too high, malformed system"
+               (list target-rank target-type datum))
+        (raise-to-rank datum target-rank))))
 #+end_src
 
 
@@ -6019,10 +6035,8 @@ Time to change apply generic. In this change, we are now coupling the implementa
 (define (apply-generic op . args)
   ;; accumulation procedure to find the highest type in the input args.
   ;; Takes in datum args and not just the type args
-  (define (highest-type args)
-    (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
-               lowest-type
-               (map type-tag args)))
+  (define (highest-rank args)
+    (left-fold (lambda (acc ele) (if (> ele acc) ele acc)) (lowest-rank) (map rank-of-datum args)))
   ;; This brings all the input args to a target type
   (define (raise-args-to-type target-type args)
     (map (lambda (x) (consecutive-raise x target-type)) args))
@@ -6036,7 +6050,7 @@ Time to change apply generic. In this change, we are now coupling the implementa
   ;; procedure that attempts to raise the input datum args to the
   ;; highest type. If this fails, then return false
   (define (raise-args-to-highest args)
-    (validate (raise-args-to-type (rank-default-of-type (highest-type args)) args)))
+    (validate (raise-args-to-type (type-of-rank (highest-rank args)) args)))
   ;; Actual implementation
   (let ([type-tags (map type-tag args)])
     (let ([proc (get op type-tags)])
@@ -6079,7 +6093,6 @@ We stopped using the testing frameworks since we keep on building many throwaway
 (install-rectangular-package)
 (install-polar-package)
 (install-raise)
-(install-type-rank)
 (install-scheme-number-package)
 
 ;; testing if we could consecutively raise the type
@@ -6109,7 +6122,6 @@ We stopped using the testing frameworks since we keep on building many throwaway
 
 #+RESULTS:
 #+begin_example
-done
 done
 done
 done
@@ -6161,43 +6173,55 @@ We can design ~drop~, but we would have to define all the one step conversion do
   (define (rational->integer n)
     (make-integer (/ (numer n) (denom n))))
 
-  (put 'project '(complex) complex->real)
-  (put 'project '(real) real->rational)
-  (put 'project '(rational) rational->integer)
-  (put 'project '(integer) (lambda (x) (make-integer x)))
+  (put-coercion 'complex 'real complex->real)
+  (put-coercion 'real 'rational real->rational)
+  (put-coercion 'rational 'integer rational->integer)
   'done)
 
 ;; Project allows for lossy downward coercion of the type. Project will return
 ;; the same item if we are at the bottom of the type tower.
 (define (project n)
-  (apply-generic 'project n))
+  (let ([curr-type-rank (rank-of-datum n)])
+    (cond
+      [(= curr-type-rank (lowest-rank)) n]
+      [(< curr-type-rank (lowest-rank))
+       (error "type rank of parameter lower than lowest rank registered"
+              (list curr-type-rank (lowest-rank) n))]
+      [else
+       (let ([cleaned-arg (to-default-type n)]
+             [next-type (type-of-rank (- curr-type-rank 1))])
+         (let ([coer-proc (get-coercion (type-tag cleaned-arg) next-type)])
+           (if (not coer-proc)
+               (error "missing coercion procedure for the following types"
+                      (list (type-tag cleaned-arg next-type n)))
+               (coer-proc (contents cleaned-arg)))))])))
+
+;; Checks if the value v is a droppable type
+(define (droppable? v)
+  (cond
+    [(not (pair? v)) false]
+    [(contain? (type-tag v) default-ranks) true]
+    [else false]))
 
 ;; Drop will prevent lossy dropping of the value, but it will also drop it as far as possible
 (define (drop n)
   (define (iter prev)
     (let ([projected (project prev)])
-      (if (or (= (type-rank (type-tag projected )) (type-rank (type-tag prev ))) (not (equ? (raise projected) prev)))
+      (if (or (= (rank-of-datum projected) (rank-of-datum prev)) (not (equ? (raise projected) prev)))
           prev
           (iter projected))))
-  (iter n))
+  (iter (to-default-type n)))
 #+end_src
+
+#+RESULTS: 2.85-drop
 
 #+name: 2.85-raise-drop-apply-generic
 #+begin_src racket :exports code
 (define (apply-generic op . args)
-  (define (typed? datum)
-    (if (pair? datum) true false))
-  ;; Need to check if the result is even a typed value
-  (define (drop-result value)
-    (if (and (typed? value) (not (or (eq? op 'project) (eq? op 'raise))))
-        (drop value)
-        value))
   ;; accumulation procedure to find the highest type in the input args.
   ;; Takes in datum args and not just the type args
-  (define (highest-type args)
-    (left-fold (lambda (acc ele) (if (higher-type? ele acc) ele acc))
-               lowest-type
-               (map type-tag args)))
+  (define (highest-rank args)
+    (left-fold (lambda (acc ele) (if (> ele acc) ele acc)) (lowest-rank) (map rank-of-datum args)))
   ;; This brings all the input args to a target type
   (define (raise-args-to-type target-type args)
     (map (lambda (x) (consecutive-raise x target-type)) args))
@@ -6211,22 +6235,28 @@ We can design ~drop~, but we would have to define all the one step conversion do
   ;; procedure that attempts to raise the input datum args to the
   ;; highest type. If this fails, then return false
   (define (raise-args-to-highest args)
-    (validate (raise-args-to-type (rank-default-of-type (highest-type args)) args)))
+    (validate (raise-args-to-type (type-of-rank (highest-rank args)) args)))
+
+  (define (handle-output v)
+    (if (droppable? v)
+        (drop v)
+        v))
   ;; Actual implementation
-  (drop-result (let ([type-tags (map type-tag args)])
-    (let ([proc (get op type-tags)])
-      (if proc
-          (apply proc (map contents args))
-          (let ([coerced (raise-args-to-highest args)])
-            (if (not coerced)
-                (error "unable to coerce all args to highest type" (list op args type-tags))
-                (let ([coerced-proc (get op (map type-tag coerced))])
-                  (if (not coerced-proc)
-                      (error "unable to find method for arguments" (list op coerced))
-                      (apply coerced-proc (map contents coerced))))))))) ))
+  (define (apply-generic-aux)
+    (let ([type-tags (map type-tag args)])
+      (let ([proc (get op type-tags)])
+        (if proc
+            (apply proc (map contents args))
+            (let ([coerced (raise-args-to-highest args)])
+              (if (not coerced)
+                  (error "unable to coerce all args to highest type" (list op args type-tags))
+                  (let ([coerced-proc (get op (map type-tag coerced))])
+                    (if (not coerced-proc)
+                        (error "unable to find method for arguments" (list op coerced))
+                        (apply coerced-proc (map contents coerced))))))))))
+  (handle-output (apply-generic-aux)))
 #+end_src
 
-#+RESULTS: 2.85-raise-drop-apply-generic
 
 To test our implementation, we can use the set of tests from the previous exercise with updated imports.
 #+caption: Testing that the type raising system is working as intended.
@@ -6252,7 +6282,6 @@ To test our implementation, we can use the set of tests from the previous exerci
 
 (install-rational-package)
 (install-integer-package)
-(install-type-rank)
 (install-real-package)
 (install-complex-package)
 (install-rectangular-package)
@@ -6311,7 +6340,6 @@ done
 done
 done
 done
-done
 
 testing project
 (real . 8)
@@ -6320,6 +6348,27 @@ testing project
 
 testing drop, and its limits
 (integer . 8)
+(integer . 64)
+(integer . 8)
+(integer . 8)
+(rational 17.0 . 2.0)
+(rational 17.0 . 2.0)
+(rational 17.0 . 2.0)
+
+testing apply generic now
+
+8.9
+(complex rectangular 7 . 4)
+(rational 4022066310962741.0 . 351843720888320.0)
+(integer . 11)
+(rational 14 . 3)
+(rational 19 . 3)
+(complex rectangular 19/3 . 4)
+(complex rectangular 7.7 . 4)
+(integer . 7)
+(complex rectangular 7.7 . 4)
+(complex rectangular 12 . 4)
+(rational -788129934789837.0 . 1125899906842624.0)
 #+end_example
 
 Yep, we were able to satisfy the requirements set by the exercise. Types are getting dropped as expected now (with the exception of make-rational being a little funny, but that is not the spirit of the exercise.)
