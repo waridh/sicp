@@ -6831,7 +6831,6 @@ done
 
 testing project
 (real . 8)
-drop (integer . 8)
 (real . 8)
 (rational 8 . 1)
 (integer . 8)
@@ -6839,70 +6838,29 @@ drop (integer . 8)
 testing drop, and its limits
 #f
 #t
-drop (integer . 8)
-drop (real . 8)
-drop (integer . 0)
-drop (real . 0)
 #t
 8
-drop (complex rectangular 8 . 0)
 (integer . 8)
-drop 64
 64
-drop (complex rectangular 8 . 0)
-drop (integer . 8)
 (integer . 8)
-drop (complex rectangular 8 . 0)
-drop (integer . 8)
-drop (integer . 8)
 (integer . 8)
-drop (complex rectangular 8.5 . 0)
 (rational 17.0 . 2.0)
-drop (complex rectangular 8.5 . 0)
-drop (rational 17.0 . 2.0)
 (rational 17.0 . 2.0)
-drop (complex rectangular 8.5 . 0)
-drop (rational 17.0 . 2.0)
-drop (rational 17.0 . 2.0)
 (rational 17.0 . 2.0)
 
 testing apply generic now
 
 8.9
-drop (real . 4)
-drop (real . 7)
-drop (complex rectangular (integer . 7) . 4)
-drop (integer . 7)
-drop (integer . 7)
 (complex rectangular (integer . 7) . 4)
-drop (real . 4)
-drop (rational 2091753141927569.0 . 281474976710656.0)
-drop (rational 3217653048770193.0 . 281474976710656.0)
-drop (integer . 0)
-drop (real . 0)
-drop (integer . 0)
-drop (complex rectangular (rational 3217653048770193.0 . 281474976710656.0) integer . 0)
-drop (rational 3217653048770193.0 . 281474976710656.0)
-drop (rational 3217653048770193.0 . 281474976710656.0)
-drop (integer . 0)
 (rational 4022066310962741.0 . 351843720888320.0)
-drop (complex rectangular 11 . 0)
 (integer . 11)
-drop (real . 14/3)
 (rational 14 . 3)
-drop (complex rectangular 19/3 . 0)
 (rational 19 . 3)
-drop (complex rectangular 19/3 . 4)
 (complex rectangular 19/3 . 4)
-drop (complex rectangular 7.7 . 4)
 (complex rectangular 7.7 . 4)
-drop (complex rectangular 7 . 0)
 (integer . 7)
-drop (complex rectangular 7.7 . 4)
 (complex rectangular 7.7 . 4)
-drop (complex rectangular 12 . 4)
 (complex rectangular 12 . 4)
-drop (complex rectangular -0.7000000000000002 . 0)
 (rational -788129934789837.0 . 1125899906842624.0)
 #+end_example
 
@@ -6993,6 +6951,8 @@ Firstly, we are going to have to import the polynomial type into our org documen
   ((get 'make 'polynomial) var terms))
 #+end_src
 
+#+RESULTS: 2.87-poly-package
+
 #+caption: Testing that composible complex type is working.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
@@ -7032,8 +6992,13 @@ Firstly, we are going to have to import the polynomial type into our org documen
 (define test-poly2 (make-polynomial 'x '((3 2) (1 2) (0 8))) )
 test-poly1
 test-poly2
+(define test-poly3 (make-polynomial 'y (list (list 2 test-poly1) (list 1 test-poly2))))
+(define test-poly4 (make-polynomial 'y (list (list 2 test-poly2) (list 0 test-poly1))))
 (contain? 'polynomial default-ranks)
 (add test-poly1 test-poly2)
+(mul test-poly1 test-poly2)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
 #+end_src
 
 #+RESULTS:
@@ -7053,4 +7018,9 @@ testing polynomial construction
 (polynomial x (3 2) (1 2) (0 8))
 #f
 (polynomial x (3 6) (2 1) (1 6) (0 14))
+(polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial y (2 (polynomial x (3 6) (2 1) (1 6) (0 14))) (1 (polynomial x (3 2) (1 2) (0 8))) (0 (polynomial x (3 4) (2 1) (1 4) (0 6))))
+(polynomial y (4 (polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
 #+end_example
+
+Yep, this is real and working. Only current downside is that it is unergonomic to construct the term-list objects that are required for constructing a polynomial.
