@@ -54,10 +54,10 @@
 ;; This procedure checks if the target value is contained inside the sequence
 ;; Currently only comparing numerical contents
 (define (contain? target seq)
-  (right-fold (lambda (left right)
+  (right-fold (lambda (acc ele)
                 (cond
-                  [(equal? left target) true]
-                  [else right]))
+                  [(equal? ele target) true]
+                  [else acc]))
               false
               seq))
 #+end_src
@@ -5767,6 +5767,10 @@ CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
     [(eq? n 'complex) 3]
     [else false]))
 
+;; checks if the input type is participating in ranks
+(define (ranked? n)
+  (if (not rank-of-type) false true))
+
 (define (rank-of-datum n)
   (rank-of-type (type-tag n)))
 
@@ -5798,7 +5802,7 @@ CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
 (define (raise n)
   (let ([para-type (type-tag n)])
     (let ([para-rank (rank-of-type para-type)])
-      (if (highest-rank? para-rank)
+      (if (or (not para-rank) (highest-rank? para-rank))
           n
           (let ([safe-curr-datum (if (eq? (default-type-of-type para-type) para-type)
                                      n
@@ -6017,6 +6021,7 @@ Right, we are thinking about making the type tower system easy to add to. Luckil
   (define (raise-to-rank acc rank)
     (let ([curr-rank (rank-of-datum acc)])
       (cond
+        [(not curr-rank) (error "datum parameter not participating in ranks" (list datum target-type))]
         [(> rank curr-rank) (raise-to-rank (raise acc) rank)]
         [(= rank curr-rank) (to-default-type acc)]
         [else false])))
@@ -6179,10 +6184,12 @@ We can design ~drop~, but we would have to define all the one step conversion do
   'done)
 
 ;; Project allows for lossy downward coercion of the type. Project will return
-;; the same item if we are at the bottom of the type tower.
+;; the same item if we are at the bottom of the type tower. If the type is not
+;; participating in type ranking, then return itself
 (define (project n)
   (let ([curr-type-rank (rank-of-datum n)])
     (cond
+      [(not curr-type-rank) n]
       [(= curr-type-rank (lowest-rank)) n]
       [(< curr-type-rank (lowest-rank))
        (error "type rank of parameter lower than lowest rank registered"
@@ -6692,6 +6699,7 @@ Because we designed the system in such a way, we can just implement all the new 
 (define (project n)
   (let ([curr-type-rank (rank-of-datum n)])
     (cond
+      [(not curr-type-rank) n]
       [(= curr-type-rank (lowest-rank)) n]
       [(< curr-type-rank (lowest-rank))
        (error "type rank of parameter lower than lowest rank registered"
@@ -6705,7 +6713,8 @@ Because we designed the system in such a way, we can just implement all the new 
                       (list (type-tag cleaned-arg next-type n)))
                (coer-proc (contents cleaned-arg)))))])))
 
-;; Checks if the value v is a droppable type
+;; Checks if the value v is a droppable type. Droppables have to participate
+;; in the rank system.
 (define (droppable? v)
   (cond
     [(not (pair? v)) false]
@@ -6719,7 +6728,9 @@ Because we designed the system in such a way, we can just implement all the new 
       (if (or (= (rank-of-datum projected) (rank-of-datum prev)) (not (equ? (raise projected) prev)))
           prev
           (iter projected))))
-  (iter (to-default-type n)))
+  (if (droppable? n)
+      (iter (to-default-type n))
+      n))
 #+end_src
 
 #+RESULTS: 2.86-drop
@@ -6820,6 +6831,7 @@ done
 
 testing project
 (real . 8)
+drop (integer . 8)
 (real . 8)
 (rational 8 . 1)
 (integer . 8)
@@ -6827,30 +6839,218 @@ testing project
 testing drop, and its limits
 #f
 #t
+drop (integer . 8)
+drop (real . 8)
+drop (integer . 0)
+drop (real . 0)
 #t
 8
+drop (complex rectangular 8 . 0)
 (integer . 8)
-(integer . 64)
+drop 64
+64
+drop (complex rectangular 8 . 0)
+drop (integer . 8)
 (integer . 8)
+drop (complex rectangular 8 . 0)
+drop (integer . 8)
+drop (integer . 8)
 (integer . 8)
+drop (complex rectangular 8.5 . 0)
 (rational 17.0 . 2.0)
+drop (complex rectangular 8.5 . 0)
+drop (rational 17.0 . 2.0)
 (rational 17.0 . 2.0)
+drop (complex rectangular 8.5 . 0)
+drop (rational 17.0 . 2.0)
+drop (rational 17.0 . 2.0)
 (rational 17.0 . 2.0)
 
 testing apply generic now
 
 8.9
+drop (real . 4)
+drop (real . 7)
+drop (complex rectangular (integer . 7) . 4)
+drop (integer . 7)
+drop (integer . 7)
 (complex rectangular (integer . 7) . 4)
+drop (real . 4)
+drop (rational 2091753141927569.0 . 281474976710656.0)
+drop (rational 3217653048770193.0 . 281474976710656.0)
+drop (integer . 0)
+drop (real . 0)
+drop (integer . 0)
+drop (complex rectangular (rational 3217653048770193.0 . 281474976710656.0) integer . 0)
+drop (rational 3217653048770193.0 . 281474976710656.0)
+drop (rational 3217653048770193.0 . 281474976710656.0)
+drop (integer . 0)
 (rational 4022066310962741.0 . 351843720888320.0)
+drop (complex rectangular 11 . 0)
 (integer . 11)
+drop (real . 14/3)
 (rational 14 . 3)
+drop (complex rectangular 19/3 . 0)
 (rational 19 . 3)
+drop (complex rectangular 19/3 . 4)
 (complex rectangular 19/3 . 4)
+drop (complex rectangular 7.7 . 4)
 (complex rectangular 7.7 . 4)
+drop (complex rectangular 7 . 0)
 (integer . 7)
+drop (complex rectangular 7.7 . 4)
 (complex rectangular 7.7 . 4)
+drop (complex rectangular 12 . 4)
 (complex rectangular 12 . 4)
+drop (complex rectangular -0.7000000000000002 . 0)
 (rational -788129934789837.0 . 1125899906842624.0)
 #+end_example
 
 Tada! Working as expected.
+** Exercise 2.87
+*** Prompt
+Yeah, SICP decided to add a polynomial data type, and we are now supposed to install the ~=zero?~ dispatch for polynomials. Okay, we can try that.
+*** Solution
+Firstly, we are going to have to import the polynomial type into our org document so that we could test the implementation.
+
+#+name: 2.87-poly-package
+#+begin_src racket :exports code
+(define (install-polynomial-package)
+  ;; internal procedures
+  ;; representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (variable p)
+    (car p))
+  (define (term-list p)
+    (cdr p))
+  (define (variable? p)
+    (symbol? p))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  ;; representation of terms and term lists
+  (define (adjoin-term term term-list)
+    (if (=zero? (coeff term))
+        term-list
+        (cons term term-list)))
+  (define (the-empty-termlist)
+    '())
+  (define (first-term term-list)
+    (car term-list))
+  (define (rest-terms term-list)
+    (cdr term-list))
+  (define (empty-termlist? term-list)
+    (null? term-list))
+  (define (make-term order coeff)
+    (list order coeff))
+  (define (order term)
+    (car term))
+  (define (coeff term)
+    (cadr term))
+  (define (add-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (add-terms (term-list p1) (term-list p2)))
+        (error "Polys not in same var: ADD-POLY" (list p1 p2))))
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+       (let ([t1 (first-term L1)]
+             [t2 (first-term L2)])
+         (cond
+           [(> (order t1) (order t2)) (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+           [(< (order t1) (order t2)) (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+           [else
+            (adjoin-term (make-term (order t1) (add (coeff t1) (coeff t2)))
+                         (add-terms (rest-terms L1) (rest-terms L2)))]))]))
+  (define (mul-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (mul-terms (term-list p1) (term-list p2)))
+        (error "Polys not in same var: MUL-POLY" (list p1 p2))))
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+        (the-empty-termlist)
+        (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+        (the-empty-termlist)
+        (let ([t2 (first-term L)])
+          (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
+                       (mul-term-by-all-terms t1 (rest-terms L))))))
+  ;; Might have to do a little modification to do a linear check on empty term-list
+  (define (=zero?-poly p) (empty-termlist? (term-list p)))
+  ;; interface to rest of the system
+  (define (tag p)
+    (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put '=zero? '(polynomial) =zero?-poly)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (make-polynomial var terms)
+  ((get 'make 'polynomial) var terms))
+#+end_src
+
+#+caption: Testing that composible complex type is working.
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
+<<2.86-complex-implementation>>
+<<2.86-rational-implementation>>
+<<2.86-generic-arithmetic>>
+<<2.86-integer-type-package>>
+<<2.86-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.86-scheme-implementation>>
+<<2.86-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.87-poly-package>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+
+(display "testing polynomial construction")
+(newline)
+(define test-poly1 (make-polynomial 'x '((3 4) (2 1) (1 4) (0 6))) )
+(define test-poly2 (make-polynomial 'x '((3 2) (1 2) (0 8))) )
+test-poly1
+test-poly2
+(contain? 'polynomial default-ranks)
+(add test-poly1 test-poly2)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing polynomial construction
+(polynomial x (3 4) (2 1) (1 4) (0 6))
+(polynomial x (3 2) (1 2) (0 8))
+#f
+(polynomial x (3 6) (2 1) (1 6) (0 14))
+#+end_example
