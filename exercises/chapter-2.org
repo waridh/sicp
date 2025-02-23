@@ -6225,9 +6225,17 @@ We can design ~drop~, but we would have to define all the one step conversion do
 #+begin_src racket :exports code
 (define (apply-generic op . args)
   ;; accumulation procedure to find the highest type in the input args.
-  ;; Takes in datum args and not just the type args
+  ;; Takes in datum args and not just the type args. If there are datums that
+  ;; are not participating in the rank system, this procedure will return
+  ;; false
   (define (highest-rank args)
-    (left-fold (lambda (acc ele) (if (> ele acc) ele acc)) (lowest-rank) (map rank-of-datum args)))
+    (left-fold (lambda (acc ele)
+                 (cond
+                   [(or (not (number? acc)) (not (number? ele))) false]
+                   [(> acc ele) acc]
+                   [else ele]))
+               (lowest-rank)
+               (map rank-of-datum args)))
   ;; This brings all the input args to a target type
   (define (raise-args-to-type target-type args)
     (map (lambda (x) (consecutive-raise x target-type)) args))
@@ -6241,7 +6249,10 @@ We can design ~drop~, but we would have to define all the one step conversion do
   ;; procedure that attempts to raise the input datum args to the
   ;; highest type. If this fails, then return false
   (define (raise-args-to-highest args)
-    (validate (raise-args-to-type (type-of-rank (highest-rank args)) args)))
+    (let ([local-largest-rank (highest-rank args)])
+      (if (not local-largest-rank)
+          false
+          (validate (raise-args-to-type (type-of-rank local-largest-rank) args)))))
 
   (define (handle-output v)
     (if (droppable? v)
@@ -6249,16 +6260,18 @@ We can design ~drop~, but we would have to define all the one step conversion do
         v))
   ;; Actual implementation
   (define (apply-generic-aux)
+    ;; (display "apply-generic ") (display (list op args)) (newline)
     (let ([type-tags (map type-tag args)])
       (let ([proc (get op type-tags)])
+        ;; (display "apply-generic-aux ") (display (list type-tags proc)) (newline)
         (if proc
             (apply proc (map contents args))
             (let ([coerced (raise-args-to-highest args)])
               (if (not coerced)
-                  (error "unable to coerce all args to highest type" (list op args type-tags))
+                  (error "unable to find method for argument, and coercion failed:" op type-tags args)
                   (let ([coerced-proc (get op (map type-tag coerced))])
                     (if (not coerced-proc)
-                        (error "unable to find method for arguments" (list op coerced))
+                        (error "unable to find method for arguments:" op coerced)
                         (apply coerced-proc (map contents coerced))))))))))
   (handle-output (apply-generic-aux)))
 #+end_src
@@ -6426,8 +6439,9 @@ Because we designed the system in such a way, we can just implement all the new 
 (define (install-real-package)
   ;; internal procedures
   (define (make-real n)
-    (cond [(number? n) n]
-          [else (error "bad argument: MAKE-REAL" n)]))
+    (cond
+      [(number? n) n]
+      [else (error "bad argument: MAKE-REAL" n)]))
   (define (add-real x y)
     (make-real (+ x y)))
   (define (sub-real x y)
@@ -6455,9 +6469,9 @@ Because we designed the system in such a way, we can just implement all the new 
   (put 'div '(real real) (lambda (x y) (tag (div-real x y))))
   (put '=zero? '(real) =zero?)
   (put 'equ? '(real real) equ?)
-  (put 'squrt '(real) squrt-real)
-  (put 'cosine '(real) cosine-real)
-  (put 'sine '(real) sine-real)
+  (put 'squrt '(real) (lambda (x) (tag (squrt-real x))))
+  (put 'cosine '(real) (lambda (x) (tag (cosine-real x))))
+  (put 'sine '(real) (lambda (x) (tag (sine-real x))))
   (put 'make 'real (lambda (n) (tag (make-real n))))
   'done)
 (define (make-real n)
@@ -6503,9 +6517,9 @@ Because we designed the system in such a way, we can just implement all the new 
   (put 'div '(rational rational) (lambda (x y) (tag (div-rat x y))))
   (put '=zero? '(rational) =zero?)
   (put 'equ? '(rational rational) equ?)
-  (put 'squrt '(rational) squrt-rat)
-  (put 'cosine '(rational) cosine-rat)
-  (put 'sine '(rational) sine-rat)
+  (put 'squrt '(rational) (lambda (x) (tag (squrt-rat x))))
+  (put 'cosine '(rational) (lambda (x) (tag (cosine-rat x))))
+  (put 'sine '(rational) (lambda (x) (tag (sine-rat x))))
   (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
   (put 'numer 'rational (lambda (n) (numer n))) ;; numerator and denominator
   (put 'denom 'rational (lambda (n) (denom n)))
@@ -6806,6 +6820,7 @@ Because we designed the system in such a way, we can just implement all the new 
 (add 2.5 6.4)
 (add (make-complex-from-real-imag (make-real 4 ) 4) 3)
 (add (make-complex-from-real-imag (make-real 4 ) (make-integer 0 )) (make-complex-from-real-imag (make-rational 7.4314 1) (make-real 0 )))
+(add (make-complex-from-real-imag (make-real 4 ) (make-integer 0 )) (make-complex-from-real-imag (make-rational 7.4314 1) (make-real 2.74 )))
 (add (make-complex-from-real-imag 4 0) (make-complex-from-real-imag 7 0))
 (add (make-rational 8 3) 2)
 (add (make-rational 7 3) (make-complex-from-real-imag 4 0))
@@ -6853,6 +6868,7 @@ testing apply generic now
 8.9
 (complex rectangular (integer . 7) . 4)
 (rational 4022066310962741.0 . 351843720888320.0)
+(complex rectangular (rational 3217653048770193.0 . 281474976710656.0) rational 1542482872374395.0 . 562949953421312.0)
 (integer . 11)
 (rational 14 . 3)
 (rational 19 . 3)
@@ -6953,7 +6969,7 @@ Firstly, we are going to have to import the polynomial type into our org documen
 
 #+RESULTS: 2.87-poly-package
 
-#+caption: Testing that composible complex type is working.
+#+caption: Testing basic polynomial operations.
 #+begin_src racket :exports both :noweb yes
 #lang sicp
 <<put-get-implementation>>
@@ -7024,3 +7040,842 @@ testing polynomial construction
 #+end_example
 
 Yep, this is real and working. Only current downside is that it is unergonomic to construct the term-list objects that are required for constructing a polynomial.
+** Exercise 2.88
+*** Prompt
+Extend the polynomial system so that we could subtract. Prompt is also suggesting that a generic negate procedure might be helpful.
+*** Solution
+:LOGBOOK:
+CLOCK: [2025-02-23 Sun 09:19]--[2025-02-23 Sun 10:09] =>  0:50
+:END:
+We can start with the negation. We are really at the stage where we are considering making a dedicated file for each of the exercises, as there are so much code modification. Now we are adding negation to our system
+
+#+caption: Adding a generic negation procedure
+#+name: 2.88-generic-arithmetic
+#+begin_src racket :exports code
+(define (add x y)
+  (apply-generic 'add x y))
+(define (sub x y)
+  (apply-generic 'sub x y))
+(define (mul x y)
+  (apply-generic 'mul x y))
+(define (div x y)
+  (apply-generic 'div x y))
+(define (neg x)
+  (apply-generic 'neg x))
+(define (equ? x y)
+  (apply-generic 'equ? x y))
+(define (exp x y)
+  (apply-generic 'exp x y))
+(define (squrt x)
+  (apply-generic 'squrt x))
+(define (cosine x)
+  (apply-generic 'cosine x))
+(define (sine x)
+  (apply-generic 'sine x))
+(define (arctan x)
+  (div (cosine x) (sine x)))
+(define (square x)
+  (mul x x))
+(define (=zero? x)
+  (apply-generic '=zero? x))
+#+end_src
+
+#+name: 2.88-real-type-package
+#+begin_src racket :exports code
+(define (install-real-package)
+  ;; internal procedures
+  (define (make-real n)
+    (cond
+      [(number? n) n]
+      [else (error "bad argument: MAKE-REAL" n)]))
+  (define (add-real x y)
+    (make-real (+ x y)))
+  (define (sub-real x y)
+    (make-real (- x y)))
+  (define (mul-real x y)
+    (make-real (* x y)))
+  (define (div-real x y)
+    (make-real (* x y)))
+  (define (squrt-real x)
+    (make-real (sqrt x)))
+  (define (cosine-real x)
+    (make-real (cos x)))
+  (define (sine-real x)
+    (make-real (sin x)))
+  (define (neg-real x)
+    (make-real (- 0 x)))
+  (define (equ? x y)
+    (= x y))
+  (define (=zero? x)
+    (= x 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'real x))
+  (put 'add '(real real) (lambda (x y) (tag (add-real x y))))
+  (put 'sub '(real real) (lambda (x y) (tag (sub-real x y))))
+  (put 'mul '(real real) (lambda (x y) (tag (mul-real x y))))
+  (put 'div '(real real) (lambda (x y) (tag (div-real x y))))
+  (put '=zero? '(real) =zero?)
+  (put 'neg '(real) (lambda (x) (tag (neg-real x))))
+  (put 'equ? '(real real) equ?)
+  (put 'squrt '(real) (lambda (x) (tag (squrt-real x))))
+  (put 'cosine '(real) (lambda (x) (tag (cosine-real x))))
+  (put 'sine '(real) (lambda (x) (tag (sine-real x))))
+  (put 'make 'real (lambda (n) (tag (make-real n))))
+  'done)
+(define (make-real n)
+  ((get 'make 'real) n))
+#+end_src
+
+#+name: 2.88-rational-implementation
+#+begin_src racket :exports code
+(define (install-rational-package)
+  ;; internal procedures
+  (define (to-scheme-number x)
+    (/ (numer x) (denom x)))
+  (define (numer x)
+    (car x))
+  (define (denom x)
+    (cdr x))
+  (define (make-rat n d)
+    (let ([g (gcd n d)]) (cons (/ n g) (/ d g))))
+  (define (add-rat x y)
+    (make-rat (add (mul (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (sub-rat x y)
+    (make-rat (- (* (numer x) (denom y)) (* (numer y) (denom x))) (* (denom x) (denom y))))
+  (define (mul-rat x y)
+    (make-rat (* (numer x) (numer y)) (* (denom x) (denom y))))
+  (define (div-rat x y)
+    (make-rat (* (numer x) (denom y)) (* (denom x) (numer y))))
+  (define (neg-rat x)
+    (make-rat (- 0 (numer x)) (denom x)))
+  (define (squrt-rat x)
+    (make-rat (sqrt (numer x)) (sqrt (denom x))))
+  (define (cosine-rat x)
+    (make-rat (cos (to-scheme-number x)) 1))
+  (define (sine-rat x)
+    (make-rat (sin (to-scheme-number x)) 1))
+  (define (equ? x y)
+    (and (= (numer x) (numer y)) (= (denom x) (denom y))))
+  (define (=zero? x)
+    (= (numer x) 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'rational x))
+  (put 'add '(rational rational) (lambda (x y) (tag (add-rat x y))))
+  (put 'sub '(rational rational) (lambda (x y) (tag (sub-rat x y))))
+  (put 'mul '(rational rational) (lambda (x y) (tag (mul-rat x y))))
+  (put 'div '(rational rational) (lambda (x y) (tag (div-rat x y))))
+  (put '=zero? '(rational) =zero?)
+  (put 'neg '(rational) (lambda (x) (tag (neg-rat x))))
+  (put 'equ? '(rational rational) equ?)
+  (put 'squrt '(rational) (lambda (x) (tag (squrt-rat x))))
+  (put 'cosine '(rational) (lambda (x) (tag (cosine-rat x))))
+  (put 'sine '(rational) (lambda (x) (tag (sine-rat x))))
+  (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
+  (put 'numer 'rational (lambda (n) (numer n))) ;; numerator and denominator
+  (put 'denom 'rational (lambda (n) (denom n)))
+  'done)
+(define (make-rational n d)
+  ((get 'make 'rational) n d))
+(define (numer x)
+  ((get 'numer 'rational) x))
+(define (denom x)
+  ((get 'denom 'rational) x))
+#+end_src
+
+#+name: 2.88-integer-type-package
+#+begin_src racket :exports code
+(define (install-integer-package)
+  ;; internal procedures
+  (define (make-int n)
+    (cond
+      [(integer? n) n]
+      [(number? n) (floor n)]
+      [else (error "bad argument: MAKE-INT" n)]))
+  (define (add-int x y)
+    (make-int (+ x y)))
+  (define (sub-int x y)
+    (make-int (- x y)))
+  (define (mul-int x y)
+    (make-int (* x y)))
+  (define (div-int x y)
+    (make-int (* x y)))
+  (define (neg-int x)
+    (make-int (- 0 x)))
+  (define (equ? x y)
+    (= x y))
+  (define (=zero? x)
+    (= x 0))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'integer x))
+  (put 'add '(integer integer) (lambda (x y) (tag (add-int x y))))
+  (put 'sub '(integer integer) (lambda (x y) (tag (sub-int x y))))
+  (put 'mul '(integer integer) (lambda (x y) (tag (mul-int x y))))
+  (put 'div '(integer integer) (lambda (x y) (tag (div-int x y))))
+  (put '=zero? '(integer) =zero?)
+  (put 'neg '(integer) (lambda (x) (tag (neg-int x))))
+  (put 'equ? '(integer integer) equ?)
+  (put 'make 'integer (lambda (n) (tag (make-int n))))
+  'done)
+(define (make-integer n)
+  ((get 'make 'integer) n))
+#+end_src
+
+#+name: 2.88-scheme-implementation
+#+begin_src racket :exports code
+(define (install-scheme-number-package)
+  (define (tag x)
+    (attach-tag 'scheme-number x))
+  (put 'add '(scheme-number scheme-number) (lambda (x y) (tag (+ x y))))
+  (put 'sub '(scheme-number scheme-number) (lambda (x y) (tag (- x y))))
+  (put 'mul '(scheme-number scheme-number) (lambda (x y) (tag (* x y))))
+  (put 'div '(scheme-number scheme-number) (lambda (x y) (tag (/ x y))))
+  (put 'exp '(scheme-number scheme-number) (lambda (x y) (tag (expt x y))))
+  (put 'equ? '(scheme-number scheme-number) (lambda (x y) (= x y)))
+  (put 'squrt '(scheme-number) (lambda (x) (tag (sqrt x))))
+  (put 'cosine '(scheme-number) (lambda (x) (tag (cos x))))
+  (put 'sine '(scheme-number) (lambda (x) (tag (sin x))))
+  (put '=zero? '(scheme-number) (lambda (x) (= x 0)))
+  (put 'neg '(scheme-number) (lambda (x) (tag (- 0 x))))
+  (put 'make 'scheme-number (lambda (x) (tag x)))
+  'done)
+(define (make-scheme-number n)
+  ((get 'make 'scheme-number) n))
+#+end_src
+
+#+name: 2.88-complex-implementation
+#+begin_src racket :exports code
+(define (install-rectangular-package)
+  ;; internal procedures
+  (define (real-part z)
+    (car z))
+  (define (imag-part z)
+    (cdr z))
+  (define (make-from-real-imag x y)
+    (cons x y))
+  (define (magnitude z)
+    (squrt (add (square (real-part z)) (square (imag-part z)))))
+  (define (angle z)
+    (arctan (imag-part z) (real-part z)))
+  (define (make-from-mag-ang r a)
+    (cons (mul r (cosine a)) (mul r (sine a))))
+  ;; interface to the rest of the system
+  (define (tag x)
+    (attach-tag 'rectangular x))
+  (put 'real-part '(rectangular) real-part)
+  (put 'imag-part '(rectangular) imag-part)
+  (put 'magnitude '(rectangular) magnitude)
+  (put 'angle '(rectangular) angle)
+  (put 'make-from-real-imag 'rectangular (lambda (x y) (tag (make-from-real-imag x y))))
+  (put 'make-from-mag-ang 'rectangular (lambda (r a) (tag (make-from-mag-ang r a))))
+  'done)
+
+(define (install-polar-package)
+  ;; internal procedures
+  (define (magnitude z)
+    (car z))
+  (define (angle z)
+    (cdr z))
+  (define (make-from-mag-ang r a)
+    (cons r a))
+  (define (real-part z)
+    (mul (magnitude z) (cosine (angle z))))
+  (define (imag-part z)
+    (mul (magnitude z) (sine (angle z))))
+  (define (make-from-real-imag x y)
+    (cons (squrt (add (square x) (square y))) (arctan y x)))
+  ;; interface to the rest of the system
+  (define (tag x)
+    (attach-tag 'polar x))
+  (put 'real-part '(polar) real-part)
+  (put 'imag-part '(polar) imag-part)
+  (put 'magnitude '(polar) magnitude)
+  (put 'angle '(polar) angle)
+  (put 'make-from-real-imag 'polar (lambda (x y) (tag (make-from-real-imag x y))))
+  (put 'make-from-mag-ang 'polar (lambda (r a) (tag (make-from-mag-ang r a))))
+  'done)
+
+(define (install-complex-package)
+  ;; imported procedures from rectangular and polar packages
+  (define (make-from-real-imag x y)
+    ((get 'make-from-real-imag 'rectangular) x y))
+  (define (make-from-mag-ang r a)
+    ((get 'make-from-mag-ang 'polar) r a))
+  ;; internal procedures
+  (define (add-complex z1 z2)
+    (make-from-real-imag (add (real-part z1) (real-part z2)) (add (imag-part z1) (imag-part z2))))
+  (define (sub-complex z1 z2)
+    (make-from-real-imag (sub (real-part z1) (real-part z2)) (sub (imag-part z1) (imag-part z2))))
+  (define (mul-complex z1 z2)
+    (make-from-mag-ang (mul (magnitude z1) (magnitude z2)) (add (angle z1) (angle z2))))
+  (define (div-complex z1 z2)
+    (make-from-mag-ang (div (magnitude z1) (magnitude z2)) (sub (angle z1) (angle z2))))
+  (define (equ?-complex z1 z2)
+    (and (equ? (real-part z1) (real-part z2)) (equ? (imag-part z1) (imag-part z2))))
+  (define (=zero?-complex z)
+    (equ? (magnitude z) 0))
+  (define (neg-complex z)
+    (make-from-real-imag (neg (real-part z)) (neg (imag-part z))))
+  ;; interface to rest of the system
+  (define (tag z)
+    (attach-tag 'complex z))
+  (put 'add '(complex complex) (lambda (z1 z2) (tag (add-complex z1 z2))))
+  (put 'sub '(complex complex) (lambda (z1 z2) (tag (sub-complex z1 z2))))
+  (put 'mul '(complex complex) (lambda (z1 z2) (tag (mul-complex z1 z2))))
+  (put 'div '(complex complex) (lambda (z1 z2) (tag (div-complex z1 z2))))
+  (put 'equ? '(complex complex) equ?-complex)
+  (put '=zero? '(complex) =zero?-complex)
+  (put 'neg '(complex) (lambda (z) (tag (neg-complex) z)))
+  (put 'real-part '(complex) real-part)
+  (put 'imag-part '(complex) imag-part)
+  (put 'magnitude '(complex) magnitude)
+  (put 'angle '(complex) angle)
+  (put 'make-from-real-imag 'complex (lambda (x y) (tag (make-from-real-imag x y))))
+  (put 'make-from-mag-ang 'complex (lambda (r a) (tag (make-from-mag-ang r a))))
+  'done)
+(define (real-part z)
+  (apply-generic 'real-part z))
+(define (imag-part z)
+  (apply-generic 'imag-part z))
+(define (magnitude z)
+  (apply-generic 'magnitude z))
+(define (angle z)
+  (apply-generic 'angle z))
+(define (make-complex-from-real-imag x y)
+  ((get 'make-from-real-imag 'complex) x y))
+(define (make-complex-from-mag-ang r a)
+  ((get 'make-from-mag-ang 'complex) r a))
+#+end_src
+
+Only thing that we had to do here was define a concrete negate procedure, and then we were able to use a combination of addtion and negation to achieve subtraction, meaning that we do not currently need to have a termlist type implementation for subtraction. This is the power of data abstraction.
+#+name: 2.88-poly-package
+#+begin_src racket :exports code
+(define (install-polynomial-package)
+  ;; internal procedures
+  ;; representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (variable p)
+    (car p))
+  (define (term-list p)
+    (cdr p))
+  (define (variable? p)
+    (symbol? p))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  ;; representation of terms and term lists
+  (define (adjoin-term term term-list)
+    (if (=zero? (coeff term))
+        term-list
+        (cons term term-list)))
+  (define (the-empty-termlist)
+    '())
+  (define (first-term term-list)
+    (car term-list))
+  (define (rest-terms term-list)
+    (cdr term-list))
+  (define (empty-termlist? term-list)
+    (null? term-list))
+  (define (make-term order coeff)
+    (list order coeff))
+  (define (order term)
+    (car term))
+  (define (coeff term)
+    (cadr term))
+  (define (add-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (add-terms (term-list p1) (term-list p2)))
+        (error "Polys not in same var: ADD-POLY" (list p1 p2))))
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+       (let ([t1 (first-term L1)]
+             [t2 (first-term L2)])
+         (cond
+           [(> (order t1) (order t2)) (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+           [(< (order t1) (order t2)) (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+           [else
+            (adjoin-term (make-term (order t1) (add (coeff t1) (coeff t2)))
+                         (add-terms (rest-terms L1) (rest-terms L2)))]))]))
+  (define (mul-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (mul-terms (term-list p1) (term-list p2)))
+        (error "Polys not in same var: MUL-POLY" (list p1 p2))))
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+        (the-empty-termlist)
+        (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+        (the-empty-termlist)
+        (let ([t2 (first-term L)])
+          (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
+                       (mul-term-by-all-terms t1 (rest-terms L))))))
+  (define (sub-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (add-poly p1 (neg-poly p2))
+        (error "Polys not in same var: SUB-POLY" (list p1 p2))))
+  (define (neg-poly p)
+    (make-poly (variable p) (neg-terms (term-list p))))
+  (define (neg-terms term-list)
+    (if (empty-termlist? term-list)
+        (the-empty-termlist)
+        (adjoin-term (neg-term (first-term term-list)) (neg-terms (rest-terms term-list)))))
+  ;; negates term unit
+  (define (neg-term term)
+    (make-term (order term) (neg (coeff term))))
+  ;; Might have to do a little modification to do a linear check on empty term-list
+  (define (=zero?-poly p) (empty-termlist? (term-list p)))
+  ;; interface to rest of the system
+  (define (tag p)
+    (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+  (put 'neg '(polynomial) (lambda (p) (tag (neg-poly p))))
+  (put '=zero? '(polynomial) =zero?-poly)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (make-polynomial var terms)
+  ((get 'make 'polynomial) var terms))
+#+end_src
+
+#+caption: Testing the we could subtract polynomials
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.88-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.86-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.88-poly-package>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+
+(display "testing polynomial construction")
+(newline)
+(define test-poly1 (make-polynomial 'x '((3 4) (2 1) (1 4) (0 6))) )
+(define test-poly2 (make-polynomial 'x '((3 2) (1 2) (0 8))) )
+test-poly1
+test-poly2
+(define test-poly3 (make-polynomial 'y (list (list 2 test-poly1) (list 1 test-poly2))))
+(define test-poly4 (make-polynomial 'y (list (list 2 test-poly2) (list 0 test-poly1))))
+test-poly3
+test-poly4
+(contain? 'polynomial default-ranks)
+(newline)
+(display "testing polynomial combinations")
+(newline)
+(add test-poly1 test-poly2)
+(mul test-poly1 test-poly2)
+(sub test-poly1 test-poly2)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
+(sub test-poly3 test-poly4)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing polynomial construction
+(polynomial x (3 4) (2 1) (1 4) (0 6))
+(polynomial x (3 2) (1 2) (0 8))
+(polynomial y (2 (polynomial x (3 4) (2 1) (1 4) (0 6))) (1 (polynomial x (3 2) (1 2) (0 8))))
+(polynomial y (2 (polynomial x (3 2) (1 2) (0 8))) (0 (polynomial x (3 4) (2 1) (1 4) (0 6))))
+#f
+
+testing polynomial combinations
+(polynomial x (3 6) (2 1) (1 6) (0 14))
+(polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x (3 2) (2 1) (1 2) (0 -2))
+(polynomial y (2 (polynomial x (3 6) (2 1) (1 6) (0 14))) (1 (polynomial x (3 2) (1 2) (0 8))) (0 (polynomial x (3 4) (2 1) (1 4) (0 6))))
+(polynomial y (4 (polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y (2 (polynomial x (3 2) (2 1) (1 2) (0 -2))) (1 (polynomial x (3 2) (1 2) (0 8))) (0 (polynomial x (3 -4) (2 -1) (1 -4) (0 -6))))
+#+end_example
+
+Alright, this is neat. We are now able to subtract polynomials from each other.
+** Exercise 2.89
+*** Prompt
+Define the termlist type implementation that is best for dense polynomials.
+*** Solution
+We are building a different term list concrete implementation that would be more efficient for dense polynomials. How can we do this? As stated in SICP, it is just ordering the coefficient by their power. The inefficiency that stopped us from making the default implementation is that we have to also fill in terms that are 0 with a 0 in the list representation.
+
+Since I looked a little ahead, I noticed that it would be helpful if we designed the dense version of the term list as a package.
+
+One of the problem that we are running into is that ~apply-generic~ is stripping off the type as it is applying the procedure on the argument. By doing this, it actually makes it so that the coeff procedure and the order procedure break. This is rather challenging. The current hack we could do is make it so that for those two procedures, we check if there is a type tag. If not, then treat the input as the type.
+
+#+name: 2.89-term-list
+#+begin_src racket :exports code
+(define (install-dense-termlist-package)
+  (define (the-empty-termlist-dense)
+    '())
+  (define (termlist-length term-list)
+    (length term-list))
+  (define (place-dense value rest-zeros term-list)
+    (cond
+      [(= rest-zeros 0) (cons value term-list)]
+      [(< rest-zeros 0)
+       (error "malformed system, trying to place a value in the middle of term-list: PLACE-DENSE"
+              (list value rest-zeros term-list))]
+      [else (place-dense value (- rest-zeros 1) (cons 0 term-list))]))
+  (define (adjoin-term-dense term term-list)
+    ;; FIXME: This is the fail site. Due to how apply generic works, the term
+    ;; will also have its type stripped, meaning that we cannot use the generic
+    ;; application to retrieve the coeff
+    (let ([term-coeff (coeff term)])
+      (if (=zero? term-coeff)
+          term-list
+          (place-dense term-coeff (- (order term) (termlist-length term-list)) term-list))))
+  (define (first-term-dense term-list)
+    (make-term (- (termlist-length term-list) 1) (car term-list)))
+  (define (rest-terms-dense term-list)
+    (cdr term-list))
+  (define (empty-termlist?-dense term-list)
+    (null? term-list))
+  (define (make-from-coeffs coeffs)
+    coeffs)
+  (define (make-from-terms terms)
+    (if (null? terms)
+        (the-empty-termlist 'dense-termlist)
+        (adjoin-term-dense (car terms) (make-from-terms (cdr terms)))))
+  ;; negation function for the dense representation, taking advantage of the
+  ;; number representation of the type.
+  (define (neg-terms-dense term-list)
+    (if (empty-termlist?-dense term-list)
+        (the-empty-termlist 'dense-termlist)
+        (cons (neg (car term-list)) (neg-terms-dense (rest-terms-dense term-list)))))
+  (define (tag x)
+    (attach-tag 'dense-termlist x))
+  (put 'adjoin-term '(term dense-termlist) (lambda (x y) (tag (adjoin-term-dense x y))))
+  (put 'first-term '(dense-termlist) first-term-dense)
+  (put 'rest-terms '(dense-termlist) (lambda (x) (tag (rest-terms-dense x))))
+  (put 'empty-termlist? '(dense-termlist) empty-termlist?-dense)
+  (put 'the-empty-termlist 'dense-termlist (lambda () (tag (the-empty-termlist-dense))))
+  (put 'make-from-coeffs 'dense-termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'make-from-terms 'dense-termlist (lambda (x) (tag (make-from-terms x))))
+  (put 'neg '(dense-termlist) (lambda (x) (tag (neg-terms-dense))))
+  'done)
+
+;; Forcing the user to pass in a parameter for the type being constructed
+(define (the-empty-termlist x)
+  (cond
+    [(eq? x 'dense-termlist) ((get 'the-empty-termlist 'dense-termlist))]))
+
+(define (install-term-package)
+  (define (make-term-aux order coeff)
+    (list order coeff))
+  (define (order-term term)
+    (car term))
+  (define (coeff-term term)
+    (cadr term))
+  ;; negates term unit
+  (define (neg-term term)
+    (make-term (order-term term) (neg (coeff-term term))))
+  (define (tag x)
+    (attach-tag 'term x))
+  (put 'make 'term (lambda (order coeff) (tag (make-term-aux order coeff))))
+  (put 'neg '(term) (lambda (x) (tag (neg-term x))))
+  (put 'order '(term) order-term)
+  (put 'coeff '(term) coeff-term)
+  'done)
+(define (make-term order coeff)
+  ((get 'make 'term) order coeff))
+(define (order term)
+  (let ([curr-type (type-tag term)])
+    (if (symbol? curr-type)
+        (apply-generic 'order term)
+        ((get 'order '(term)) term))))
+(define (coeff term)
+  (let ([curr-type (type-tag term)])
+    (if (symbol? curr-type)
+        (apply-generic 'coeff term)
+        ((get 'coeff '(term)) term))))
+
+;; Need to include add, neg, and mul
+(define (install-termlist-package)
+  (define (make-from-coeffs x)
+    ((get 'make-from-coeffs 'dense-termlist) x))
+  (define (first-term-termlist term-list)
+    (apply-generic 'first-term term-list))
+  (define (rest-terms term-list)
+    (apply-generic 'rest-terms term-list))
+  (define (adjoin-term term term-list)
+    (apply-generic 'adjoin-term term term-list))
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+       (let ([t1 (first-term L1)]
+             [t2 (first-term L2)])
+         (let ([t1-order (order t1)]
+               [t2-order (order t2)])
+           (cond
+             [(> t1-order t2-order) (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+             [(< t1-order t2-order) (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+             [else
+              (adjoin-term (make-term t1-order (add (coeff t1) (coeff t2)))
+                           (add-terms (rest-terms L1) (rest-terms L2)))])))]))
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+        (the-empty-termlist)
+        (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+        (the-empty-termlist)
+        (let ([t2 (first-term L)])
+          (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
+                       (mul-term-by-all-terms t1 (rest-terms L))))))
+  (define (neg-terms term-list)
+    (if (empty-termlist? term-list)
+        (the-empty-termlist 'dense-termlist)
+        (adjoin-term (neg (first-term term-list)) (neg-terms (rest-terms term-list)))))
+  (define (tag x)
+    (attach-tag 'termlist x))
+  (put 'make-from-coeffs 'termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'empty-termlist? '(termlist) empty-termlist?)
+  (put 'first-term '(termlist) first-term-termlist)
+  (put 'add '(termlist termlist) (lambda (t1 t2) (tag (add-terms t1 t2))))
+  (put 'neg '(termlist) (lambda (x) (tag (neg-terms x))))
+  'done)
+(define (make-termlist-from-coeffs x)
+  ((get 'make-from-coeffs 'termlist) x))
+(define (empty-termlist? term-list)
+  (apply-generic 'empty-termlist? term-list))
+(define (first-term term-list)
+  (apply-generic 'first-term term-list))
+#+end_src
+
+#+name: 2.89-poly-package
+#+begin_src racket :exports code
+(define (install-polynomial-package)
+  ;; internal procedures
+  ;; representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (variable p)
+    (car p))
+  (define (term-list p)
+    (cdr p))
+  (define (variable? p)
+    (symbol? p))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  (define (add-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (add (term-list p1) (term-list p2)))
+        (error "Polys not in same var: ADD-POLY" (list p1 p2))))
+  (define (mul-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (mul (term-list p1) (term-list p2)))
+        (error "Polys not in same var: MUL-POLY" (list p1 p2))))
+  (define (sub-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (add-poly p1 (neg-poly p2))
+        (error "Polys not in same var: SUB-POLY" (list p1 p2))))
+  (define (neg-poly p)
+    (make-poly (variable p) (neg (term-list p))))
+  ;; negates term unit
+  (define (neg-term term)
+    (make-term (order term) (neg (coeff term))))
+  ;; Might have to do a little modification to do a linear check on empty term-list
+  (define (=zero?-poly p) (empty-termlist? (term-list p)))
+  ;; interface to rest of the system
+  (define (tag p)
+    (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+  (put 'neg '(polynomial) (lambda (p) (tag (neg-poly p))))
+  (put '=zero? '(polynomial) =zero?-poly)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (make-polynomial var terms)
+  ((get 'make 'polynomial) var terms))
+#+end_src
+
+#+name: 2.89-imports
+#+begin_src racket :exports code :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.88-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.86-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.89-poly-package>>
+<<2.89-term-list>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+(install-termlist-package)
+(install-term-package)
+(install-dense-termlist-package)
+#+end_src
+
+
+#+caption: Testing the termlist interface.
+#+begin_src racket :exports both :noweb yes
+<<2.89-imports>>
+
+
+(display "testing dense construction")
+(newline)
+
+(define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
+(define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
+(define empty-dense-termlist (make-termlist-from-coeffs '()))
+dense-termlist1
+dense-termlist2
+(empty-termlist? empty-dense-termlist)
+(empty-termlist? dense-termlist1)
+(neg dense-termlist1)
+(first-term dense-termlist1)
+(first-term dense-termlist2)
+
+(newline)
+(display "testing termlist combinations")
+(newline)
+(add dense-termlist1 dense-termlist2)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing dense construction
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 5 6 7)
+#t
+#f
+(termlist dense-termlist -1 -2 -3)
+(term 2 1)
+(term 3 4)
+
+testing termlist combinations
+(termlist dense-termlist 4 6 8 10)
+#+end_example
+
+#+caption: Testing the we could do the standard operations of a polynomial on the new datatype.
+#+begin_src racket :exports both :noweb yes
+<<2.89-imports>>
+
+(display "testing dense construction")
+(newline)
+
+(make-termlist-from-coeffs (list 1 2 3))
+
+(display "testing polynomial construction")
+(newline)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6 )) ) )
+(define test-poly2 (make-polynomial 'x (make-termlist-from-coeffs (list 2 0 2 8 )) ) )
+test-poly1
+test-poly2
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0) ) ))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1)) ))
+test-poly3
+test-poly4
+(contain? 'polynomial default-ranks)
+(newline)
+(display "testing polynomial combinations")
+(newline)
+(add test-poly1 test-poly2)
+(mul test-poly1 test-poly2)
+(sub test-poly1 test-poly2)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
+(sub test-poly3 test-poly4)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing dense construction
+(termlist dense-termlist 1 2 3)
+testing polynomial construction
+(polynomial x termlist dense-termlist 4 1 4 6)
+(polynomial x termlist dense-termlist 2 0 2 8)
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist dense-termlist 2 0 2 8) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 2 0 2 8) 0 (polynomial x termlist dense-termlist 4 1 4 6))
+#f
+
+testing polynomial combinations
+#+end_example
