@@ -7533,19 +7533,26 @@ Alright, this is neat. We are now able to subtract polynomials from each other.
 *** Prompt
 Define the termlist type implementation that is best for dense polynomials.
 *** Solution
-We are building a different term list concrete implementation that would be more efficient for dense polynomials. How can we do this? As stated in SICP, it is just ordering the coefficient by their power. The inefficiency that stopped us from making the default implementation is that we have to also fill in terms that are 0 with a 0 in the list representation.
+We are building a different term list concrete implementation that would be more
+efficient for dense polynomials. How can we do this? As stated in SICP, it is
+just ordering the coefficient by their power. The inefficiency that stopped us
+from making the default implementation is that we have to also fill in terms
+that are 0 with a 0 in the list representation.
 
-Since I looked a little ahead, I noticed that it would be helpful if we designed the dense version of the term list as a package.
+Since I looked a little ahead, I noticed that it would be helpful if we designed the
+dense version of the term list as a package.
 
-One of the problem that we are running into is that ~apply-generic~ is stripping off the type as it is applying the procedure on the argument. By doing this, it actually makes it so that the coeff procedure and the order procedure break. This is rather challenging. The current hack we could do is make it so that for those two procedures, we check if there is a type tag. If not, then treat the input as the type.
+One of the problem that we are running into is that ~apply-generic~ is stripping off
+the type as it is applying the procedure on the argument. By doing this, it actually
+makes it so that the coeff procedure and the order procedure break. This is rather
+challenging. The current hack we could do is make it so that for those two procedures,
+we check if there is a type tag. If not, then treat the input as the type.
 
 #+name: 2.89-term-list
 #+begin_src racket :exports code
 (define (install-dense-termlist-package)
   (define (the-empty-termlist-dense)
     '())
-  (define (termlist-length term-list)
-    (length term-list))
   (define (place-dense value rest-zeros term-list)
     (cond
       [(= rest-zeros 0) (cons value term-list)]
@@ -7554,19 +7561,28 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
               (list value rest-zeros term-list))]
       [else (place-dense value (- rest-zeros 1) (cons 0 term-list))]))
   (define (adjoin-term-dense term term-list)
-    ;; FIXME: This is the fail site. Due to how apply generic works, the term
-    ;; will also have its type stripped, meaning that we cannot use the generic
-    ;; application to retrieve the coeff
     (let ([term-coeff (coeff term)])
       (if (=zero? term-coeff)
           term-list
-          (place-dense term-coeff (- (order term) (termlist-length term-list)) term-list))))
+          (place-dense term-coeff (- (order term) (length term-list)) term-list))))
+  ;; Private procedure that removes the leading zeros
+  (define (remove-leading-zeros term-list)
+    (cond
+      [(null? term-list) term-list]
+      [(=zero? (car term-list)) (remove-leading-zeros (cdr term-list))]
+      [else term-list]))
+  ;; Additional requirement here is that we don't want to return a term that is
+  ;; zero, therefore, we should keep looking for the next one.
   (define (first-term-dense term-list)
-    (make-term (- (termlist-length term-list) 1) (car term-list)))
+    (let ([cleaned-term-list (remove-leading-zeros term-list)])
+      (make-term (- (length term-list) 1) (car cleaned-term-list))))
+  ;; This method must also discard leading zeros
   (define (rest-terms-dense term-list)
-    (cdr term-list))
+    (let ([cleaned-term-list (remove-leading-zeros term-list)])
+      (remove-leading-zeros (cdr cleaned-term-list))))
+  ;; We should discard the leading zero terms
   (define (empty-termlist?-dense term-list)
-    (null? term-list))
+    (null? (remove-leading-zeros term-list)))
   (define (make-from-coeffs coeffs)
     coeffs)
   (define (make-from-terms terms)
@@ -7628,11 +7644,13 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
 
 ;; Need to include add, neg, and mul
 (define (install-termlist-package)
+  (define (empty-termlist?-termlist term-list)
+    (apply-generic 'empty-termlist? term-list))
   (define (make-from-coeffs x)
     ((get 'make-from-coeffs 'dense-termlist) x))
   (define (first-term-termlist term-list)
     (apply-generic 'first-term term-list))
-  (define (rest-terms term-list)
+  (define (rest-terms-termlist term-list)
     (apply-generic 'rest-terms term-list))
   (define (adjoin-term term term-list)
     (apply-generic 'adjoin-term term term-list))
@@ -7653,11 +7671,11 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
                            (add-terms (rest-terms L1) (rest-terms L2)))])))]))
   (define (mul-terms L1 L2)
     (if (empty-termlist? L1)
-        (the-empty-termlist)
+        (the-empty-termlist 'dense-termlist)
         (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
   (define (mul-term-by-all-terms t1 L)
     (if (empty-termlist? L)
-        (the-empty-termlist)
+        (the-empty-termlist 'dense-termlist)
         (let ([t2 (first-term L)])
           (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
                        (mul-term-by-all-terms t1 (rest-terms L))))))
@@ -7668,9 +7686,11 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
   (define (tag x)
     (attach-tag 'termlist x))
   (put 'make-from-coeffs 'termlist (lambda (x) (tag (make-from-coeffs x))))
-  (put 'empty-termlist? '(termlist) empty-termlist?)
+  (put 'empty-termlist? '(termlist) empty-termlist?-termlist)
   (put 'first-term '(termlist) first-term-termlist)
+  (put 'rest-terms '(termlist) (lambda (term-list) (tag (rest-terms-termlist term-list))))
   (put 'add '(termlist termlist) (lambda (t1 t2) (tag (add-terms t1 t2))))
+  (put 'mul '(termlist termlist) (lambda (t1 t2) (tag (mul-terms t1 t2))))
   (put 'neg '(termlist) (lambda (x) (tag (neg-terms x))))
   'done)
 (define (make-termlist-from-coeffs x)
@@ -7679,6 +7699,8 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
   (apply-generic 'empty-termlist? term-list))
 (define (first-term term-list)
   (apply-generic 'first-term term-list))
+(define (rest-terms term-list)
+  (apply-generic 'rest-terms term-list))
 #+end_src
 
 #+name: 2.89-poly-package
@@ -7773,25 +7795,35 @@ One of the problem that we are running into is that ~apply-generic~ is stripping
 #+begin_src racket :exports both :noweb yes
 <<2.89-imports>>
 
-
 (display "testing dense construction")
 (newline)
 
 (define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
 (define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
-(define empty-dense-termlist (make-termlist-from-coeffs '()))
+(define dense-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)) )
+(define dense-termlist4 (make-termlist-from-coeffs (list 0 6 7)) )
+(define empty-dense-termlist1 (make-termlist-from-coeffs '()))
+(define empty-dense-termlist2 (make-termlist-from-coeffs (list 0)))
 dense-termlist1
 dense-termlist2
-(empty-termlist? empty-dense-termlist)
+dense-termlist2
+(empty-termlist? empty-dense-termlist1)
+(empty-termlist? empty-dense-termlist2)
 (empty-termlist? dense-termlist1)
 (neg dense-termlist1)
+(neg dense-termlist2)
 (first-term dense-termlist1)
+(first-term (rest-terms dense-termlist1))
 (first-term dense-termlist2)
+(first-term dense-termlist4)
 
 (newline)
 (display "testing termlist combinations")
 (newline)
 (add dense-termlist1 dense-termlist2)
+(add dense-termlist1 dense-termlist3)
+(add dense-termlist1 empty-dense-termlist2)
+(mul dense-termlist1 dense-termlist2)
 #+end_src
 
 #+RESULTS:
@@ -7812,15 +7844,26 @@ done
 testing dense construction
 (termlist dense-termlist 1 2 3)
 (termlist dense-termlist 4 5 6 7)
+(termlist dense-termlist 4 5 6 7)
+#t
 #t
 #f
 (termlist dense-termlist -1 -2 -3)
+(termlist dense-termlist -4 -5 -6 -7)
 (term 2 1)
+(term 1 2)
 (term 3 4)
+(term 2 6)
 
 testing termlist combinations
 (termlist dense-termlist 4 6 8 10)
+(termlist dense-termlist 4 1 8 10)
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 13 28 34 32 21)
 #+end_example
+
+The result of the test shows that we were able to satisfy the required
+termlist implementation that will facilitate our polynomial operations.
 
 #+caption: Testing the we could do the standard operations of a polynomial on the new datatype.
 #+begin_src racket :exports both :noweb yes
@@ -7833,12 +7876,12 @@ testing termlist combinations
 
 (display "testing polynomial construction")
 (newline)
-(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6 )) ) )
-(define test-poly2 (make-polynomial 'x (make-termlist-from-coeffs (list 2 0 2 8 )) ) )
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2 (make-polynomial 'x (make-termlist-from-coeffs (list 2 0 2 8))))
 test-poly1
 test-poly2
-(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0) ) ))
-(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1)) ))
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
 test-poly3
 test-poly4
 (contain? 'polynomial default-ranks)
@@ -7848,6 +7891,10 @@ test-poly4
 (add test-poly1 test-poly2)
 (mul test-poly1 test-poly2)
 (sub test-poly1 test-poly2)
+
+(newline)
+(display "testing polynomial with polynomial coefficient combination")
+(newline)
 (add test-poly3 test-poly4)
 (mul test-poly3 test-poly4)
 (sub test-poly3 test-poly4)
@@ -7878,4 +7925,522 @@ testing polynomial construction
 #f
 
 testing polynomial combinations
+(polynomial x termlist dense-termlist 6 1 6 14)
+(polynomial x termlist dense-termlist 8 2 16 46 16 44 48)
+(polynomial x termlist dense-termlist 2 1 2 -2)
+
+testing polynomial with polynomial coefficient combination
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist dense-termlist 2 0 2 8) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 16 46 16 44 48) (polynomial x termlist dense-termlist 4 0 8 32 4 32 64) (polynomial x termlist dense-termlist 16 8 33 56 28 48 36) (polynomial x termlist dense-termlist 8 2 16 46 16 44 48) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 2 1 2 -2) (polynomial x termlist dense-termlist 2 0 2 8) (polynomial x termlist dense-termlist -4 -1 -4 -6))
+#+end_example
+
+Well, we build a set of relatively basic tests (that does not even do asserts!), and we saw that we were able to do all the previous set of operations from exercise 2.88 on this new package. We put the extra effort in making the dense termlist a package that uses generic procedures. This will come in handy in the next exercise.
+** Exercise 2.90
+*** Prompt
+Suppose we want to have a polynomial system that is efficient for both sparse and dense polynomials. One way to do this is to allow both kinds of term-list representations in our system. The situation is analogous to the complex-number example of Section 2.4, where we allowed both rectangular and polar representations. To do this we must distinguish different types of term lists and make the operations on term lists generic. Redesign the polynomial system to implement this generalization. This is a major effort, not a local change.
+*** Solution
+We were slightly ahead of this exercise in that we already refactored the system into packages. Now lets modify what we had so that it satisfies the requirements set by this exercise.
+
+All we have to do in this section is to build another termlist package that uses the old termlist representation instead of the dense one.
+
+There are a lot of things to do here, so let's make a checklist of tasks:
+- [ ] Test both construction methods of the sparse implementation
+- [ ] Test the three supported operations
+- [ ] Test combination using different termlist representations
+#+name: 2.90-term-list
+#+begin_src racket :exports code
+(define (install-dense-termlist-package)
+  (define (the-empty-termlist-dense)
+    '())
+  (define (place-dense value rest-zeros term-list)
+    (cond
+      [(= rest-zeros 0) (cons value term-list)]
+      [(< rest-zeros 0)
+       (error "malformed system, trying to place a value in the middle of term-list: PLACE-DENSE"
+              (list value rest-zeros term-list))]
+      [else (place-dense value (- rest-zeros 1) (cons 0 term-list))]))
+  (define (adjoin-term-dense term term-list)
+    (let ([term-coeff (coeff term)])
+      (if (=zero? term-coeff)
+          term-list
+          (place-dense term-coeff (- (order term) (length term-list)) term-list))))
+  ;; Private procedure that removes the leading zeros
+  (define (remove-leading-zeros term-list)
+    (cond
+      [(null? term-list) term-list]
+      [(=zero? (car term-list)) (remove-leading-zeros (cdr term-list))]
+      [else term-list]))
+  ;; Additional requirement here is that we don't want to return a term that is
+  ;; zero, therefore, we should keep looking for the next one.
+  (define (first-term-dense term-list)
+    (let ([cleaned-term-list (remove-leading-zeros term-list)])
+      (make-term (- (length term-list) 1) (car cleaned-term-list))))
+  ;; This method must also discard leading zeros
+  (define (rest-terms-dense term-list)
+    (let ([cleaned-term-list (remove-leading-zeros term-list)])
+      (remove-leading-zeros (cdr cleaned-term-list))))
+  ;; We should discard the leading zero terms
+  (define (empty-termlist?-dense term-list)
+    (null? (remove-leading-zeros term-list)))
+  (define (make-from-coeffs coeffs)
+    coeffs)
+  (define (make-from-terms terms)
+    (if (null? terms)
+        (the-empty-termlist 'dense-termlist)
+        (adjoin-term-dense (car terms) (make-from-terms (cdr terms)))))
+  ;; negation function for the dense representation, taking advantage of the
+  ;; number representation of the type.
+  (define (neg-terms-dense term-list)
+    (if (empty-termlist?-dense term-list)
+        (the-empty-termlist 'dense-termlist)
+        (cons (neg (car term-list)) (neg-terms-dense (rest-terms-dense term-list)))))
+  (define (tag x)
+    (attach-tag 'dense-termlist x))
+  (put 'adjoin-term '(term dense-termlist) (lambda (x y) (tag (adjoin-term-dense x y))))
+  (put 'first-term '(dense-termlist) first-term-dense)
+  (put 'rest-terms '(dense-termlist) (lambda (x) (tag (rest-terms-dense x))))
+  (put 'empty-termlist? '(dense-termlist) empty-termlist?-dense)
+  (put 'the-empty-termlist 'dense-termlist (lambda () (tag (the-empty-termlist-dense))))
+  (put 'make-from-coeffs 'dense-termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'make-from-terms 'dense-termlist (lambda (x) (tag (make-from-terms x))))
+  (put 'neg '(dense-termlist) (lambda (x) (tag (neg-terms-dense x))))
+  'done)
+
+(define (install-sparse-termlist-package)
+  (define (make-internal-term order coeff)
+    (list order coeff))
+  (define (internal-order internal-term)
+    (car internal-term))
+  (define (internal-coeff internal-term)
+    (cadr internal-term))
+  (define (the-empty-termlist-sparse)
+    '())
+  (define (adjoin-term-sparse term term-list)
+    (if (=zero? (coeff term))
+        term-list
+        (cons term term-list)))
+  ;; want to tag this as a term again
+  (define (first-term-sparse term-list)
+    (let ([front-term (car term-list)]) (make-term (internal-order front-term) (internal-coeff front-term))))
+  ;; This method must also discard leading zeros
+  (define (rest-terms-sparse term-list)
+    (cdr term-list))
+  ;; We should discard the leading zero terms
+  (define (empty-termlist?-sparse term-list)
+    (null? term-list))
+  (define (make-from-coeffs coeffs)
+    (let ([res (right-fold (lambda (acc ele)
+                             (let ([curr-power (car acc)]
+                                   [built-acc (cdr acc)])
+                               (cons (+ curr-power 1)
+                                     (adjoin-term-sparse (make-internal-term curr-power ele) built-acc))))
+                           (cons 0 (the-empty-termlist-sparse))
+                           coeffs)])
+      (cdr res)))
+  ;; TODO: Test this construction
+  (define (make-from-terms terms)
+    (map contents terms))
+  ;; negation function for the dense representation, taking advantage of the
+  ;; number representation of the type.
+  ;; TODO: This procedure must be corrected
+  (define (neg-terms-sparse term-list)
+    (if (empty-termlist?-sparse term-list)
+        (the-empty-termlist-sparse)
+        (adjoin-term-sparse (neg (first-term-sparse term-list)) (neg-terms-sparse (rest-terms-sparse term-list)))))
+  (define (tag x)
+    (attach-tag 'sparse-termlist x))
+  (put 'adjoin-term '(term sparse-termlist) (lambda (x y) (tag (adjoin-term-sparse x y))))
+  (put 'first-term '(sparse-termlist) first-term-sparse)
+  (put 'rest-terms '(sparse-termlist) (lambda (x) (tag (rest-terms-sparse x))))
+  (put 'empty-termlist? '(sparse-termlist) empty-termlist?-sparse)
+  (put 'the-empty-termlist 'sparse-termlist (lambda () (tag (the-empty-termlist-sparse))))
+  (put 'make-from-coeffs 'sparse-termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'make-from-terms 'sparse-termlist (lambda (x) (tag (make-from-terms x))))
+  (put 'neg '(sparse-termlist) (lambda (x) (tag (neg-terms-sparse x))))
+  'done)
+
+(define (install-term-package)
+  (define (make-term-aux order coeff)
+    (list order coeff))
+  (define (order-term term)
+    (car term))
+  (define (coeff-term term)
+    (cadr term))
+  ;; negates term unit
+  (define (neg-term term)
+    (make-term (order-term term) (neg (coeff-term term))))
+  (define (tag x)
+    (attach-tag 'term x))
+  (put 'make 'term (lambda (order coeff) (tag (make-term-aux order coeff))))
+  (put 'neg '(term) (lambda (x) (tag (neg-term x))))
+  (put 'order '(term) order-term)
+  (put 'coeff '(term) coeff-term)
+  'done)
+(define (make-term order coeff)
+  ((get 'make 'term) order coeff))
+(define (order term)
+  (let ([curr-type (type-tag term)])
+    (if (symbol? curr-type)
+        (apply-generic 'order term)
+        ((get 'order '(term)) term))))
+(define (coeff term)
+  (let ([curr-type (type-tag term)])
+    (if (symbol? curr-type)
+        (apply-generic 'coeff term)
+        ((get 'coeff '(term)) term))))
+
+;; Need to include add, neg, and mul
+;; This is the higher level of abstraction for the data type, responsible for
+;; combinations
+(define (install-termlist-package)
+  (define (empty-termlist?-termlist term-list)
+    (apply-generic 'empty-termlist? term-list))
+  (define (make-from-coeffs x)
+    ((get 'make-from-coeffs 'dense-termlist) x))
+  (define (make-from-terms x)
+    ((get 'make-from-terms 'sparse-termlist) x))
+  (define (first-term-termlist term-list)
+    (apply-generic 'first-term term-list))
+  (define (rest-terms-termlist term-list)
+    (apply-generic 'rest-terms term-list))
+  (define (adjoin-term term term-list)
+    (apply-generic 'adjoin-term term term-list))
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+       (let ([t1 (first-term L1)]
+             [t2 (first-term L2)])
+         (let ([t1-order (order t1)]
+               [t2-order (order t2)])
+           (cond
+             [(> t1-order t2-order) (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+             [(< t1-order t2-order) (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+             [else
+              (adjoin-term (make-term t1-order (add (coeff t1) (coeff t2)))
+                           (add-terms (rest-terms L1) (rest-terms L2)))])))]))
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+        (the-empty-termlist 'dense-termlist)
+        (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+        (the-empty-termlist 'dense-termlist)
+        (let ([t2 (first-term L)])
+          (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
+                       (mul-term-by-all-terms t1 (rest-terms L))))))
+  (define (neg-terms term-list)
+    (neg term-list))
+  (define (tag x)
+    (attach-tag 'termlist x))
+  (put 'make-from-coeffs 'termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'make-from-terms 'termlist (lambda (x) (tag (make-from-terms x))))
+  (put 'empty-termlist? '(termlist) empty-termlist?-termlist)
+  (put 'first-term '(termlist) first-term-termlist)
+  (put 'rest-terms '(termlist) (lambda (term-list) (tag (rest-terms-termlist term-list))))
+  (put 'add '(termlist termlist) (lambda (t1 t2) (tag (add-terms t1 t2))))
+  (put 'mul '(termlist termlist) (lambda (t1 t2) (tag (mul-terms t1 t2))))
+  (put 'neg '(termlist) (lambda (x) (tag (neg-terms x))))
+  'done)
+
+;; Forcing the user to pass in a parameter for the type being constructed
+(define (the-empty-termlist x)
+  ((get 'the-empty-termlist x)))
+
+;; constructor that operates on a list of integers, where the position in the
+;; gives order information, and the elements of the list are the coefficients.
+(define (make-termlist-from-coeffs x)
+  ((get 'make-from-coeffs 'termlist) x))
+;; Constructor that operates on list of term objects.
+(define (make-termlist-from-terms x)
+  ((get 'make-from-terms 'termlist) x))
+(define (empty-termlist? term-list)
+  (apply-generic 'empty-termlist? term-list))
+(define (first-term term-list)
+  (apply-generic 'first-term term-list))
+(define (rest-terms term-list)
+  (apply-generic 'rest-terms term-list))
+#+end_src
+
+#+RESULTS: 2.90-term-list
+
+
+#+name: 2.90-imports
+#+begin_src racket :exports code :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.88-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.86-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.89-poly-package>>
+<<2.90-term-list>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+(install-termlist-package)
+(install-term-package)
+(install-dense-termlist-package)
+(install-sparse-termlist-package)
+#+end_src
+
+
+
+#+caption: Testing the termlist interface.
+#+begin_src racket :exports both :noweb yes
+<<2.90-imports>>
+
+(display "testing dense construction")
+(newline)
+(display "===========================================")
+(newline)
+
+(define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
+(define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
+(define dense-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)) )
+(define dense-termlist4 (make-termlist-from-coeffs (list 0 6 7)) )
+(define empty-dense-termlist1 (make-termlist-from-coeffs '()))
+(define empty-dense-termlist2 (make-termlist-from-coeffs (list 0)))
+dense-termlist1
+dense-termlist2
+dense-termlist2
+empty-dense-termlist1
+empty-dense-termlist2
+
+(newline)
+(display "testing misc procedures on dense termlists")
+(newline)
+(display "===========================================")
+(newline)
+(empty-termlist? empty-dense-termlist1)
+(empty-termlist? empty-dense-termlist2)
+(empty-termlist? dense-termlist1)
+(neg dense-termlist1)
+(neg dense-termlist2)
+(first-term dense-termlist1)
+(first-term (rest-terms dense-termlist1))
+(first-term dense-termlist2)
+(first-term dense-termlist4)
+
+(newline)
+(display "testing dense termlist combinations")
+(newline)
+(display "===========================================")
+(newline)
+(add dense-termlist1 dense-termlist2)
+(add dense-termlist1 dense-termlist3)
+(add dense-termlist1 empty-dense-termlist2)
+(mul dense-termlist1 dense-termlist2)
+
+(newline)
+(display "testing sparse construction")
+(newline)
+(display "===========================================")
+(newline)
+
+(define sparse-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
+(define sparse-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
+(define sparse-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)) )
+(define sparse-termlist4 (make-termlist-from-coeffs (list 0 6 7)) )
+(define empty-sparse-termlist1 (make-termlist-from-terms '()))
+(define empty-sparse-termlist2 (make-termlist-from-terms (list 0)))
+sparse-termlist1
+sparse-termlist2
+sparse-termlist2
+empty-sparse-termlist1
+empty-sparse-termlist2
+
+(newline)
+(display "testing misc procedures on sparse termlists")
+(newline)
+(display "===========================================")
+(newline)
+(empty-termlist? empty-dense-termlist1)
+(empty-termlist? empty-dense-termlist2)
+(empty-termlist? dense-termlist1)
+(neg dense-termlist1)
+(neg dense-termlist2)
+(first-term dense-termlist1)
+(first-term (rest-terms dense-termlist1))
+(first-term dense-termlist2)
+(first-term dense-termlist4)
+
+(newline)
+(display "testing sparse termlist combinations")
+(newline)
+(display "===========================================")
+(newline)
+(add dense-termlist1 dense-termlist2)
+(add dense-termlist1 dense-termlist3)
+(add dense-termlist1 empty-dense-termlist2)
+(mul dense-termlist1 dense-termlist2)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing dense construction
+===========================================
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 5 6 7)
+(termlist dense-termlist 4 5 6 7)
+(termlist dense-termlist)
+(termlist dense-termlist 0)
+
+testing misc procedures on dense termlists
+===========================================
+#t
+#t
+#f
+(termlist dense-termlist -1 -2 -3 dense-termlist)
+(termlist dense-termlist -4 -5 -6 -7 dense-termlist)
+(term 2 1)
+(term 1 2)
+(term 3 4)
+(term 2 6)
+
+testing dense termlist combinations
+===========================================
+(termlist dense-termlist 4 6 8 10)
+(termlist dense-termlist 4 1 8 10)
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 13 28 34 32 21)
+
+testing sparse construction
+===========================================
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 5 6 7)
+(termlist dense-termlist 4 5 6 7)
+(termlist sparse-termlist)
+(termlist sparse-termlist 0)
+
+testing misc procedures on sparse termlists
+===========================================
+#t
+#t
+#f
+(termlist dense-termlist -1 -2 -3 dense-termlist)
+(termlist dense-termlist -4 -5 -6 -7 dense-termlist)
+(term 2 1)
+(term 1 2)
+(term 3 4)
+(term 2 6)
+
+testing sparse termlist combinations
+===========================================
+(termlist dense-termlist 4 6 8 10)
+(termlist dense-termlist 4 1 8 10)
+(termlist dense-termlist 1 2 3)
+(termlist dense-termlist 4 13 28 34 32 21)
+#+end_example
+
+#+caption: Testing the we could do the standard operations of a polynomial on the new datatype.
+#+begin_src racket :exports both :noweb yes
+<<2.90-imports>>
+
+(display "testing dense construction")
+(newline)
+(display "===========================================")
+(newline)
+
+(make-termlist-from-coeffs (list 1 2 3))
+
+(newline)
+(display "testing polynomial construction")
+(newline)
+(display "===========================================")
+(newline)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2 (make-polynomial 'x (make-termlist-from-coeffs (list 2 0 2 8))))
+test-poly1
+test-poly2
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
+test-poly3
+test-poly4
+(contain? 'polynomial default-ranks)
+(newline)
+(display "testing polynomial combinations")
+(newline)
+(display "===========================================")
+(newline)
+(add test-poly1 test-poly2)
+(mul test-poly1 test-poly2)
+(sub test-poly1 test-poly2)
+
+(newline)
+(display "testing polynomial with polynomial coefficient combination")
+(newline)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
+(sub test-poly3 test-poly4)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+testing dense construction
+===========================================
+(termlist dense-termlist 1 2 3)
+
+testing polynomial construction
+===========================================
+(polynomial x termlist dense-termlist 4 1 4 6)
+(polynomial x termlist dense-termlist 2 0 2 8)
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist dense-termlist 2 0 2 8) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 2 0 2 8) 0 (polynomial x termlist dense-termlist 4 1 4 6))
+#f
+
+testing polynomial combinations
+===========================================
+(polynomial x termlist dense-termlist 6 1 6 14)
+(polynomial x termlist dense-termlist 8 2 16 46 16 44 48)
 #+end_example
