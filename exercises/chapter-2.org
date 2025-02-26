@@ -8164,7 +8164,6 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (apply-generic 'rest-terms term-list))
 #+end_src
 
-#+RESULTS: 2.90-term-list
 
 
 #+name: 2.90-imports
@@ -8207,20 +8206,20 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 #+end_src
 
 
-
 #+caption: Testing the termlist interface.
 #+begin_src racket :exports both :noweb yes
 <<2.90-imports>>
 
+(newline)
 (display "testing dense construction")
 (newline)
 (display "===========================================")
 (newline)
 
-(define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
-(define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
-(define dense-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)) )
-(define dense-termlist4 (make-termlist-from-coeffs (list 0 6 7)) )
+(define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)))
+(define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)))
+(define dense-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)))
+(define dense-termlist4 (make-termlist-from-coeffs (list 0 6 7)))
 (define empty-dense-termlist1 (make-termlist-from-coeffs '()))
 (define empty-dense-termlist2 (make-termlist-from-coeffs (list 0)))
 dense-termlist1
@@ -8260,12 +8259,13 @@ empty-dense-termlist2
 (display "===========================================")
 (newline)
 
-(define sparse-termlist1 (make-termlist-from-coeffs (list 1 2 3)) )
-(define sparse-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)) )
-(define sparse-termlist3 (make-termlist-from-coeffs (list 4 0 6 7)) )
-(define sparse-termlist4 (make-termlist-from-coeffs (list 0 6 7)) )
+(define sparse-termlist1
+  (make-termlist-from-terms (list (make-term 2 1) (make-term 1 2) (make-term 0 3))))
+(define sparse-termlist2 (make-termlist-from-terms (list (make-term 3 4) (make-term 2 5) (make-term 1 6) (make-term 0 7))))
+(define sparse-termlist3 (make-termlist-from-terms (list (make-term 3 4) (make-term 1 6) (make-term 0 7))))
+(define sparse-termlist4 (make-termlist-from-terms (list (make-term 2 0) (make-term 1 6) (make-term 0 7))))
 (define empty-sparse-termlist1 (make-termlist-from-terms '()))
-(define empty-sparse-termlist2 (make-termlist-from-terms (list 0)))
+(define empty-sparse-termlist2 (make-termlist-from-terms (list (make-term 0 0))))
 sparse-termlist1
 sparse-termlist2
 sparse-termlist2
@@ -8277,25 +8277,29 @@ empty-sparse-termlist2
 (newline)
 (display "===========================================")
 (newline)
-(empty-termlist? empty-dense-termlist1)
-(empty-termlist? empty-dense-termlist2)
-(empty-termlist? dense-termlist1)
-(neg dense-termlist1)
-(neg dense-termlist2)
-(first-term dense-termlist1)
-(first-term (rest-terms dense-termlist1))
-(first-term dense-termlist2)
-(first-term dense-termlist4)
+(empty-termlist? empty-sparse-termlist1)
+(empty-termlist? empty-sparse-termlist2)
+(empty-termlist? sparse-termlist1)
+(display "testing sparse negation")
+(newline)
+(neg sparse-termlist1)
+(neg sparse-termlist2)
+(display "testing sparse first term")
+(newline)
+(first-term sparse-termlist1)
+(first-term (rest-terms sparse-termlist1))
+(first-term sparse-termlist2)
+(first-term sparse-termlist4)
 
 (newline)
 (display "testing sparse termlist combinations")
 (newline)
 (display "===========================================")
 (newline)
-(add dense-termlist1 dense-termlist2)
-(add dense-termlist1 dense-termlist3)
-(add dense-termlist1 empty-dense-termlist2)
-(mul dense-termlist1 dense-termlist2)
+(add sparse-termlist1 sparse-termlist2)
+(add sparse-termlist1 sparse-termlist3)
+(add sparse-termlist1 empty-sparse-termlist2)
+(mul sparse-termlist1 sparse-termlist2)
 #+end_src
 
 #+RESULTS:
@@ -8314,6 +8318,7 @@ done
 done
 done
 done
+
 testing dense construction
 ===========================================
 (termlist dense-termlist 1 2 3)
@@ -8343,29 +8348,31 @@ testing dense termlist combinations
 
 testing sparse construction
 ===========================================
-(termlist dense-termlist 1 2 3)
-(termlist dense-termlist 4 5 6 7)
-(termlist dense-termlist 4 5 6 7)
+(termlist sparse-termlist (2 1) (1 2) (0 3))
+(termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
+(termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
 (termlist sparse-termlist)
-(termlist sparse-termlist 0)
+(termlist sparse-termlist (0 0))
 
 testing misc procedures on sparse termlists
 ===========================================
 #t
-#t
 #f
-(termlist dense-termlist -1 -2 -3 dense-termlist)
-(termlist dense-termlist -4 -5 -6 -7 dense-termlist)
+#f
+testing sparse negation
+(termlist sparse-termlist (term term 2 -1) (term term 1 -2))
+(termlist sparse-termlist (term term 3 -4) (term term 2 -5) (term term 1 -6))
+testing sparse first term
 (term 2 1)
 (term 1 2)
 (term 3 4)
-(term 2 6)
+(term 2 0)
 
 testing sparse termlist combinations
 ===========================================
-(termlist dense-termlist 4 6 8 10)
-(termlist dense-termlist 4 1 8 10)
-(termlist dense-termlist 1 2 3)
+(termlist sparse-termlist (3 4) (2 6) (1 8) (0 10))
+(termlist sparse-termlist (3 4) (2 1) (1 8) (0 10))
+(termlist sparse-termlist (2 1) (1 2) (0 3))
 (termlist dense-termlist 4 13 28 34 32 21)
 #+end_example
 
