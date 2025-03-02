@@ -8505,6 +8505,9 @@ test-poly4
 (newline)
 (add test-poly3 test-poly4)
 (mul test-poly3 test-poly4)
+(display "subtraction")
+(newline)
+(display-hline--)
 (sub test-poly3 test-poly4)
 #+end_src
 
@@ -8548,14 +8551,14 @@ testing polynomial combinations
 testing polynomial with polynomial coefficient combination
 (polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
 (polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) 0 (polynomial x termlist dense-termlist -4 -1 -4 -6))
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
 #+end_example
 
 And with these ad hoc testing, have reasonable certainty that our system is now working as designed. There were further optimizations that could have been applied, such as making a termlist specific implementation for both addition and multiplication, but for the sake of timeline, those additional implementations were not done.
 ** Exercise 2.91
 *** Prompt
 :LOGBOOK:
-CLOCK: [2025-03-02 Sun 09:24]
+CLOCK: [2025-03-02 Sun 09:24]--[2025-03-02 Sun 10:14] =>  0:50
 :END:
 A univariate polynomial can be divided by another one to produce a polynomial quotient and a polynomial remainder. for example,
 
