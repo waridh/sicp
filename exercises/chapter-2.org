@@ -7949,6 +7949,9 @@ Well, we build a set of relatively basic tests (that does not even do asserts!),
 *** Prompt
 Suppose we want to have a polynomial system that is efficient for both sparse and dense polynomials. One way to do this is to allow both kinds of term-list representations in our system. The situation is analogous to the complex-number example of Section 2.4, where we allowed both rectangular and polar representations. To do this we must distinguish different types of term lists and make the operations on term lists generic. Redesign the polynomial system to implement this generalization. This is a major effort, not a local change.
 *** Solution
+:LOGBOOK:
+CLOCK: [2025-03-02 Sun 08:17]--[2025-03-02 Sun 08:23] =>  0:06
+:END:
 We were slightly ahead of this exercise in that we already refactored the system into packages. Now lets modify what we had so that it satisfies the requirements set by this exercise.
 
 All we have to do in this section is to build another termlist package that uses the old termlist representation instead of the dense one.
@@ -7956,10 +7959,11 @@ All we have to do in this section is to build another termlist package that uses
 There are a lot of things to do here, so let's make a checklist of tasks:
 - [X] Test both construction methods of the sparse implementation
 - [X] Test the three supported operations
-- [ ] Test combination using different termlist representations
-- [ ] Test the construction of polynomials
-- [ ] Test the operations on the polynomials
-- [ ] Test combination of different polynomials with different internal representations
+- [X] Test combination using different termlist representations
+- [X] Test the construction of polynomials
+- [X] Test the operations on the polynomials
+  - [X] Sub is failing, we need to debug why
+- [X] Test combination of different polynomials with different internal representations
 #+name: 2.90-term-list
 #+begin_src racket :exports code
 (define (install-dense-termlist-package)
@@ -8028,6 +8032,8 @@ There are a lot of things to do here, so let's make a checklist of tasks:
     (cadr internal-term))
   (define (the-empty-termlist-sparse)
     '())
+  ;; This procedure is registered as a generic procedure, therefore, it acts
+  ;; upon the parameters as if they do not have a type tag.
   (define (adjoin-term-sparse term term-list)
     (if (=zero? (coeff term))
         term-list
@@ -8050,16 +8056,25 @@ There are a lot of things to do here, so let's make a checklist of tasks:
                            (cons 0 (the-empty-termlist-sparse))
                            coeffs)])
       (cdr res)))
-  ;; TODO: Test this construction
   (define (make-from-terms terms)
     (map contents (filter (lambda (x) (not (=zero? x))) terms)))
+  ;; Internal procedure that acts is not aware of type tags
+  (define (head-sparse term-list)
+    (car term-list))
   ;; negation function for the dense representation, taking advantage of the
   ;; number representation of the type.
   ;; TODO: This procedure must be corrected
+  ;; Here is the problem we are running into. The neg terms sparse method uses
+  ;; procedures that tags the return values, but we are not calling the
+  ;; procedures that would unwrap these. This causes accumulation of type
+  ;; tags. This is also inefficient, since apply generic calls are not
+  ;; efficient. Here is what we could do. We could rewrite this procedure in a
+  ;; way that is more specific to this implementation, but is more efficient.
   (define (neg-terms-sparse term-list)
     (if (empty-termlist?-sparse term-list)
         (the-empty-termlist-sparse)
-        (adjoin-term-sparse (neg (first-term-sparse term-list)) (neg-terms-sparse (rest-terms-sparse term-list)))))
+        (let ([curr-term (first-term-sparse term-list)])
+          (adjoin-term-sparse (contents (neg curr-term)) (neg-terms-sparse (rest-terms-sparse term-list))))))
   (define (tag x)
     (attach-tag 'sparse-termlist x))
   (put 'adjoin-term '(term sparse-termlist) (lambda (x y) (tag (adjoin-term-sparse x y))))
@@ -8081,7 +8096,7 @@ There are a lot of things to do here, so let's make a checklist of tasks:
     (cadr term))
   ;; negates term unit
   (define (neg-term term)
-    (make-term (order-term term) (neg (coeff-term term))))
+    (make-term-aux (order-term term) (neg (coeff-term term))))
   (define (tag x)
     (attach-tag 'term x))
   (define (=zero?-term x)
@@ -8179,6 +8194,8 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (apply-generic 'rest-terms term-list))
 #+end_src
 
+#+RESULTS: 2.90-term-list
+
 
 #+name: 2.90-imports
 #+begin_src racket :exports code :noweb yes
@@ -8217,6 +8234,13 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 (install-term-package)
 (install-dense-termlist-package)
 (install-sparse-termlist-package)
+
+(define (display-hline-=)
+  (display "=========================================")
+  (newline))
+(define (display-hline--)
+  (display "-----------------------------------------")
+  (newline))
 #+end_src
 
 
@@ -8227,8 +8251,7 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 (newline)
 (display "testing dense construction")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 
 (define dense-termlist1 (make-termlist-from-coeffs (list 1 2 3)))
 (define dense-termlist2 (make-termlist-from-coeffs (list 4 5 6 7)))
@@ -8245,11 +8268,13 @@ empty-dense-termlist2
 (newline)
 (display "testing misc procedures on dense termlists")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 (empty-termlist? empty-dense-termlist1)
 (empty-termlist? empty-dense-termlist2)
 (empty-termlist? dense-termlist1)
+(display "testing dense negation")
+(newline)
+(display-hline--)
 (neg dense-termlist1)
 (neg dense-termlist2)
 (first-term dense-termlist1)
@@ -8260,8 +8285,7 @@ empty-dense-termlist2
 (newline)
 (display "testing dense termlist combinations")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 (add dense-termlist1 dense-termlist2)
 (add dense-termlist1 dense-termlist3)
 (add dense-termlist1 empty-dense-termlist2)
@@ -8270,14 +8294,16 @@ empty-dense-termlist2
 (newline)
 (display "testing sparse construction")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 
 (define sparse-termlist1
   (make-termlist-from-terms (list (make-term 2 1) (make-term 1 2) (make-term 0 3))))
-(define sparse-termlist2 (make-termlist-from-terms (list (make-term 3 4) (make-term 2 5) (make-term 1 6) (make-term 0 7))))
-(define sparse-termlist3 (make-termlist-from-terms (list (make-term 3 4) (make-term 1 6) (make-term 0 7))))
-(define sparse-termlist4 (make-termlist-from-terms (list (make-term 2 0) (make-term 1 6) (make-term 0 7))))
+(define sparse-termlist2
+  (make-termlist-from-terms (list (make-term 3 4) (make-term 2 5) (make-term 1 6) (make-term 0 7))))
+(define sparse-termlist3
+  (make-termlist-from-terms (list (make-term 3 4) (make-term 1 6) (make-term 0 7))))
+(define sparse-termlist4
+  (make-termlist-from-terms (list (make-term 2 0) (make-term 1 6) (make-term 0 7))))
 (define empty-sparse-termlist1 (make-termlist-from-terms '()))
 (define empty-sparse-termlist2 (make-termlist-from-terms (list (make-term 0 0))))
 sparse-termlist1
@@ -8289,15 +8315,17 @@ empty-sparse-termlist2
 (newline)
 (display "testing misc procedures on sparse termlists")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 (empty-termlist? empty-sparse-termlist1)
-(display "The following should be true: ") (newline)
+(display "The following should be true: ")
+(newline)
 (empty-termlist? empty-sparse-termlist2)
-(display "The following should be false: ") (newline)
+(display "The following should be false: ")
+(newline)
 (empty-termlist? sparse-termlist1)
 (display "testing sparse negation")
 (newline)
+(display-hline--)
 (neg sparse-termlist1)
 (neg sparse-termlist2)
 (display "testing sparse first term")
@@ -8310,12 +8338,22 @@ empty-sparse-termlist2
 (newline)
 (display "testing sparse termlist combinations")
 (newline)
-(display "===========================================")
-(newline)
+(display-hline-=)
 (add sparse-termlist1 sparse-termlist2)
 (add sparse-termlist1 sparse-termlist3)
 (add sparse-termlist1 empty-sparse-termlist2)
 (mul sparse-termlist1 sparse-termlist2)
+
+(newline)
+(display "testing sparse and dense combinations")
+(newline)
+(display-hline-=)
+(add dense-termlist1 sparse-termlist2)
+(add sparse-termlist1 dense-termlist3)
+(add sparse-termlist1 empty-dense-termlist2)
+(add dense-termlist1 empty-sparse-termlist2)
+(mul sparse-termlist1 dense-termlist2)
+(mul dense-termlist1 sparse-termlist2)
 #+end_src
 
 #+RESULTS:
@@ -8336,7 +8374,7 @@ done
 done
 
 testing dense construction
-===========================================
+=========================================
 (termlist dense-termlist 1 2 3)
 (termlist dense-termlist 4 5 6 7)
 (termlist dense-termlist 4 5 6 7)
@@ -8344,10 +8382,12 @@ testing dense construction
 (termlist dense-termlist 0)
 
 testing misc procedures on dense termlists
-===========================================
+=========================================
 #t
 #t
 #f
+testing dense negation
+-----------------------------------------
 (termlist dense-termlist -1 -2 -3)
 (termlist dense-termlist -4 -5 -6 -7)
 (term 2 1)
@@ -8356,14 +8396,14 @@ testing misc procedures on dense termlists
 (term 2 6)
 
 testing dense termlist combinations
-===========================================
+=========================================
 (termlist dense-termlist 4 6 8 10)
 (termlist dense-termlist 4 1 8 10)
 (termlist dense-termlist 1 2 3)
 (termlist sparse-termlist (5 4) (4 13) (3 28) (2 34) (1 32) (0 21))
 
 testing sparse construction
-===========================================
+=========================================
 (termlist sparse-termlist (2 1) (1 2) (0 3))
 (termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
 (termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
@@ -8371,15 +8411,16 @@ testing sparse construction
 (termlist sparse-termlist)
 
 testing misc procedures on sparse termlists
-===========================================
+=========================================
 #t
 The following should be true:
 #t
 The following should be false:
 #f
 testing sparse negation
-(termlist sparse-termlist (term term 2 -1) (term term 1 -2))
-(termlist sparse-termlist (term term 3 -4) (term term 2 -5) (term term 1 -6))
+-----------------------------------------
+(termlist sparse-termlist (2 -1) (1 -2) (0 -3))
+(termlist sparse-termlist (3 -4) (2 -5) (1 -6) (0 -7))
 testing sparse first term
 (term 2 1)
 (term 1 2)
@@ -8387,10 +8428,19 @@ testing sparse first term
 (term 1 6)
 
 testing sparse termlist combinations
-===========================================
+=========================================
 (termlist sparse-termlist (3 4) (2 6) (1 8) (0 10))
 (termlist sparse-termlist (3 4) (2 1) (1 8) (0 10))
 (termlist sparse-termlist (2 1) (1 2) (0 3))
+(termlist sparse-termlist (5 4) (4 13) (3 28) (2 34) (1 32) (0 21))
+
+testing sparse and dense combinations
+=========================================
+(termlist sparse-termlist (3 4) (2 6) (1 8) (0 10))
+(termlist dense-termlist 4 1 8 10)
+(termlist sparse-termlist (2 1) (1 2) (0 3))
+(termlist dense-termlist 1 2 3)
+(termlist sparse-termlist (5 4) (4 13) (3 28) (2 34) (1 32) (0 21))
 (termlist sparse-termlist (5 4) (4 13) (3 28) (2 34) (1 32) (0 21))
 #+end_example
 
@@ -8411,7 +8461,7 @@ testing sparse termlist combinations
 (display "===========================================")
 (newline)
 (define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
-(define test-poly2 (make-polynomial 'x (make-termlist-from-coeffs (list 2 0 2 8))))
+(define test-poly2 (make-polynomial 'x (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
 test-poly1
 test-poly2
 (define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
@@ -8425,8 +8475,11 @@ test-poly4
 (display "===========================================")
 (newline)
 (add test-poly1 test-poly2)
+(add test-poly2 test-poly1)
 (mul test-poly1 test-poly2)
+(mul test-poly2 test-poly1)
 (sub test-poly1 test-poly2)
+(sub test-poly2 test-poly1)
 
 (newline)
 (display "testing polynomial with polynomial coefficient combination")
@@ -8459,19 +8512,24 @@ testing dense construction
 testing polynomial construction
 ===========================================
 (polynomial x termlist dense-termlist 4 1 4 6)
-(polynomial x termlist dense-termlist 2 0 2 8)
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist dense-termlist 2 0 2 8) 0)
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 2 0 2 8) 0 (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial x termlist sparse-termlist (3 2) (1 2) (0 8))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0 (polynomial x termlist dense-termlist 4 1 4 6))
 #f
 
 testing polynomial combinations
 ===========================================
+(polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14))
 (polynomial x termlist dense-termlist 6 1 6 14)
 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
-(polynomial x termlist dense-termlist 4 -1 2 -2)
+(polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2))
+(polynomial x termlist dense-termlist -2 -1 -2 2)
 
 testing polynomial with polynomial coefficient combination
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist dense-termlist 2 0 2 8) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
 (polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist dense-termlist 2 -2 0 0) (polynomial x termlist dense-termlist -4 -1 -4 -6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) 0 (polynomial x termlist dense-termlist -4 -1 -4 -6))
 #+end_example
+
+And with these ad hoc testing, have reasonable certainty that our system is now working as designed. There were further optimizations that could have been applied, such as making a termlist specific implementation for both addition and multiplication, but for the sake of timeline, those additional implementations were not done.
