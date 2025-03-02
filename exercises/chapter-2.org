@@ -8008,9 +8008,9 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   ;; negation function for the dense representation, taking advantage of the
   ;; number representation of the type.
   (define (neg-terms-dense term-list)
-    (if (empty-termlist?-dense term-list)
+    (if (null? term-list)
         (the-empty-termlist-dense)
-        (cons (neg (car term-list)) (neg-terms-dense (rest-terms-dense term-list)))))
+        (cons (neg (car term-list)) (neg-terms-dense (cdr term-list)))))
   (define (tag x)
     (attach-tag 'dense-termlist x))
   (put 'adjoin-term '(term dense-termlist) (lambda (x y) (tag (adjoin-term-dense x y))))
