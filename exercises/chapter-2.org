@@ -8063,13 +8063,6 @@ There are a lot of things to do here, so let's make a checklist of tasks:
     (car term-list))
   ;; negation function for the dense representation, taking advantage of the
   ;; number representation of the type.
-  ;; TODO: This procedure must be corrected
-  ;; Here is the problem we are running into. The neg terms sparse method uses
-  ;; procedures that tags the return values, but we are not calling the
-  ;; procedures that would unwrap these. This causes accumulation of type
-  ;; tags. This is also inefficient, since apply generic calls are not
-  ;; efficient. Here is what we could do. We could rewrite this procedure in a
-  ;; way that is more specific to this implementation, but is more efficient.
   (define (neg-terms-sparse term-list)
     (if (empty-termlist?-sparse term-list)
         (the-empty-termlist-sparse)
@@ -8086,8 +8079,6 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (put 'make-from-terms 'sparse-termlist (lambda (x) (tag (make-from-terms x))))
   (put 'neg '(sparse-termlist) (lambda (x) (tag (neg-terms-sparse x))))
   'done)
-
-
 #+end_src
 
 #+name: 2.90-term
@@ -8202,9 +8193,7 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (apply-generic 'first-term term-list))
 (define (rest-terms term-list)
   (apply-generic 'rest-terms term-list))
-
 #+end_src
-
 
 
 #+name: 2.90-imports
@@ -8551,7 +8540,8 @@ And with these ad hoc testing, have reasonable certainty that our system is now 
 CLOCK: [2025-03-02 Sun 09:24]
 :END:
 A univariate polynomial can be divided by another one to produce a polynomial quotient and a polynomial remainder. for example,
-$$\frac{x^5 - 1}{x^2 - 1} = x^3 + x,~ \text{remainder}~x - 1$$
+
+$\frac{x^5 - 1}{x^2 - 1} = x^3 + x,~ \text{remainder}~x - 1$
 
 Division can be done through long division. That is, divide the highest-order term of the dividend by the highest-order term of the divisor. The result of the first term of the quotient. Next, multiply the result by the divisor, subtract that from the dividend, and produce the rest of the answer by recursively dividing the difference by the divisor. Stop when the order of the divisor exceeds the order of the dividend and declare the dividend to be the remainder. Also, if the dividend ever becomes zero, return zero as both quotient and remainder.
 
