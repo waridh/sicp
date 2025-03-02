@@ -7964,7 +7964,7 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 - [X] Test the operations on the polynomials
   - [X] Sub is failing, we need to debug why
 - [X] Test combination of different polynomials with different internal representations
-#+name: 2.90-term-list
+#+name: 2.90-term-list-concrete
 #+begin_src racket :exports code
 (define (install-dense-termlist-package)
   (define (the-empty-termlist-dense)
@@ -8087,6 +8087,11 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (put 'neg '(sparse-termlist) (lambda (x) (tag (neg-terms-sparse x))))
   'done)
 
+
+#+end_src
+
+#+name: 2.90-term
+#+begin_src racket :exports code
 (define (install-term-package)
   (define (make-term-aux order coeff)
     (list order coeff))
@@ -8120,6 +8125,11 @@ There are a lot of things to do here, so let's make a checklist of tasks:
         (apply-generic 'coeff term)
         ((get 'coeff '(term)) term))))
 
+#+end_src
+
+
+#+name: 2.90-term-list
+#+begin_src racket :exports code
 ;; Need to include add, neg, and mul
 ;; This is the higher level of abstraction for the data type, responsible for
 ;; combinations
@@ -8192,9 +8202,9 @@ There are a lot of things to do here, so let's make a checklist of tasks:
   (apply-generic 'first-term term-list))
 (define (rest-terms term-list)
   (apply-generic 'rest-terms term-list))
+
 #+end_src
 
-#+RESULTS: 2.90-term-list
 
 
 #+name: 2.90-imports
@@ -8219,6 +8229,8 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 <<2.83-default-rank-type>>
 <<2.89-poly-package>>
 <<2.90-term-list>>
+<<2.90-term-list-concrete>>
+<<2.90-term>>
 
 (install-rational-package)
 (install-integer-package)
@@ -8533,3 +8545,33 @@ testing polynomial with polynomial coefficient combination
 #+end_example
 
 And with these ad hoc testing, have reasonable certainty that our system is now working as designed. There were further optimizations that could have been applied, such as making a termlist specific implementation for both addition and multiplication, but for the sake of timeline, those additional implementations were not done.
+** Exercise 2.91
+*** Prompt
+:LOGBOOK:
+CLOCK: [2025-03-02 Sun 09:24]
+:END:
+A univariate polynomial can be divided by another one to produce a polynomial quotient and a polynomial remainder. for example,
+$$\frac{x^5 - 1}{x^2 - 1} = x^3 + x,~ \text{remainder}~x - 1$$
+
+Division can be done through long division. That is, divide the highest-order term of the dividend by the highest-order term of the divisor. The result of the first term of the quotient. Next, multiply the result by the divisor, subtract that from the dividend, and produce the rest of the answer by recursively dividing the difference by the divisor. Stop when the order of the divisor exceeds the order of the dividend and declare the dividend to be the remainder. Also, if the dividend ever becomes zero, return zero as both quotient and remainder.
+
+We can design a ~div-poly~ procedure on the model of ~add-poly~ and ~mul-poly~. The procedure checks to see if the two polys have the same variable. If so, ~div-poly~ strips off the variable and passes the problem to ~div-terms~, which performs the division operation on term lists. ~div-poly~ finally reattaches the variable to the result supplied by ~div-terms~. It is convenient to design ~div-terms~ to compute both the quotient and the remainder of a division. ~div-terms~ can take two term lists as arguments and return a list of the quotient term list and the remainder termlist.
+
+Complete the following definition of ~div-terms~ by filling in the missing expressions. Use this to implement ~div-poly~, which takes two polys as arguments and returns a list of the quotient and remainder polys.
+
+#+begin_src racket :exports code
+(define (div-terms L1 L2)
+  (if (empty-termlist? L1)
+      (list (the-empty-termlist) (the-empty-termlist))
+      (let ([t1 (first-term L1)]
+            [t2 (first-term L2)])
+        (if (> (order t2) (order t1))
+            (list (the-empty-termlist) L1)
+            (let ([new-c (div (coeff t1) (coeff t2))]
+                  [new-o (- (order t1) (order t2))])
+              (let ([rest-of-result
+                     ;;⟨compute rest of result recursively⟩
+                     ])
+                ;;⟨form complete result⟩
+                ))))))
+#+end_src
