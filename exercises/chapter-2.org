@@ -8260,9 +8260,13 @@ There are a lot of things to do here, so let's make a checklist of tasks:
 (define dense-termlist4 (make-termlist-from-coeffs (list 0 6 7)))
 (define empty-dense-termlist1 (make-termlist-from-coeffs '()))
 (define empty-dense-termlist2 (make-termlist-from-coeffs (list 0)))
+(display "dense termlist 1-4")
+(newline)
+(display-hline--)
 dense-termlist1
 dense-termlist2
-dense-termlist2
+dense-termlist3
+dense-termlist4
 empty-dense-termlist1
 empty-dense-termlist2
 
@@ -8278,6 +8282,8 @@ empty-dense-termlist2
 (display-hline--)
 (neg dense-termlist1)
 (neg dense-termlist2)
+(neg dense-termlist3)
+(neg dense-termlist4)
 (first-term dense-termlist1)
 (first-term (rest-terms dense-termlist1))
 (first-term dense-termlist2)
@@ -8307,9 +8313,13 @@ empty-dense-termlist2
   (make-termlist-from-terms (list (make-term 2 0) (make-term 1 6) (make-term 0 7))))
 (define empty-sparse-termlist1 (make-termlist-from-terms '()))
 (define empty-sparse-termlist2 (make-termlist-from-terms (list (make-term 0 0))))
+(display "sparse termlist 1-4")
+(newline)
+(display-hline--)
 sparse-termlist1
 sparse-termlist2
-sparse-termlist2
+sparse-termlist3
+sparse-termlist4
 empty-sparse-termlist1
 empty-sparse-termlist2
 
@@ -8376,9 +8386,12 @@ done
 
 testing dense construction
 =========================================
+dense termlist 1-4
+-----------------------------------------
 (termlist dense-termlist 1 2 3)
 (termlist dense-termlist 4 5 6 7)
-(termlist dense-termlist 4 5 6 7)
+(termlist dense-termlist 4 0 6 7)
+(termlist dense-termlist 0 6 7)
 (termlist dense-termlist)
 (termlist dense-termlist 0)
 
@@ -8391,6 +8404,8 @@ testing dense negation
 -----------------------------------------
 (termlist dense-termlist -1 -2 -3)
 (termlist dense-termlist -4 -5 -6 -7)
+(termlist dense-termlist -4 0 -6 -7)
+(termlist dense-termlist 0 -6 -7)
 (term 2 1)
 (term 1 2)
 (term 3 4)
@@ -8405,9 +8420,12 @@ testing dense termlist combinations
 
 testing sparse construction
 =========================================
+sparse termlist 1-4
+-----------------------------------------
 (termlist sparse-termlist (2 1) (1 2) (0 3))
 (termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
-(termlist sparse-termlist (3 4) (2 5) (1 6) (0 7))
+(termlist sparse-termlist (3 4) (1 6) (0 7))
+(termlist sparse-termlist (1 6) (0 7))
 (termlist sparse-termlist)
 (termlist sparse-termlist)
 
