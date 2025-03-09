@@ -9218,3 +9218,213 @@ testing polynomial with polynomial coefficient combination
 (polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
 (polynomial y termlist dense-termlist)
 #+end_example
+** Exercise 2.92
+*** Prompt
+By imposing an ordering on variables, extend the polynomial package so that addition and multiplication of polynomials work for polynomials in different variables. (This is not easy!)
+*** Solution
+Since this is not easy, it is necessary that I complete the exercise. Due to implementation time consideration, we are going to be coercing the hierarchy of polynomials into their correct ordering eagerly, instead of lazily, due to ease of implementation. For this task, we are going to have to achieve the following.
+**** Tasks
+- [ ] hash the variables, so that a variable ranking could be generated without the need actually store the tower somewhere. Seems trivial, but vital.
+- [ ] find how to do a second order polynomial flip (convert the coefficient polynomials into the principal polynomial)
+- [ ] find how to do that recursively
+- [ ] make the policy for more malformed compound polynomials (polynomial with variable z only on some terms of a principal polynomial)
+**** Design Details
+***** Swapping principal variable on second order multivariant polynomial
+We should really think about what we will do before we do it, so here is a step by step, so that we could factor this out. We are going to start with a basic example of swapping the principal variable from y to x.
+
+$\left( x - 1 \right) y ^2 + \left( 2x^2 + x \right) y + x^3$
+
+For the polynomial coefficient of each term, we must multiply them by the term to bring the secondary variable to the principal. This could be done on our system by creating a one term polynomial with the order of 0, and the coefficient that is just the term being applied. From here, the previously implemented algorithm for polynomial multiplication would produce the correct output.
+
+$\left( y^2 x - y^2 \right) + \left( 2 y x^2 + y x \right) + x^3$
+
+From here, we now have 3 polynomials that have the same principal variable, and summing them together would generate the final polynomial representation with flipped variables. We simply need to use the implemented algorithm for polynomial addition to produce to final swapped value.
+
+$x^3 + 2y x^2 + \left( y^2 + y \right) x - y^2$
+
+Before continuing, let's describe this algorithm in a more generic way.
+
+To swap the principal of a multivariant polynomial of n terms, we convert each of those terms into a multivariant polynomial of the secondary variable, with the original principal variable as the secondary variable. From here a summation of the n polynomials will result in a swap of the principal variable in the multivariant polynomial.
+
+Now the challenge is extending this to all higher order multivariant polynomials
+***** COMMENT Ordering multivariant polynomials
+In the previous section, we have shown how to do a single swap of the principal and the secondary variable in a multivariant polynomial. Now, we have to lab the behavior of the polynomial if there are further nested variables. We are going to start with a test multivariant polynomial, which we will describe below.
+We are designing this with the assumption that the polynomials are already organized such that every instance of the polynomials have a principal variable.
+
+$\left( z x - z^2 \right) y^2 + \left( 2 z^3 x^2 + \left( z + 2 \right) x \right) y + x^3$
+
+So what we have here is a multivariant polynomial with the principal variable being y, second order variable being x, and the third order variable being z. We want to go over how we could bring y from the principal to the third order variable. At a deeper look, we are going to have to choose the nesting level of the polynomial. Defaulting to swapping the order would be the most flexible, so we will pick that design choice.
+
+$y^2 \left( 1 \right) \left( z x - z^2 \left( 1 \right) \right) + y \left( 1 \right) \left( 2 z ^3 x^2 + (z + 2) x \right) + \left( 1 \right) x^3$
+
+Completing the multiplication, we get the following polynomial, with x as the principal variable, y as the secondary variable, and z as the last.
+
+$\left( z y^2 x - z^2 y^2 \right) + \left( 2 z^3 y x^2 + \left( z + 2 \right) y x \right) + x^3$
+
+We're now going to quickly add up the terms.
+
+$x^3 + 2z^3 y x^2 + \left( z y^2 + \left( z + 2 \right) y \right) x - z^2 y^2$
+
+Finally, to swap y with z.
+
+$x^3 + 2 y z^3 x^2 + (y^2 z + (y z + y 2))x - y ^2 z^2$
+
+$x^3 + 2 y z^3 x^2 + \left( \left( y^2 + y \right) z + y 2 \right) - y^2 z^2$
+
+
+Doing this action, we noticed that a vital part of the algorithm is the multiplication of a polynomial of y and a polynomial of z must resolve properly. This really just means that given multiplication of two polynomials of different bases, the result must be a polynomial of one base. Although this is analysis, we'll just take a note saying that we could make a procedure that takes two polynomials of different principal variables, and multiplies them such that the principal variable of the output polynomial will be the same values as that of the first parameter. Then we write a procedure that chooses which of the polynomial will be on the left. We are taking advantage of the commutative property of polynomials here. Similarly, we need to addition for polynomials of different bases.
+
+
+
+**** Implementation
+
+#+name: 2.91-poly-package
+#+begin_src racket :exports code
+(define (install-polynomial-package)
+  ;; internal procedures
+  ;; representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (variable p)
+    (car p))
+  (define (term-list p)
+    (cdr p))
+  (define (variable? p)
+    (symbol? p))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  (define (univariant-application proc error-msg p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (proc)
+        (error error-msg (list p1 p2))))
+  (define (add-poly p1 p2)
+    (univariant-application (lambda () (make-poly (variable p1) (add (term-list p1) (term-list p2))))
+                            "Polys does not have same var: ADD-POLY"
+                            p1
+                            p2))
+  (define (mul-poly p1 p2)
+    (univariant-application (lambda () (make-poly (variable p1) (mul (term-list p1) (term-list p2))))
+                            "Polys not in same var: MUL-POLY"
+                            p1
+                            p2))
+  (define (sub-poly p1 p2)
+    (univariant-application (lambda () (make-poly (variable p1) (sub (term-list p1) (term-list p2))))
+                            "Polys not in same var: SUB-POLY"
+                            p1
+                            p2))
+  ;; Need to unwrap and properly convert the termlist into polynomials
+  (define (div-poly p1 p2)
+    (univariant-application (lambda ()
+                              (let ([div-res (div (term-list p1) (term-list p2))]
+                                    [poly-var (variable p1)])
+                                (list (make-poly poly-var (car div-res))
+                                      (make-poly poly-var (cadr div-res)))))
+                            "Polys not in same var: DIV-POLY"
+                            p1
+                            p2))
+  (define (neg-poly p)
+    (make-poly (variable p) (neg (term-list p))))
+  ;; Might have to do a little modification to do a linear check on empty term-list
+  (define (=zero?-poly p)
+    (empty-termlist? (term-list p)))
+  ;; interface to rest of the system
+  (define (tag p)
+    (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+  (put 'div
+       '(polynomial polynomial)
+       (lambda (p1 p2)
+         (let ([div-res (div-poly p1 p2)]) (list (tag (car div-res)) (tag (cadr div-res))))))
+  (put 'neg '(polynomial) (lambda (p) (tag (neg-poly p))))
+  (put '=zero? '(polynomial) =zero?-poly)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (make-polynomial var terms)
+  ((get 'make 'polynomial) var terms))
+#+end_src
+
+***** Hashing
+Thinking about it, we should first come up with a hashing function that could resolve the order of the polynomials. We might be able to hash the symbol by converting it to a string, and then converting that string into an number. We are going to make a not so good hashing function that literally converts the string into an integer, and use that as the hashing value. We need to do this because we want to be able compare the different variables so we don't have to register all the variables in a tower.
+
+#+name: 2.92-hash-of-variable
+#+begin_src racket :exports code
+(define (hash-of-variable variable)
+  (define (<< val shift-value)
+    (iter acc remaining-shifts))
+  (define (shift-byte val amount)
+    (<< val (* amount 8)))
+  (define (hash-of-char-list val)
+    (define (iter idx acc tail)
+      (if (null? tail)
+          acc
+          (iter (+ 1 idx) (shift-byte (char->integer (car tail)) idx) (cdr tail)))))
+  (hash-of-char-list (string->list (symbol->string variable))))
+#+end_src
+
+****** Hashing testing
+
+#+begin_src racket :exports both :noweb yes
+#lang sicp
+<<2.92-hash-of-variable>>
+
+(hash-of-variable 'x)
+#+end_src
+
+#+RESULTS:
+
+**** Import
+
+A centralized location for importing the source code. Left visible so readers could trace the code.
+#+name: 2.92-imports
+#+begin_src racket :exports code :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.85-raise-drop-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.88-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.86-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.91-poly-package>>
+<<2.91-term-list>>
+<<2.90-term-list-concrete>>
+<<2.90-term>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+(install-termlist-package)
+(install-term-package)
+(install-dense-termlist-package)
+(install-sparse-termlist-package)
+
+(define (display-hline-=)
+  (display "=========================================")
+  (newline))
+(define (display-hline--)
+  (display "-----------------------------------------")
+  (newline))
+#+end_src
+
+**** Testing
+***** Regression
