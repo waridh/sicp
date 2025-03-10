@@ -9409,6 +9409,8 @@ Found out that there isn't a bitwise or operation in racket, so I think I have t
 (assert-eq "1 >> 1 = 0" (>> 1 1) 0)
 (assert-eq "9 >> 1 = 4" (>> 9 1) 4)
 (assert-eq "8 >> 1 = 4" (>> 8 1) 4)
+(assert-eq "8 >> 2 = 2" (>> 8 2) 2)
+(assert-eq "8 >> 3 = 1" (>> 8 3) 1)
 #+end_src
 
 #+RESULTS:
@@ -9423,6 +9425,8 @@ pass: 1 >> 0 = 1 value: 1 expected: 1
 pass: 1 >> 1 = 0 value: 0 expected: 0
 pass: 9 >> 1 = 4 value: 4 expected: 4
 pass: 8 >> 1 = 4 value: 4 expected: 4
+pass: 8 >> 2 = 2 value: 2 expected: 2
+pass: 8 >> 3 = 1 value: 1 expected: 1
 #+end_example
 
 #+caption: Testing the hashing function
