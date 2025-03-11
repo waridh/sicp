@@ -9351,15 +9351,22 @@ Thinking about it, we should first come up with a hashing function that could re
 
 Found out that there isn't a bitwise or operation in racket, so I think I have to implement some bitwise operations.
 
+- Currently, these are not the fastest implementation of bitshifting, as we should be able to take advantage of the power of 2 to make the algorithm more efficient. Right now a linear time algorithm is enough.
+  - Bitwise ~and~ and ~or~ must be implemented with this restrictions.
+    1. We currently have one way of masking, that is the use modulo 2 to get the least significant bit.
+    2. We have bitshifting
+  - Strategy is to shift each bits of the number down to the lsb, and then do the conditional logic. After doing that, we will shift it back up.
+  - We need to know when to stop the operation, and that is when the result of the first half of the operation would always result in 0.
+
 #+name: 2.92-bitwise-operator
 #+begin_src racket :exports code
 ;; Bitshift left
 (define (<< val shift-value)
-    (define (iter acc remaining-shifts)
-      (if (= remaining-shifts 0)
-          acc
-          (iter (* acc 2) (- remaining-shifts 1))))
-    (iter val shift-value))
+  (define (iter acc remaining-shifts)
+    (if (= remaining-shifts 0)
+        acc
+        (iter (* acc 2) (- remaining-shifts 1))))
+  (iter val shift-value))
 
 ;; Bitshift right
 (define (>> val shift-value)
@@ -9368,6 +9375,20 @@ Found out that there isn't a bitwise or operation in racket, so I think I have t
         acc
         (iter (floor (/ acc 2)) (- remaining-shifts 1))))
   (iter val shift-value))
+
+;; Bitwise or
+(define (bor first other)
+  (define (or-condition left right)
+    (if (and (= left 0) (= right 0)) 0 1))
+  (define (iter acc shift-amount)
+    (let ([shifted-first (>> first shift-amount)]
+          [shifted-other (>> other shift-amount)])
+      (if (and (= shifted-first 0) (= shifted-other 0))
+          acc
+          (iter (+ acc
+                   (<< (or-condition (modulo shifted-first 2) (modulo shifted-other 2)) shift-amount))
+                (+ shift-amount 1)))))
+  (iter 0 0))
 #+end_src
 
 #+name: 2.92-hash-of-variable
@@ -9411,6 +9432,15 @@ Found out that there isn't a bitwise or operation in racket, so I think I have t
 (assert-eq "8 >> 1 = 4" (>> 8 1) 4)
 (assert-eq "8 >> 2 = 2" (>> 8 2) 2)
 (assert-eq "8 >> 3 = 1" (>> 8 3) 1)
+(assert-eq "8 >> 4 = 0" (>> 8 4) 0)
+(assert-eq "8 >> 5 = 0" (>> 8 5) 0)
+
+(newline)
+(display "bitwise or") (newline)
+(assert-eq "1 | 2 = 3" (bor 1 2) 3)
+(assert-eq "1 | 0 = 1" (bor 1 0) 1)
+(assert-eq "0 | 0 = 0" (bor 0 0) 0)
+(assert-eq "8 | 8 = 8" (bor 8 8) 8)
 #+end_src
 
 #+RESULTS:
@@ -9427,6 +9457,14 @@ pass: 9 >> 1 = 4 value: 4 expected: 4
 pass: 8 >> 1 = 4 value: 4 expected: 4
 pass: 8 >> 2 = 2 value: 2 expected: 2
 pass: 8 >> 3 = 1 value: 1 expected: 1
+pass: 8 >> 4 = 0 value: 0 expected: 0
+pass: 8 >> 5 = 0 value: 0 expected: 0
+
+bitwise or
+pass: 1 | 2 = 3 value: 3 expected: 3
+pass: 1 | 0 = 1 value: 1 expected: 1
+pass: 0 | 0 = 0 value: 0 expected: 0
+pass: 8 | 8 = 8 value: 8 expected: 8
 #+end_example
 
 #+caption: Testing the hashing function
