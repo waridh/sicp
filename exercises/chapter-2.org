@@ -9407,19 +9407,13 @@ Found out that there isn't a bitwise or operation in racket, so I think I have t
 #+name: 2.92-hash-of-variable
 #+begin_src racket :exports code
 (define (hash-of-variable variable)
-  (define (<< val shift-value)
-    (define (iter acc remaining-shifts)
-      (if (= remaining-shifts 0)
-          acc
-          (iter (* acc 2) (- remaining-shifts 1))))
-    (iter val shift-value))
   (define (shift-byte val amount)
     (<< val (* amount 8)))
   (define (hash-of-char-list val)
     (define (iter idx acc tail)
       (if (null? tail)
           acc
-          (iter (+ 1 idx) (shift-byte (car tail) idx) (cdr tail))))
+          (iter (+ 1 idx) (bor (shift-byte (car tail) idx) acc) (cdr tail))))
     (let ([converted-list (map char->integer val)]) (iter 0 0 converted-list)))
   (hash-of-char-list (string->list (symbol->string variable))))
 #+end_src
@@ -9497,6 +9491,8 @@ pass: 7 & 9 = 1 value: 1 expected: 1
 #+begin_src racket :exports both :noweb yes
 #lang sicp
 <<2.92-hash-of-variable>>
+<<2.92-bitwise-operator>>
+<<assertion-suite>>
 
 (hash-of-variable 'x)
 (hash-of-variable 'xy)
@@ -9507,9 +9503,9 @@ pass: 7 & 9 = 1 value: 1 expected: 1
 
 #+RESULTS:
 : 120
-: 30976
-: 30720
-: 30720
+: 31096
+: 30840
+: 30841
 : 42
 
 **** Import
