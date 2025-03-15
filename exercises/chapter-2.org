@@ -9529,12 +9529,14 @@ Modifications must be made to termlist to give polynomial more utility.
 #+end_src
 
 ***** Polynomial
-
 There are challenges we faced, so we are going to log them here, in attempts to use literate programming.
 
 Firstly, we need to implement addition of two polynomials of different principal variables. We were going to go about this by finding out which of the variables has a higher hash value, and making that the principal variable of both the polynomials. This was relatively straightforward to implement, we just have to make an aux procedure that will compare the variable of the two polynomials, and coerce the other polynomial into one where the principal of the other is the base.
 
 After this, we immediately ran into a problem, in that we do not have an implementation of polynomial addition with a scheme number, (or any number). This means that we should make an implementation for polynomial addition with a number, and register that into the generic application framework.
+
+Part of trying to do additions and multiplications on polynomials with different principal variables, we have to allow for operations between polynomials and regular numbers (reals and scheme-numbers). Right, so the thing is that, even after finishing this version of addition, our system is not generic to other number types, since polynomial does not participate in the type tower system that we implemented before. We really do not want to implement the same thing for all the types in the tower, therefore, we are going to extend the ~apply-generic~ so that when the system sees a type registered as a "bedrock type", we will try to raise the type of the other operands. If we want to keep it simple, just bring it to the real number type.
+
 
 #+name: 2.92-poly-package
 #+begin_src racket :exports code
@@ -9563,8 +9565,9 @@ After this, we immediately ran into a problem, in that we do not have an impleme
             (list poly1 (make-poly var1 (make-termlist-from-coeffs (list (tag poly2)))))
             (list (make-poly var2 (make-termlist-from-coeffs (list (tag poly1)))) poly2))))
     (let ([norm-polies (normalize-poly p1 p2)])
-      (display norm-polies)
       (add-poly (car norm-polies) (cadr norm-polies))))
+  (define (add-poly-number p1 n2)
+    (add-poly p1 (make-poly (variable p1) (make-termlist-from-coeffs (list n2)))))
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
         (make-poly (variable p1) (add (term-list p1) (term-list p2)))
@@ -9602,6 +9605,10 @@ After this, we immediately ran into a problem, in that we do not have an impleme
   (define (tag p)
     (attach-tag 'polynomial p))
   (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'add '(polynomial scheme-number) (lambda (p1 n2) (tag (add-poly-number p1 n2))))
+  (put 'add '(scheme-number polynomial) (lambda (n1 p2) (tag (add-poly-number p2 n1))))
+  (put 'add '(polynomial real) (lambda (p1 n2) (tag (add-poly-number p1 n2))))
+  (put 'add '(real polynomial) (lambda (n1 p2) (tag (add-poly-number p2 n1))))
   (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
   (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
   (put 'div
@@ -9622,7 +9629,61 @@ After this, we immediately ran into a problem, in that we do not have an impleme
 ****** Changes
 1. Added ~equ?~ to the polynomial package so that we are able to test implementation more robustly.
 2.
+***** Apply generic
+#+name: 2.92-apply-generic
+#+begin_src racket :exports code
+(define (apply-generic op . args)
+  ;; accumulation procedure to find the highest type in the input args.
+  ;; Takes in datum args and not just the type args. If there are datums that
+  ;; are not participating in the rank system, this procedure will return
+  ;; false
+  (define (highest-rank args)
+    (left-fold (lambda (acc ele)
+                 (cond
+                   [(or (not (number? acc)) (not (number? ele))) false]
+                   [(> acc ele) acc]
+                   [else ele]))
+               (lowest-rank)
+               (map rank-of-datum args)))
+  ;; This brings all the input args to a target type
+  (define (raise-args-to-type target-type args)
+    (map (lambda (x) (consecutive-raise x target-type)) args))
+  (define (validate args)
+    (define (iter left)
+      (cond
+        [(null? left) args]
+        [(not (car left)) false]
+        [else (iter (cdr left))]))
+    (iter args))
+  ;; procedure that attempts to raise the input datum args to the
+  ;; highest type. If this fails, then return false
+  (define (raise-args-to-highest args)
+    (let ([local-largest-rank (highest-rank args)])
+      (if (not local-largest-rank)
+          false
+          (validate (raise-args-to-type (type-of-rank local-largest-rank) args)))))
 
+  (define (handle-output v)
+    (if (droppable? v)
+        (drop v)
+        v))
+  ;; Actual implementation
+  (define (apply-generic-aux)
+    ;; (display "apply-generic ") (display (list op args)) (newline)
+    (let ([type-tags (map type-tag args)])
+      (let ([proc (get op type-tags)])
+        ;; (display "apply-generic-aux ") (display (list type-tags proc)) (newline)
+        (if proc
+            (apply proc (map contents args))
+            (let ([coerced (raise-args-to-highest args)])
+              (if (not coerced)
+                  (error "unable to find method for argument, and coercion failed:" op type-tags args)
+                  (let ([coerced-proc (get op (map type-tag coerced))])
+                    (if (not coerced-proc)
+                        (error "unable to find method for arguments:" op coerced)
+                        (apply coerced-proc (map contents coerced))))))))))
+  (handle-output (apply-generic-aux)))
+#+end_src
 
 **** Import
 
@@ -9634,7 +9695,7 @@ A centralized location for importing the source code. Left visible so readers co
 <<assertion-suite>>
 <<coercion-put-get-implementation>>
 <<2.80-tag-system>>
-<<2.85-raise-drop-apply-generic>>
+<<2.92-apply-generic>>
 <<2.88-complex-implementation>>
 <<2.88-rational-implementation>>
 <<2.88-generic-arithmetic>>
@@ -9814,6 +9875,7 @@ testing polynomial with polynomial coefficient combination
 (assert "representationally the same poly" (equ? termlist1 termlist1-aux-aux))
 (assert "different coefficient case" (not (equ? termlist1 termlist2)))
 (assert "different order case" (not (equ? termlist1 termlist3)))
+(assert "(4 1 4 6) + (1)" (equ? (add (make-termlist-from-coeffs (list 4 1 4 6)) (make-termlist-from-coeffs (list 1))) (make-termlist-from-coeffs (list 4 1 4 7))))
 
 #+end_src
 
@@ -9838,6 +9900,7 @@ pass: mathematically the same poly
 pass: representationally the same poly
 pass: different coefficient case
 pass: different order case
+pass: (4 1 4 6) + (1)
 #+end_example
 
 ***** Simple Multi-variant addition
@@ -9852,7 +9915,9 @@ This section is for testing if we are able to add two polynomials of differing v
 (newline)
 (display-hline-=)
 (define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
-(define test-poly2 (make-polynomial 'x (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
+(define test-poly2
+  (make-polynomial 'x
+                   (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
 (define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
 (define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
 (define test-poly5 (make-polynomial-from-coeffs 'y (list 3 2 1)))
@@ -9861,15 +9926,24 @@ This section is for testing if we are able to add two polynomials of differing v
 (display "Testing first order addition (matching)")
 (newline)
 (display-hline-=)
-(assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14" (add test-poly1 test-poly2) (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
-(assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14" (add test-poly2 test-poly1) (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
-(assert-poly-eq "(3 2 1) + (5 0 2 3) = (5 3 4 4)" (add test-poly5 test-poly6) (make-polynomial-from-coeffs 'y (list 5 3 4 4)))
+(assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14"
+                (add test-poly1 test-poly2)
+                (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
+(assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14"
+                (add test-poly2 test-poly1)
+                (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
+(assert-poly-eq "(3 2 1) + (5 0 2 3) = (5 3 4 4)"
+                (add test-poly5 test-poly6)
+                (make-polynomial-from-coeffs 'y (list 5 3 4 4)))
 
 (newline)
 (display "testing addition between simple polynomials with different principal variables")
 (newline)
 (display-hline-=)
-(assert-poly-eq "(x 4 1 4 6) + (y 3 2 1) = (x 4 1 4 6(y 3 2 1))" (add test-poly1 test-poly5) (make-polynomial-from-coeffs 'x (4 1 4 (mul (make-polynomial-from-coeffs 'y (6)) (make-polynomial-from-coeffs 'y (3 2 1))))))
+(assert-poly-eq
+ "(x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6))"
+ (add test-poly1 test-poly5)
+ (make-polynomial-from-coeffs 'y (list 3 2 (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))
 
 (newline)
 (display "testing polynomial with polynomial coefficient combination")
@@ -9887,7 +9961,6 @@ This section is for testing if we are able to add two polynomials of differing v
 (add test-poly4 test-poly4)
 (mul test-poly4 test-poly4)
 (sub test-poly4 test-poly4)
-
 #+end_src
 
 #+RESULTS:
@@ -9918,7 +9991,22 @@ pass: (3 2 1) + (5 0 2 3) = (5 3 4 4) value: (polynomial y termlist dense-termli
 
 testing addition between simple polynomials with different principal variables
 =========================================
-((y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6)) (y termlist dense-termlist 3 2 1))
+pass: (x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7)) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
+
+testing polynomial with polynomial coefficient combination
+=========================================
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist -2 -1 -2 2) (polynomial x termlist sparse-termlist (3 -2) (1 -2) (0 -8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0)
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (3 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (2 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))))
+(polynomial y termlist dense-termlist)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0 (polynomial x termlist dense-termlist 8 2 8 12))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
+(polynomial y termlist dense-termlist)
 #+end_example
 
 ***** Simple Multi-variant multiplication
