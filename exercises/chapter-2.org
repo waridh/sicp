@@ -9233,50 +9233,9 @@ Since this is not easy, it is necessary that I complete the exercise. Due to imp
 - [ ] find how to do that recursively
 - [ ] make the policy for more malformed compound polynomials (polynomial with variable z only on some terms of a principal polynomial)
 **** Design Details
-***** Swapping principal variable on second order multivariant polynomial
-We should really think about what we will do before we do it, so here is a step by step, so that we could factor this out. We are going to start with a basic example of swapping the principal variable from y to x.
-
-$\left( x - 1 \right) y ^2 + \left( 2x^2 + x \right) y + x^3$
-
-For the polynomial coefficient of each term, we must multiply them by the term to bring the secondary variable to the principal. This could be done on our system by creating a one term polynomial with the order of 0, and the coefficient that is just the term being applied. From here, the previously implemented algorithm for polynomial multiplication would produce the correct output.
-
-$\left( y^2 x - y^2 \right) + \left( 2 y x^2 + y x \right) + x^3$
-
-From here, we now have 3 polynomials that have the same principal variable, and summing them together would generate the final polynomial representation with flipped variables. We simply need to use the implemented algorithm for polynomial addition to produce to final swapped value.
-
-$x^3 + 2y x^2 + \left( y^2 + y \right) x - y^2$
-
-Before continuing, let's describe this algorithm in a more generic way.
-
-To swap the principal of a multivariant polynomial of n terms, we convert each of those terms into a multivariant polynomial of the secondary variable, with the original principal variable as the secondary variable. From here a summation of the n polynomials will result in a swap of the principal variable in the multivariant polynomial.
-
-Now the challenge is extending this to all higher order multivariant polynomials
 ***** Ordering multivariant polynomials
-In the previous section, we have shown how to do a single swap of the principal and the secondary variable in a multivariant polynomial. Now, we have to lab the behavior of the polynomial if there are further nested variables. We are going to start with a test multivariant polynomial, which we will describe below.
-We are designing this with the assumption that the polynomials are already organized such that every instance of the polynomials have a principal variable.
+We are going to use the following observation to base our design around. We are actually able to add and multiply different polynomials if they have the exact same polynomial ordering. What we are doing here is when there is a combination of differing principal variables, we should combine them such that the two operands have their polynomials ordered in a tower. We have two actions to focus on. Changing the construction so that if it detects a polynomial in the terms being used in its construction, it should try to order the nesting of the variable type. During combination, the operand should be converted so that all the variables that are participating are represented.
 
-$\left( z x - z^2 \right) y^2 + \left( 2 z^3 x^2 + \left( z + 2 \right) x \right) y + x^3$
-
-So what we have here is a multivariant polynomial with the principal variable being y, second order variable being x, and the third order variable being z. We want to go over how we could bring y from the principal to the third order variable. At a deeper look, we are going to have to choose the nesting level of the polynomial. Defaulting to swapping the order would be the most flexible, so we will pick that design choice.
-
-$y^2 \left( 1 \right) \left( z x - z^2 \left( 1 \right) \right) + y \left( 1 \right) \left( 2 z ^3 x^2 + (z + 2) x \right) + \left( 1 \right) x^3$
-
-Completing the multiplication, we get the following polynomial, with x as the principal variable, y as the secondary variable, and z as the last.
-
-$\left( z y^2 x - z^2 y^2 \right) + \left( 2 z^3 y x^2 + \left( z + 2 \right) y x \right) + x^3$
-
-We're now going to quickly add up the terms.
-
-$x^3 + 2z^3 y x^2 + \left( z y^2 + \left( z + 2 \right) y \right) x - z^2 y^2$
-
-Finally, to swap y with z.
-
-$x^3 + 2 y z^3 x^2 + (y^2 z + (y z + y 2))x - y ^2 z^2$
-
-$x^3 + 2 y z^3 x^2 + \left( \left( y^2 + y \right) z + y 2 \right) - y^2 z^2$
-
-
-Doing this action, we noticed that a vital part of the algorithm is the multiplication of a polynomial of y and a polynomial of z must resolve properly. This really just means that given multiplication of two polynomials of different bases, the result must be a polynomial of one base. Although this is analysis, we'll just take a note saying that we could make a procedure that takes two polynomials of different principal variables, and multiplies them such that the principal variable of the output polynomial will be the same values as that of the first parameter. Then we write a procedure that chooses which of the polynomial will be on the left. We are taking advantage of the commutative property of polynomials here. Similarly, we need to addition for polynomials of different bases.
 
 **** Implementation
 
@@ -9569,7 +9528,6 @@ Modifications must be made to termlist to give polynomial more utility.
   (apply-generic 'adjoin-term term term-list))
 #+end_src
 
-
 ***** Polynomial
 
 #+name: 2.92-poly-package
@@ -9623,7 +9581,7 @@ Modifications must be made to termlist to give polynomial more utility.
     (empty-termlist? (term-list p)))
   (define (equ?-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
-        false
+        (equ? (term-list p1) (term-list p2))
         false))
   ;; interface to rest of the system
   (define (tag p)
@@ -9646,9 +9604,10 @@ Modifications must be made to termlist to give polynomial more utility.
 (define (make-polynomial-from-coeffs var coeffs)
   (make-polynomial var (make-termlist-from-coeffs coeffs)))
 #+end_src
-
 ****** Changes
 1. Added ~equ?~ to the polynomial package so that we are able to test implementation more robustly.
+2.
+
 
 **** Import
 
@@ -9867,6 +9826,9 @@ pass: different order case
 
 
 ***** Simple Multi-variant addition
+
+This section is for testing if we are able to add two polynomials of differing variable types.
+
 #+caption: Testing addition between polynomials of different principal variables.
 #+begin_src racket :exports both :noweb yes
 <<2.92-imports>>
@@ -9874,29 +9836,25 @@ pass: different order case
 (display "polynomial construction")
 (newline)
 (display-hline-=)
-(display "Basic polynomials") (newline)
-(display-hline--)
 (define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
 (define test-poly2 (make-polynomial 'x (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
-test-poly1
-test-poly2
-(display "x -> y nested polynomials") (newline)
 (define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
 (define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
-test-poly3
-test-poly4
-(contain? 'polynomial default-ranks)
+(define test-poly5 (make-polynomial-from-coeffs 'y (list 3 2 1)))
+(define test-poly6 (make-polynomial-from-coeffs 'y (list 5 0 2 3)))
 (newline)
-(display "Testing first order addition")
+(display "Testing first order addition (matching)")
 (newline)
 (display-hline-=)
 (assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14" (add test-poly1 test-poly2) (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
 (assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14" (add test-poly2 test-poly1) (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
-(display "testing polynomial division")
+(assert-poly-eq "(3 2 1) + (5 0 2 3) = (5 3 4 4)" (add test-poly5 test-poly6) (make-polynomial-from-coeffs 'y (list 5 3 4 4)))
+
 (newline)
-(display-hline--)
-(div test-poly1 test-poly2)
-(div test-poly2 test-poly1)
+(display "testing addition between simple polynomials with different principal variables")
+(newline)
+(display-hline-=)
+(assert-poly-eq "(x 4 1 4 6) + (y 3 2 1) = (x 4 1 4 6(y 3 2 1))" (add test-poly1 test-poly5) (make-polynomial-from-coeffs 'x (4 1 4 (mul (make-polynomial-from-coeffs 'y (6)) (make-polynomial-from-coeffs 'y (3 2 1))))))
 
 (newline)
 (display "testing polynomial with polynomial coefficient combination")
@@ -9936,38 +9894,15 @@ done
 
 polynomial construction
 =========================================
-Basic polynomials
------------------------------------------
-(polynomial x termlist dense-termlist 4 1 4 6)
-(polynomial x termlist sparse-termlist (3 2) (1 2) (0 8))
-x -> y nested polynomials
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0)
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0 (polynomial x termlist dense-termlist 4 1 4 6))
-#f
 
-Testing first order addition
+Testing first order addition (matching)
 =========================================
-fail: (4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14 value: (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) expected: (polynomial x termlist dense-termlist 6 1 6 14)
-fail: (4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14 value: (polynomial x termlist dense-termlist 6 1 6 14) expected: (polynomial x termlist dense-termlist 6 1 6 14)
-testing polynomial division
------------------------------------------
-((polynomial x termlist sparse-termlist (0 2)) (polynomial x termlist sparse-termlist (2 1) (0 -10)))
-((polynomial x termlist sparse-termlist (0 1/2)) (polynomial x termlist sparse-termlist (2 -1/2) (0 5)))
+pass: (4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14 value: (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) expected: (polynomial x termlist dense-termlist 6 1 6 14)
+pass: (4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14 value: (polynomial x termlist dense-termlist 6 1 6 14) expected: (polynomial x termlist dense-termlist 6 1 6 14)
+pass: (3 2 1) + (5 0 2 3) = (5 3 4 4) value: (polynomial y termlist dense-termlist 5 3 4 4) expected: (polynomial y termlist dense-termlist 5 3 4 4)
 
-testing polynomial with polynomial coefficient combination
+testing addition between simple polynomials with different principal variables
 =========================================
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist -2 -1 -2 2) (polynomial x termlist sparse-termlist (3 -2) (1 -2) (0 -8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0)
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (3 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (2 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))))
-(polynomial y termlist dense-termlist)
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0 (polynomial x termlist dense-termlist 8 2 8 12))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
-(polynomial y termlist dense-termlist)
 #+end_example
 
 ***** Simple Multi-variant multiplication
