@@ -5780,6 +5780,10 @@ CLOCK: [2025-02-16 Sun 16:16]--[2025-02-16 Sun 17:06] =>  0:50
     [(eq? n 'complex) 3]
     [else false]))
 
+;; Procedure that returns the current highest type
+(define (highest-type)
+  (type-of-rank (highest-rank)))
+
 ;; checks if the input type is participating in ranks
 (define (ranked? n)
   (if (not rank-of-type) false true))
@@ -6031,6 +6035,7 @@ Right, we are thinking about making the type tower system easy to add to. Luckil
 ;; This procedure will raise a datum to the specified type. Returns false if
 ;; this operation fails
 (define (consecutive-raise datum target-type)
+  ;; (display "consecutive-raise ") (display (list datum target-type)) (newline)
   (define (raise-to-rank acc rank)
     (let ([curr-rank (rank-of-datum acc)])
       (cond
@@ -9535,7 +9540,9 @@ Firstly, we need to implement addition of two polynomials of different principal
 
 After this, we immediately ran into a problem, in that we do not have an implementation of polynomial addition with a scheme number, (or any number). This means that we should make an implementation for polynomial addition with a number, and register that into the generic application framework.
 
-Part of trying to do additions and multiplications on polynomials with different principal variables, we have to allow for operations between polynomials and regular numbers (reals and scheme-numbers). Right, so the thing is that, even after finishing this version of addition, our system is not generic to other number types, since polynomial does not participate in the type tower system that we implemented before. We really do not want to implement the same thing for all the types in the tower, therefore, we are going to extend the ~apply-generic~ so that when the system sees a type registered as a "bedrock type", we will try to raise the type of the other operands. If we want to keep it simple, just bring it to the real number type.
+Part of trying to do additions and multiplications on polynomials with different principal variables, we have to allow for operations between polynomials and regular numbers (reals and scheme-numbers). Right, so the thing is that, even after finishing this version of addition, our system is not generic to other number types, since polynomial does not participate in the type tower system that we implemented before. We really do not want to implement the same thing for all the types in the tower, therefore, we are going to extend the ~apply-generic~ so that when the system sees a type registered as a "bedrock type", we will try to raise the type of the other operands. If we want to keep it simple, just raise it as high as we can, and let the system drop the type down. We are adding coupling, and reducing performance, but like, we really need to get this done.
+
+After modifying the apply generic system, we are now able to achieve simple addition between polynomials of different types.
 
 
 #+name: 2.92-poly-package
@@ -9564,10 +9571,13 @@ Part of trying to do additions and multiplications on polynomials with different
         (if (> (hash-of-variable var1) (hash-of-variable var2))
             (list poly1 (make-poly var1 (make-termlist-from-coeffs (list (tag poly2)))))
             (list (make-poly var2 (make-termlist-from-coeffs (list (tag poly1)))) poly2))))
-    (let ([norm-polies (normalize-poly p1 p2)])
-      (add-poly (car norm-polies) (cadr norm-polies))))
-  (define (add-poly-number p1 n2)
-    (add-poly p1 (make-poly (variable p1) (make-termlist-from-coeffs (list n2)))))
+    (let ([norm-polies (normalize-poly p1 p2)]) (add-poly (car norm-polies) (cadr norm-polies))))
+  ;; Here is a mess point. We have to dig into the apply generic framework, and
+  ;; readd the type tag for a complex value in. This is not robust code, and we
+  ;; should really think about how to fix this.
+  (define (add-poly-complex p1 c1)
+    (add-poly p1
+              (make-poly (variable p1) (make-termlist-from-coeffs (list (attach-tag 'complex c1))))))
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
         (make-poly (variable p1) (add (term-list p1) (term-list p2)))
@@ -9605,10 +9615,8 @@ Part of trying to do additions and multiplications on polynomials with different
   (define (tag p)
     (attach-tag 'polynomial p))
   (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
-  (put 'add '(polynomial scheme-number) (lambda (p1 n2) (tag (add-poly-number p1 n2))))
-  (put 'add '(scheme-number polynomial) (lambda (n1 p2) (tag (add-poly-number p2 n1))))
-  (put 'add '(polynomial real) (lambda (p1 n2) (tag (add-poly-number p1 n2))))
-  (put 'add '(real polynomial) (lambda (n1 p2) (tag (add-poly-number p2 n1))))
+  (put 'add '(polynomial complex) (lambda (p1 c2) (tag (add-poly-complex p1 c2))))
+  (put 'add '(complex polynomial) (lambda (c1 p2) (tag (add-poly-complex p2 c1))))
   (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
   (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
   (put 'div
@@ -9637,7 +9645,7 @@ Part of trying to do additions and multiplications on polynomials with different
   ;; Takes in datum args and not just the type args. If there are datums that
   ;; are not participating in the rank system, this procedure will return
   ;; false
-  (define (highest-rank args)
+  (define (highest-rank-of-args args)
     (left-fold (lambda (acc ele)
                  (cond
                    [(or (not (number? acc)) (not (number? ele))) false]
@@ -9658,11 +9666,37 @@ Part of trying to do additions and multiplications on polynomials with different
   ;; procedure that attempts to raise the input datum args to the
   ;; highest type. If this fails, then return false
   (define (raise-args-to-highest args)
-    (let ([local-largest-rank (highest-rank args)])
+    (let ([local-largest-rank (highest-rank-of-args args)])
       (if (not local-largest-rank)
           false
           (validate (raise-args-to-type (type-of-rank local-largest-rank) args)))))
-
+  ;; This predicate checks if a bedrock type is present
+  (define (bedrock-present? type-tags)
+    (contain? 'polynomial type-tags))
+  ;; procedure that checks if a type is what we call bedrock, which really just
+  ;; means that it is a type that does not change, while the number types are
+  ;; getting raised.
+  (define (bedrock? a-type)
+    (if (symbol? a-type)
+        (eq? a-type 'polynomial)
+        (eq? (type-tag a-type) 'polynomial)))
+  ;; This name is a misnomer, since we are raising everything but the bedrock,
+  ;; and right now, we are always bringing it to real, which should be the
+  ;; highest rank
+  (define (bedrock-raise args)
+    ;; (display "bedrock-raise ") (display args) (newline)
+    (if (null? args)
+        '()
+        (cons (if (bedrock? (car args))
+                  (car args)
+                  (consecutive-raise (car args) (highest-type)))
+              (bedrock-raise (cdr args)))))
+  ;; New procedure that chooses how to deal with args based on the present types
+  (define (coerce-args args)
+    ;; (display "coerce-args ") (display args) (newline)
+    (cond
+      [(bedrock-present? (map type-tag args)) (bedrock-raise args)]
+      [else (raise-args-to-highest args)]))
   (define (handle-output v)
     (if (droppable? v)
         (drop v)
@@ -9675,7 +9709,7 @@ Part of trying to do additions and multiplications on polynomials with different
         ;; (display "apply-generic-aux ") (display (list type-tags proc)) (newline)
         (if proc
             (apply proc (map contents args))
-            (let ([coerced (raise-args-to-highest args)])
+            (let ([coerced (coerce-args args)])
               (if (not coerced)
                   (error "unable to find method for argument, and coercion failed:" op type-tags args)
                   (let ([coerced-proc (get op (map type-tag coerced))])
@@ -9903,7 +9937,7 @@ pass: different order case
 pass: (4 1 4 6) + (1)
 #+end_example
 
-***** Simple Multi-variant addition
+***** Multi-variant addition
 
 This section is for testing if we are able to add two polynomials of differing variable types.
 
@@ -9944,23 +9978,11 @@ This section is for testing if we are able to add two polynomials of differing v
  "(x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6))"
  (add test-poly1 test-poly5)
  (make-polynomial-from-coeffs 'y (list 3 2 (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))
+(assert-poly-eq
+ "(y 3 2 1) + (x 4 1 4 6) = (y 3 2 (x 4 1 4 6))"
+ (add test-poly5 test-poly1)
+ (make-polynomial-from-coeffs 'y (list 3 2 (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))
 
-(newline)
-(display "testing polynomial with polynomial coefficient combination")
-(newline)
-(display-hline-=)
-(add test-poly3 test-poly4)
-(mul test-poly3 test-poly4)
-(sub test-poly3 test-poly4)
-(add test-poly4 test-poly3)
-(mul test-poly4 test-poly3)
-(sub test-poly4 test-poly3)
-(add test-poly3 test-poly3)
-(mul test-poly3 test-poly3)
-(sub test-poly3 test-poly3)
-(add test-poly4 test-poly4)
-(mul test-poly4 test-poly4)
-(sub test-poly4 test-poly4)
 #+end_src
 
 #+RESULTS:
@@ -9991,22 +10013,83 @@ pass: (3 2 1) + (5 0 2 3) = (5 3 4 4) value: (polynomial y termlist dense-termli
 
 testing addition between simple polynomials with different principal variables
 =========================================
-pass: (x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7)) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
-
-testing polynomial with polynomial coefficient combination
-=========================================
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist -2 -1 -2 2) (polynomial x termlist sparse-termlist (3 -2) (1 -2) (0 -8)) (polynomial x termlist dense-termlist 4 1 4 6))
-(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0)
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (3 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (2 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))))
-(polynomial y termlist dense-termlist)
-(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0 (polynomial x termlist dense-termlist 8 2 8 12))
-(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
-(polynomial y termlist dense-termlist)
+pass: (x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 (integer . 7))) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
+pass: (y 3 2 1) + (x 4 1 4 6) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 (integer . 7))) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
 #+end_example
 
-***** Simple Multi-variant multiplication
+***** Multi-variant multiplication
+#+caption: Testing addition between polynomials of different principal variables.
+#+begin_src racket :exports both :noweb yes
+<<2.92-imports>>
+(newline)
+(display "polynomial construction")
+(newline)
+(display-hline-=)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2
+  (make-polynomial 'x
+                   (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
+(define test-poly5 (make-polynomial-from-coeffs 'y (list 3 2 1)))
+(define test-poly6 (make-polynomial-from-coeffs 'y (list 5 0 2 3)))
+(newline)
+(display "Testing first order addition (matching)")
+(newline)
+(display-hline-=)
+(assert-poly-eq "(4x^3 + x^2 + 4x + 6) * (2x^3 + 2x + 8) = (x 8 2 16 46 16 44 48)"
+                (mul test-poly1 test-poly2)
+                (make-polynomial-from-coeffs 'x (list 8 2 16 46 16 44 48)))
+(assert-poly-eq "(4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14"
+                (add test-poly2 test-poly1)
+                (make-polynomial-from-coeffs 'x (list 6 1 6 14)))
+(assert-poly-eq "(3 2 1) + (5 0 2 3) = (5 3 4 4)"
+                (add test-poly5 test-poly6)
+                (make-polynomial-from-coeffs 'y (list 5 3 4 4)))
+
+(newline)
+(display "testing addition between simple polynomials with different principal variables")
+(newline)
+(display-hline-=)
+(assert-poly-eq
+ "(x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6))"
+ (add test-poly1 test-poly5)
+ (make-polynomial-from-coeffs 'y (list 3 2 (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))
+(assert-poly-eq
+ "(y 3 2 1) + (x 4 1 4 6) = (y 3 2 (x 4 1 4 6))"
+ (add test-poly5 test-poly1)
+ (make-polynomial-from-coeffs 'y (list 3 2 (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))
+
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+
+polynomial construction
+=========================================
+
+Testing first order addition (matching)
+=========================================
+pass: (4x^3 + x^2 + 4x + 6) * (2x^3 + 2x + 8) = (x 8 2 16 46 16 44 48) value: (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48)) expected: (polynomial x termlist dense-termlist 8 2 16 46 16 44 48)
+pass: (4x^3 + x^2 + 4x + 6) + (2x^3 + 2x + 8) = 6x^3 + x^2 + 6x + 14 value: (polynomial x termlist dense-termlist 6 1 6 14) expected: (polynomial x termlist dense-termlist 6 1 6 14)
+pass: (3 2 1) + (5 0 2 3) = (5 3 4 4) value: (polynomial y termlist dense-termlist 5 3 4 4) expected: (polynomial y termlist dense-termlist 5 3 4 4)
+
+testing addition between simple polynomials with different principal variables
+=========================================
+pass: (x 4 1 4 6) + (y 3 2 1) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 (integer . 7))) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
+pass: (y 3 2 1) + (x 4 1 4 6) = (y 3 2 (x 4 1 4 6)) value: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 (integer . 7))) expected: (polynomial y termlist dense-termlist 3 2 (polynomial x termlist dense-termlist 4 1 4 7))
+#+end_example
