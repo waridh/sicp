@@ -9231,19 +9231,11 @@ testing polynomial with polynomial coefficient combination
 *** Prompt
 By imposing an ordering on variables, extend the polynomial package so that addition and multiplication of polynomials work for polynomials in different variables. (This is not easy!)
 *** Solution
-Since this is not easy, it is necessary that I complete the exercise. Due to implementation time consideration, we are going to be coercing the hierarchy of polynomials into their correct ordering eagerly, instead of lazily, due to ease of implementation. For this task, we are going to have to achieve the following.
+Since this is not easy, it is necessary that I complete the exercise. Due to implementation time consideration, we are going to be coercing the hierarchy of polynomials into their correct ordering eagerly, instead of lazily, due to ease of implementation. For this task, we are going to have to be able to order the variables, likely through a hashing function. After this, we could wrap the polynomial of lower ranking in a new polynomial with the other variable as the principal variable, and then do the operation on them. This is a simple gameplan, and it does have one flaw, which we will talk about later.
 **** Tasks
 - [X] hash the variables, so that a variable ranking could be generated without the need actually store the tower somewhere. Seems trivial, but vital.
-- [ ] find how to do a second order polynomial flip (convert the coefficient polynomials into the principal polynomial)
-- [ ] find how to do that recursively
-- [ ] make the policy for more malformed compound polynomials (polynomial with variable z only on some terms of a principal polynomial)
-**** Design Details
-***** Ordering multivariant polynomials
-We are going to use the following observation to base our design around. We are actually able to add and multiply different polynomials if they have the exact same polynomial ordering. What we are doing here is when there is a combination of differing principal variables, we should combine them such that the two operands have their polynomials ordered in a tower. We have two actions to focus on. Changing the construction so that if it detects a polynomial in the terms being used in its construction, it should try to order the nesting of the variable type. During combination, the operand should be converted so that all the variables that are participating are represented.
-
-
+- [X] Nest the lower ranked polynomial when adding and multiplying polynomials with different principal variables.
 **** Implementation
-
 ***** Hashing
 Thinking about it, we should first come up with a hashing function that could resolve the order of the polynomials. We might be able to hash the symbol by converting it to a string, and then converting that string into an number. We are going to make a not so good hashing function that literally converts the string into an integer, and use that as the hashing value. We need to do this because we want to be able compare the different variables so we don't have to register all the variables in a tower.
 
@@ -9320,6 +9312,8 @@ Found out that there isn't a bitwise or operation in racket, so I think I have t
 With this hashing procedure built, we are now able to always decide if a variable of a polynomial is less than, greater than, or equal to another variable. This will allow us to make the system self organize.
 
 ****** Testing
+
+This section contains basic testing of the hashing function and the bitwise operation micro-package.
 
 #+caption: Testing bitwise operations
 #+begin_src racket :exports both :noweb yes
@@ -9544,6 +9538,9 @@ Part of trying to do additions and multiplications on polynomials with different
 
 After modifying the apply generic system, we are now able to achieve simple addition between polynomials of different types.
 
+We do practically the same thing to implement simple multiplication between polynomials of different principal variable.
+
+After some testing against more complicated polynomial additions and multiplications that crosses variable, we could be happy, since our system is able to add and multiply polynomials that are of differing principal variables. I do think that we could stop here, since we'd like to finish this book before the end of the year, however, we do have one improvement that we could talk about. We realistically could setup the system such that all the different variable will be at their specified layer, but this added complication is more than non-trivial.
 
 #+name: 2.92-poly-package
 #+begin_src racket :exports code
@@ -9580,6 +9577,7 @@ After modifying the apply generic system, we are now able to achieve simple addi
     (add-poly p1
               (make-poly (variable p1) (make-termlist-from-coeffs (list (attach-tag 'complex c1))))))
   (define (add-poly p1 p2)
+    ;; (display "add-poly ") (display (list p1 p2)) (newline)
     (if (same-variable? (variable p1) (variable p2))
         (make-poly (variable p1) (add (term-list p1) (term-list p2)))
         (add-poly-diff p1 p2)))
@@ -9647,10 +9645,10 @@ After modifying the apply generic system, we are now able to achieve simple addi
 (define (make-polynomial-from-coeffs var coeffs)
   (make-polynomial var (make-termlist-from-coeffs coeffs)))
 #+end_src
-****** Changes
-1. Added ~equ?~ to the polynomial package so that we are able to test implementation more robustly.
-2.
 ***** Apply generic
+
+Apply generic has to be modified so that the concept of bedrock types are handled. Bedrock types are types that will not be coerced, but its presence causes the other types in the type tower be raised up to the highest type.
+
 #+name: 2.92-apply-generic
 #+begin_src racket :exports code
 (define (apply-generic op . args)
@@ -10031,7 +10029,7 @@ pass: (y 3 2 1) + (x 4 1 4 6) = (y 3 2 (x 4 1 4 7)) value: (polynomial y termlis
 #+end_example
 
 ***** Multi-variant multiplication
-#+caption: Testing addition between polynomials of different principal variables.
+#+caption: Testing multiplication between polynomials of different principal variables.
 #+begin_src racket :exports both :noweb yes
 <<2.92-imports>>
 (newline)
@@ -10101,33 +10099,477 @@ polynomial construction
 
 Testing first order multiplication (matching)
 =========================================
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist sparse-termlist (3 2) (1 2) (0 8)))
 pass: (4x^3 + x^2 + 4x + 6) * (2x^3 + 2x + 8) = (x 8 2 16 46 16 44 48) value: (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48)) expected: (polynomial x termlist dense-termlist 8 2 16 46 16 44 48)
-mul-poly ((x termlist sparse-termlist (3 2) (1 2) (0 8)) (x termlist dense-termlist 4 1 4 6))
 pass: (4x^3 + x^2 + 4x + 6) * (2x^3 + 2x + 8) = (x 8 2 16 46 16 44 48) value: (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48)) expected: (polynomial x termlist dense-termlist 8 2 16 46 16 44 48)
-mul-poly ((y termlist dense-termlist 3 2 1) (y termlist dense-termlist 5 0 2 3))
 pass: (3 2 1) * (5 0 2 3) = (15 10 11 13 8 3) value: (polynomial y termlist sparse-termlist (5 15) (4 10) (3 11) (2 13) (1 8) (0 3)) expected: (polynomial y termlist dense-termlist 15 10 11 13 8 3)
 
 testing multiplication between simple polynomials with different principal variables
 =========================================
-mul-poly ((x termlist dense-termlist 4 1 4 6) (y termlist dense-termlist 3 2 1))
-mul-poly-diff ((x termlist dense-termlist 4 1 4 6) (y termlist dense-termlist 3 2 1))
-mul-poly ((y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6)) (y termlist dense-termlist 3 2 1))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 3 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 3 . 0)))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 2 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 2 . 0)))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 1 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 1 . 0)))
 pass: (x 4 1 4 6) * (y 3 2 1) = (y 3(x 4 1 4 6) 2(x 4 1 4 6) (x 4 1 4 6)) value: (polynomial y termlist sparse-termlist (2 (polynomial x termlist sparse-termlist (3 (integer . 12)) (2 (integer . 3)) (1 (integer . 12)) (0 (integer . 18)))) (1 (polynomial x termlist sparse-termlist (3 (integer . 8)) (2 (integer . 2)) (1 (integer . 8)) (0 (integer . 12)))) (0 (polynomial x termlist sparse-termlist (3 (integer . 4)) (2 (integer . 1)) (1 (integer . 4)) (0 (integer . 6))))) expected: (polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 12 3 12 18) (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist dense-termlist 4 1 4 6))
-mul-poly ((y termlist dense-termlist 3 2 1) (x termlist dense-termlist 4 1 4 6))
-mul-poly-diff ((y termlist dense-termlist 3 2 1) (x termlist dense-termlist 4 1 4 6))
-mul-poly ((y termlist dense-termlist 3 2 1) (y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6)))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 3 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 3 . 0)))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 2 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 2 . 0)))
-mul-poly-complex ((x termlist dense-termlist 4 1 4 6) (rectangular 1 . 0))
-mul-poly ((x termlist dense-termlist 4 1 4 6) (x termlist dense-termlist (complex rectangular 1 . 0)))
 pass: (y 3 2 1) * (x 4 1 4 6) = (y 3(x 4 1 4 6) 2(x 4 1 4 6) (x 4 1 4 6)) value: (polynomial y termlist sparse-termlist (2 (polynomial x termlist sparse-termlist (3 (integer . 12)) (2 (integer . 3)) (1 (integer . 12)) (0 (integer . 18)))) (1 (polynomial x termlist sparse-termlist (3 (integer . 8)) (2 (integer . 2)) (1 (integer . 8)) (0 (integer . 12)))) (0 (polynomial x termlist sparse-termlist (3 (integer . 4)) (2 (integer . 1)) (1 (integer . 4)) (0 (integer . 6))))) expected: (polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 12 3 12 18) (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist dense-termlist 4 1 4 6))
+#+end_example
+***** Complex case testing
+#+caption: Testing complex interactions between polynomials of different principal variables.
+#+begin_src racket :exports both :noweb yes
+<<2.92-imports>>
+(newline)
+(display "polynomial construction")
+(newline)
+(display-hline-=)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2
+  (make-polynomial 'x
+                   (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
+(define test-poly5 (make-polynomial-from-coeffs 'y (list 3 2 1)))
+(define test-poly6 (make-polynomial-from-coeffs 'y (list 5 0 2 3)))
+(newline)
+
+(newline)
+(display "testing combination of multiplication and addition on three variables")
+(newline)
+(display-hline-=)
+(assert-poly-eq
+ "(x 4 1 4 6) * (y 3 2 1) + (z 7 0 0 0 1) = (z 7 0 0 0 (y 3(x 4 1 4 6) 2(x 4 1 4 6) (x 4 1 4 7)))"
+ (add (mul test-poly1 test-poly5) (make-polynomial-from-coeffs 'z (list 7 0 0 0 1)))
+ (make-polynomial-from-coeffs 'z (list 7 0 0 0 (make-polynomial-from-coeffs 'y (list (make-polynomial-from-coeffs 'x (list 12 3 12 18))
+                                       (make-polynomial-from-coeffs 'x (list 8 2 8 12))
+                                       (make-polynomial-from-coeffs 'x (list 4 1 4 7)))))))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+
+polynomial construction
+=========================================
+
+
+testing combination of multiplication and addition on three variables
+=========================================
+pass: (x 4 1 4 6) * (y 3 2 1) + (z 7 0 0 0 1) = (z 7 0 0 0 (y 3(x 4 1 4 6) 2(x 4 1 4 6) (x 4 1 4 7))) value: (polynomial z termlist dense-termlist 7 0 0 0 (polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 (integer . 12)) (2 (integer . 3)) (1 (integer . 12)) (0 (integer . 18))) (polynomial x termlist sparse-termlist (3 (integer . 8)) (2 (integer . 2)) (1 (integer . 8)) (0 (integer . 12))) (polynomial x termlist dense-termlist (integer . 4) (integer . 1) (integer . 4) (integer . 7)))) expected: (polynomial z termlist dense-termlist 7 0 0 0 (polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 12 3 12 18) (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist dense-termlist 4 1 4 7)))
+#+end_example
+** Exercise 2.93
+*** Prompt
+To build on what we just did with polynomials, we are now modifying our old rational type to be a rational function, which requires that it does not reduce the fraction to the lowest terms. Test the system by calling ~make-rational~ on two polynomials to produce a rational function.
+
+#+begin_src racket :exports code
+(define p1 (make-polynomial 'x '((2 1) (0 1))))
+(define p2 (make-polynomial 'x '((3 1) (0 1))))
+(define rf (make-rational p2 p1))
+#+end_src
+
+Now add ~rf~ to itself using ~add~. You will observe that this addition procedure does not reduce fractions to lowest terms.
+*** Solution
+Firstly, our ~polynomial~ construction api does not look like that. Secondly, we would have to look at how we are currently doing raising and dropping, since rationals are in the middle of the coercion chain that we built.
+**** Tasks
+- [ ] We have to make the rational number representation more generic
+- [ ] We have to add logic that will facilitate clean coercion of the ration type in the type tower.
+**** Implementation
+***** Rational Functions
+Fundamentally, we have to swap the assumed underlying representation from a ~scheme-number~ to a generic type.
+#+name: 2.93-rational-implementation
+#+begin_src racket :exports code
+(define (install-rational-package)
+  ;; internal procedures
+  (define (to-scheme-number x)
+    (/ (numer x) (denom x)))
+  (define (numer x)
+    ;; (display "numer ")
+    ;; (display x)
+    ;; (newline)
+    (car x))
+  (define (denom x)
+    ;; (display "denom ")
+    ;; (display x)
+    ;; (newline)
+    (cadr x))
+  (define (make-rat n d)
+    (list n d))
+  (define (add-rat x y)
+    ;; (display "add-rat ")
+    ;; (display (list x y))
+    ;; (newline)
+    (let ([nx (numer x)]
+          [dx (denom x)]
+          [ny (numer y)]
+          [dy (denom y)])
+      (make-rat (add (mul nx dy) (mul ny dx)) (mul dx dy))))
+  (define (sub-rat x y)
+    (make-rat (sub (mul (numer x) (denom y)) (mul (numer y) (denom x))) (mul (denom x) (denom y))))
+  (define (mul-rat x y)
+    (make-rat (mul (numer x) (numer y)) (mul (denom x) (denom y))))
+  (define (div-rat x y)
+    (make-rat (mul (numer x) (denom y)) (mul (denom x) (numer y))))
+  (define (neg-rat x)
+    (make-rat (neg (numer x)) (denom x)))
+  (define (squrt-rat x)
+    (make-rat (squrt (numer x)) (squrt (denom x))))
+  ;; TODO: We might need to raise the rational number before we could get the
+  ;; cosine
+  (define (cosine-rat x)
+    (make-rat (cos (to-scheme-number x)) 1))
+  (define (sine-rat x)
+    (make-rat (sin (to-scheme-number x)) 1))
+  (define (equ?-rat x y)
+    (and (equ? (numer x) (numer y)) (equ? (denom x) (denom y))))
+  (define (=zero? x)
+    (=zero? (numer x)))
+  (define (droppable?-rational x)
+    ;; (display "droppable?-rational ") (display x)
+    (and (number? (numer x)) (number? (denom x))))
+  ;; interface to rest of the system
+  (define (tag x)
+    (attach-tag 'rational x))
+  (put-droppable? 'rational droppable?-rational)
+  (put 'add '(rational rational) (lambda (x y) (tag (add-rat x y))))
+  (put 'sub '(rational rational) (lambda (x y) (tag (sub-rat x y))))
+  (put 'mul '(rational rational) (lambda (x y) (tag (mul-rat x y))))
+  (put 'div '(rational rational) (lambda (x y) (tag (div-rat x y))))
+  (put '=zero? '(rational) =zero?)
+  (put 'neg '(rational) (lambda (x) (tag (neg-rat x))))
+  (put 'equ? '(rational rational) equ?-rat)
+  (put 'squrt '(rational) (lambda (x) (tag (squrt-rat x))))
+  (put 'cosine '(rational) (lambda (x) (tag (cosine-rat x))))
+  (put 'sine '(rational) (lambda (x) (tag (sine-rat x))))
+  (put 'make 'rational (lambda (n d) (tag (make-rat n d))))
+  (put 'numer 'rational (lambda (n) (numer n))) ;; numerator and denominator
+  (put 'denom 'rational (lambda (n) (denom n)))
+  'done)
+(define (make-rational n d)
+  ((get 'make 'rational) n d))
+(define (numer x)
+  ((get 'numer 'rational) x))
+(define (denom x)
+  ((get 'denom 'rational) x))
+#+end_src
+
+***** Coercion
+We have to add an additional check for type dropping. There now needs to be a check on if that coercion is even legal.
+
+#+name: 2.93-drop
+#+begin_src racket :exports code
+(define (install-project)
+  ;; This has to now account for the type of the real part of the of the complex
+  ;; value. We could make a quick hack, which involves bringing the real
+  ;; component to real, and then converting it to a scheme number
+  (define (complex->real n)
+    (make-real (contents (consecutive-raise (real-part n) 'real))))
+  (define (real->rational n)
+    (make-rational (* n 10) 10))
+  (define (rational->integer n)
+    (make-integer (/ (numer n) (denom n))))
+
+  (put-coercion 'complex 'real complex->real)
+  (put-coercion 'real 'rational real->rational)
+  (put-coercion 'rational 'integer rational->integer)
+  'done)
+
+;; Project allows for lossy downward coercion of the type. Project will return
+;; the same item if we are at the bottom of the type tower.
+(define (project n)
+  (let ([curr-type-rank (rank-of-datum n)])
+    (cond
+      [(not curr-type-rank) n]
+      [(= curr-type-rank (lowest-rank)) n]
+      [(< curr-type-rank (lowest-rank))
+       (error "type rank of parameter lower than lowest rank registered"
+              (list curr-type-rank (lowest-rank) n))]
+      [else
+       (let ([cleaned-arg (to-default-type n)]
+             [next-type (type-of-rank (- curr-type-rank 1))])
+         (let ([coer-proc (get-coercion (type-tag cleaned-arg) next-type)])
+           (if (not coer-proc)
+               (error "missing coercion procedure for the following types"
+                      (list (type-tag cleaned-arg next-type n)))
+               (coer-proc (contents cleaned-arg)))))])))
+(define *droppable?-table* '())
+(define (make-droppable?-entry k v)
+  (list k v))
+(define (droppable?-key entry)
+  (car entry))
+(define (droppable?-value entry)
+  (cadr entry))
+(define (droppable?-key? k entry)
+  (eq? (droppable?-key entry) k))
+(define (put-droppable? t item)
+  (define (putter k array)
+    (cond
+      [(null? array) (list (make-droppable?-entry k item))]
+      [(droppable?-key? k (car array)) array]
+      [else (cons (car array) (putter k (cdr array)))]))
+  (set! *droppable?-table* (putter t *droppable?-table*)))
+(define (get-droppable? t)
+  (define (getter array)
+    (cond [(null? array) false]
+          [(droppable?-key? t (car array)) (cadr (car array))]
+          [else (getter (cdr array))]))
+  (getter *droppable?-table*))
+
+;; Checks if the value v is a droppable type. Droppables have to participate
+;; in the rank system.
+(define (droppable? v)
+  (if (not (pair? v))
+      false
+      (let ([target-type (type-tag v)])
+        (let ([droppable?-pred (get-droppable? target-type)])
+          (if (not droppable?-pred)
+              (contain? (type-tag v) default-ranks)
+              (droppable?-pred (contents v)))))))
+
+;; Drop will prevent lossy dropping of the value, but it will also drop it as far as possible
+(define (drop n)
+  (define (iter prev)
+    (let ([projected (project prev)])
+      (if (or (= (rank-of-datum projected) (rank-of-datum prev)) (not (equ? (raise projected) prev)))
+          prev
+          (iter projected))))
+  (if (droppable? n)
+      (iter (to-default-type n))
+      n))
+#+end_src
+
+**** Import
+
+A centralized location for importing the source code. Left visible so readers could trace the code.
+#+name: 2.93-imports
+#+begin_src racket :exports code :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<assertion-suite>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.92-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.93-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.93-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.92-poly-package>>
+<<2.92-term-list>>
+<<2.90-term-list-concrete>>
+<<2.90-term>>
+<<2.92-hash-of-variable>>
+<<2.92-bitwise-operator>>
+<<2.92-assert-polynomial-equal>>
+<<2.93-assert-generic-arithmetic-equal>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+(install-termlist-package)
+(install-term-package)
+(install-dense-termlist-package)
+(install-sparse-termlist-package)
+
+(define (display-hline-=)
+  (display "=========================================")
+  (newline))
+(define (display-hline--)
+  (display "-----------------------------------------")
+  (newline))
+#+end_src
+
+**** Testing
+***** Generic assertion procedure
+We need a helper procedure that will do equality assertions against things in our generic arithmetic package.
+
+#+name: 2.93-assert-generic-arithmetic-equal
+#+begin_src racket :exports code
+(define (assert-equ? test-name val expected)
+  (assert-predicate equ? test-name val expected))
+#+end_src
+
+
+***** Regression
+
+#+caption: Testing the we could do univariant division on polynomials.
+#+begin_src racket :exports both :noweb yes
+<<2.93-imports>>
+(newline)
+(display "testing polynomial construction")
+(newline)
+(display-hline-=)
+(display "Basic polynomials") (newline)
+(display-hline--)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2 (make-polynomial 'x (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
+test-poly1
+test-poly2
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
+test-poly3
+test-poly4
+(contain? 'polynomial default-ranks)
+(newline)
+(display "testing polynomial combinations")
+(newline)
+(display-hline-=)
+(add test-poly1 test-poly2)
+(add test-poly2 test-poly1)
+(mul test-poly1 test-poly2)
+(mul test-poly2 test-poly1)
+(sub test-poly1 test-poly2)
+(sub test-poly2 test-poly1)
+(display "testing polynomial division")
+(newline)
+(display-hline--)
+(div test-poly1 test-poly2)
+(div test-poly2 test-poly1)
+
+(newline)
+(display "testing polynomial with polynomial coefficient combination")
+(newline)
+(display-hline-=)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
+(sub test-poly3 test-poly4)
+(add test-poly4 test-poly3)
+(mul test-poly4 test-poly3)
+(sub test-poly4 test-poly3)
+(add test-poly3 test-poly3)
+(mul test-poly3 test-poly3)
+(sub test-poly3 test-poly3)
+(add test-poly4 test-poly4)
+(mul test-poly4 test-poly4)
+(sub test-poly4 test-poly4)
+
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+
+testing polynomial construction
+=========================================
+Basic polynomials
+-----------------------------------------
+(polynomial x termlist dense-termlist 4 1 4 6)
+(polynomial x termlist sparse-termlist (3 2) (1 2) (0 8))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0 (polynomial x termlist dense-termlist 4 1 4 6))
+#f
+
+testing polynomial combinations
+=========================================
+(polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14))
+(polynomial x termlist dense-termlist 6 1 6 14)
+(polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2))
+(polynomial x termlist dense-termlist -2 -1 -2 2)
+testing polynomial division
+-----------------------------------------
+((polynomial x termlist sparse-termlist (0 2)) (polynomial x termlist sparse-termlist (2 1) (0 -10)))
+((polynomial x termlist sparse-termlist (0 1/2)) (polynomial x termlist sparse-termlist (2 -1/2) (0 5)))
+
+testing polynomial with polynomial coefficient combination
+=========================================
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist -2 -1 -2 2) (polynomial x termlist sparse-termlist (3 -2) (1 -2) (0 -8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0)
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (3 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (2 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))))
+(polynomial y termlist dense-termlist)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0 (polynomial x termlist dense-termlist 8 2 8 12))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
+(polynomial y termlist dense-termlist)
+#+end_example
+***** Basic rational function testing
+
+This section is for testing if we are able to add two polynomials of differing variable types.
+
+#+caption: Testing addition between polynomials of different principal variables.
+#+begin_src racket :exports both :noweb yes
+<<2.93-imports>>
+(define test-poly1 (make-polynomial-from-coeffs 'x (list 1 0 1)))
+(define test-poly2 (make-polynomial-from-coeffs 'x (list 1 0 0 1)))
+(define rf (make-rational test-poly2 test-poly1))
+
+(newline)
+(display "Testing basic rational construction and rational addition")
+(newline)
+(display-hline-=)
+(display "showing the base rational function")
+(newline)
+rf
+(assert-equ? "Adding (rational (x 1 0 0 1) (x 1 0 1)) with itself"
+             (add rf rf)
+             (make-rational (make-polynomial-from-coeffs 'x (list 2 0 2 2 0 2))
+                            (make-polynomial-from-coeffs 'x (list 1 0 2 0 1))))
+(sub rf rf)
+(assert-equ? "Subtracting (rational (x 1 0 0 1) (x 1 0 1)) with itself"
+             (sub rf rf)
+             0)
+(add rf rf)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+
+Testing basic rational construction and rational addition
+=========================================
+showing the base rational function
+(rational (polynomial x termlist dense-termlist 1 0 0 1) (polynomial x termlist dense-termlist 1 0 1))
+pass: Adding (rational (x 1 0 0 1) (x 1 0 1)) with itself value: (rational (polynomial x termlist sparse-termlist (5 2) (3 2) (2 2) (0 2)) (polynomial x termlist sparse-termlist (4 1) (2 2) (0 1))) expected: (rational (polynomial x termlist dense-termlist 2 0 2 2 0 2) (polynomial x termlist dense-termlist 1 0 2 0 1))
+(rational (polynomial x termlist sparse-termlist) (polynomial x termlist sparse-termlist (4 1) (2 2) (0 1)))
 #+end_example
