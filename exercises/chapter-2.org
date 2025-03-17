@@ -9654,6 +9654,7 @@ After some testing against more complicated polynomial additions and multiplicat
 (define (make-polynomial-from-coeffs var coeffs)
   (make-polynomial var (make-termlist-from-coeffs coeffs)))
 #+end_src
+
 ***** Apply generic
 
 Apply generic has to be modified so that the concept of bedrock types are handled. Bedrock types are types that will not be coerced, but its presence causes the other types in the type tower be raised up to the highest type.
@@ -10591,4 +10592,482 @@ pass: Adding (rational (x 1 0 0 1) (x 1 0 1)) with itself value: (rational (poly
 pass: Subtracting (rational (x 1 0 0 1) (x 1 0 1)) with itself value: (rational (polynomial x termlist sparse-termlist) (polynomial x termlist sparse-termlist (4 1) (2 2) (0 1))) expected: (integer . 0)
 pass: Multiplying the rational function with itself value: (rational (polynomial x termlist sparse-termlist (6 1) (3 2) (0 1)) (polynomial x termlist sparse-termlist (4 1) (2 2) (0 1))) expected: (rational (polynomial x termlist dense-termlist 1 0 0 2 0 0 1) (polynomial x termlist dense-termlist 1 0 2 0 1))
 pass: Dividing the rational function with itself value: (rational (polynomial x termlist sparse-termlist (5 1) (3 1) (2 1) (0 1)) (polynomial x termlist sparse-termlist (5 1) (3 1) (2 1) (0 1))) expected: (rational (polynomial x termlist dense-termlist 1 0 1 1 0 1) (polynomial x termlist dense-termlist 1 0 1 1 0 1))
+#+end_example
+** Exercise 2.94
+*** Prompt
+Previous exercise has the flaw of not reducing the polynomials, (or even integers) down to the simplest form. Using ~div-terms~, given by the chapter, implement the procedure ~remainder-terms~ and use this to define ~gcd-terms~ as above. Now write a procedure ~gcd-poly~ that computes the polynomial GCD of two polys. (We want to signal an error if the two polys are not in the same variable.) Install in the system a generic operation ~greatest-common-divisor~ that reduces to ~gcd-poly~ for polynomials, and to ordinary ~gcd~ for ordinary numbers. Here are the given test.
+
+#+begin_src racket :exports code
+(define p1 (make-polynomial 'x '((4 1) (3 -1) (2 -2) (1 2))))
+(define p2 (make-polynomial 'x '((3 1) (1 -1))))
+(greatest-common-divisor p1 p2)
+#+end_src
+*** Solution
+This is an exercise where we are mainly focusing on how we can make ~gcd~ generic to polynomials as well as numbers with the end goal of being able to reduce rational functions 3 exercises from here. For sure, there will be a change to the both the termlist and polynomial package, but there is a question of how we are going to reintegrate the ordinary number GDC back into the system. We could do one of the following:
+1. Make a change in all the ordinary number packages so that they all register a GCD procedure
+2. Change the framework of the ~apply-generic~ package so that if a procedure could not be found for a type, it will keep raising the type if it is on the type tower and try to evaluate the operation again.
+3. Make another package that registers specifically just the GCD for normal numbers.
+
+Option 2 would be elegant, but I simply do not have the time to do this. Option 1 is actually a lot of code change in our current usage of org-babel, so we choose to implement GDC for ordinary numbers using a separate package.
+**** Implementation
+***** Ordinary GDC
+#+name: 2.94-ordinary-gcd
+#+begin_src racket :exports code
+(define (install-ordinary-gcd)
+  ;; This one applies to scheme-number
+  (define (gcd-ordinary a b)
+    (if (=zero? b)
+        a
+        (gcd-ordinary b (remainder a b))))
+  (put 'greatest-common-divisor '(scheme-number scheme-number) (lambda (x y) (attach-tag 'scheme-number (gcd-ordinary x y))))
+  'done)
+(define (greatest-common-divisor x y)
+  (apply-generic 'greatest-common-divisor x y))
+#+end_src
+***** Polynomials
+#+name: 2.94-poly-package
+#+begin_src racket :exports code
+(define (install-polynomial-package)
+  ;; internal procedures
+  ;; representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (make-poly-from-coeffs variable coeffs)
+    (make-poly variable (make-termlist-from-coeffs coeffs)))
+  (define (variable p)
+    (car p))
+  (define (term-list p)
+    (cdr p))
+  (define (variable? p)
+    (symbol? p))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  (define (univariant-application proc error-msg p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (proc)
+        (error error-msg (list p1 p2))))
+  (define (normalize-poly poly1 poly2)
+    (let ([var1 (variable poly1)]
+          [var2 (variable poly2)])
+      (if (> (hash-of-variable var1) (hash-of-variable var2))
+          (list poly1 (make-poly-from-coeffs var1 (list (tag poly2))))
+          (list (make-poly-from-coeffs var2 (list (tag poly1))) poly2))))
+  (define (tag-complex v)
+    (attach-tag 'complex v))
+  (define (add-poly-diff p1 p2)
+    (let ([norm-polies (normalize-poly p1 p2)]) (add-poly (car norm-polies) (cadr norm-polies))))
+  ;; Here is a mess point. We have to dig into the apply generic framework, and
+  ;; readd the type tag for a complex value in. This is not robust code, and we
+  ;; should really think about how to fix this.
+  (define (add-poly-complex p1 c1)
+    (add-poly p1
+              (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c1))))))
+  (define (add-poly p1 p2)
+    ;; (display "add-poly ") (display (list p1 p2)) (newline)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (add (term-list p1) (term-list p2)))
+        (add-poly-diff p1 p2)))
+  (define (mul-poly-diff p1 p2)
+    ;; (display "mul-poly-diff ") (display (list p1 p2)) (newline)
+    (let ([norm-polies (normalize-poly p1 p2)]) (mul-poly (car norm-polies) (cadr norm-polies))))
+  (define (mul-poly-complex p1 c2)
+    ;; (display "mul-poly-complex ") (display (list p1 c2)) (newline)
+    (mul-poly p1
+              (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c2))))))
+  (define (mul-poly p1 p2)
+    ;; (display "mul-poly ")
+    ;; (display (list p1 p2))
+    ;; (newline)
+    (if (same-variable? (variable p1) (variable p2))
+        (make-poly (variable p1) (mul (term-list p1) (term-list p2)))
+        (mul-poly-diff p1 p2)))
+
+  (define (sub-poly p1 p2)
+    (univariant-application (lambda () (make-poly (variable p1) (sub (term-list p1) (term-list p2))))
+                            "Polys not in same var: SUB-POLY"
+                            p1
+                            p2))
+  ;; Need to unwrap and properly convert the termlist into polynomials
+  (define (div-poly p1 p2)
+    (univariant-application (lambda ()
+                              (let ([div-res (div (term-list p1) (term-list p2))]
+                                    [poly-var (variable p1)])
+                                (list (make-poly poly-var (car div-res))
+                                      (make-poly poly-var (cadr div-res)))))
+                            "Polys not in same var: DIV-POLY"
+                            p1
+                            p2))
+  (define (neg-poly p)
+    (make-poly (variable p) (neg (term-list p))))
+  ;; Might have to do a little modification to do a linear check on empty term-list
+  (define (=zero?-poly p)
+    (empty-termlist? (term-list p)))
+  (define (equ?-poly-complex p1 c2)
+    (equ?-poly p1 (make-poly-from-coeffs (variable p1) (list (tag-complex c2)))))
+  (define (equ?-poly p1 p2)
+    (if (same-variable? (variable p1) (variable p2))
+        (equ? (term-list p1) (term-list p2))
+        false))
+  ;; interface to rest of the system
+  (define (tag p)
+    (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'add '(polynomial complex) (lambda (p1 c2) (tag (add-poly-complex p1 c2))))
+  (put 'add '(complex polynomial) (lambda (c1 p2) (tag (add-poly-complex p2 c1))))
+  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put 'mul '(complex polynomial) (lambda (c1 p2) (tag (mul-poly-complex p2 c1))))
+  (put 'mul '(polynomial complex) (lambda (p1 c2) (tag (mul-poly-complex p1 c2))))
+  (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+  (put 'div
+       '(polynomial polynomial)
+       (lambda (p1 p2)
+         (let ([div-res (div-poly p1 p2)]) (list (tag (car div-res)) (tag (cadr div-res))))))
+  (put 'neg '(polynomial) (lambda (p) (tag (neg-poly p))))
+  (put 'equ? '(polynomial complex) equ?-poly-complex)
+  (put 'equ? '(complex polynomial) (lambda (c1 p2) (equ?-poly-complex p2 c1)))
+  (put 'equ? '(polynomial polynomial) equ?-poly)
+  (put '=zero? '(polynomial) =zero?-poly)
+  (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (make-polynomial var terms)
+  ((get 'make 'polynomial) var terms))
+(define (make-polynomial-from-coeffs var coeffs)
+  (make-polynomial var (make-termlist-from-coeffs coeffs)))
+#+end_src
+***** Termlist
+#+name: 2.94-term-list
+#+begin_src racket :exports code
+;; Need to include add, neg, and mul
+;; This is the higher level of abstraction for the data type, responsible for
+;; combinations
+(define (install-termlist-package)
+  (define (empty-termlist?-termlist term-list)
+    (apply-generic 'empty-termlist? term-list))
+  (define (make-from-coeffs x)
+    ((get 'make-from-coeffs 'dense-termlist) x))
+  (define (make-from-terms x)
+    ((get 'make-from-terms 'sparse-termlist) x))
+  (define (first-term-termlist term-list)
+    (if (empty-termlist?-termlist term-list)
+        (make-term 0 0)
+        (first-term term-list)))
+  (define (rest-terms-termlist term-list)
+    (rest-terms term-list))
+  (define (adjoin-term-termlist term term-list)
+    (let ([term-list-type (type-tag term-list)])
+      ((get 'adjoin-term (list 'term term-list-type)) term term-list)))
+  (define (add-terms L1 L2)
+    (cond
+      [(empty-termlist? L1) L2]
+      [(empty-termlist? L2) L1]
+      [else
+       (let ([t1 (first-term L1)]
+             [t2 (first-term L2)])
+         (let ([t1-order (order t1)]
+               [t2-order (order t2)])
+           (cond
+             [(> t1-order t2-order) (adjoin-term t1 (add-terms (rest-terms L1) L2))]
+             [(< t1-order t2-order) (adjoin-term t2 (add-terms L1 (rest-terms L2)))]
+             [else
+              (adjoin-term (make-term t1-order (add (coeff t1) (coeff t2)))
+                           (add-terms (rest-terms L1) (rest-terms L2)))])))]))
+  (define (sub-terms L1 L2)
+    (add-terms L1 (neg-terms L2)))
+  (define (mul-terms L1 L2)
+    (if (empty-termlist? L1)
+        (the-empty-termlist 'sparse-termlist)
+        (add-terms (mul-term-by-all-terms (first-term L1) L2) (mul-terms (rest-terms L1) L2))))
+  (define (mul-term-by-all-terms t1 L)
+    (if (empty-termlist? L)
+        (the-empty-termlist 'sparse-termlist)
+        (let ([t2 (first-term L)])
+          (adjoin-term (make-term (+ (order t1) (order t2)) (mul (coeff t1) (coeff t2)))
+                       (mul-term-by-all-terms t1 (rest-terms L))))))
+  ;; Where L1 is the divident, and L2 is the divisor. The first element is the
+  ;; quotient, and the second return element is the remainder.
+  (define (div-terms L1 L2)
+    (if (empty-termlist? L1)
+        (list (the-empty-termlist 'sparse-termlist) (the-empty-termlist 'sparse-termlist))
+        (let ([t1 (first-term L1)]
+              [t2 (first-term L2)])
+          (if (> (order t2) (order t1))
+              (list (the-empty-termlist 'sparse-termlist) L1)
+              (let ([new-c (div (coeff t1) (coeff t2))]
+                    [new-o (- (order t1) (order t2))])
+                (let ([rest-of-result
+                       (div-terms
+                        (sub-terms L1 (mul-terms L2 (make-from-terms (list (make-term new-o new-c)))))
+                        L2)])
+                  (list (adjoin-term (make-term new-o new-c) (car rest-of-result))
+                        (cadr rest-of-result))))))))
+  (define (remainder-terms a b)
+    (cadr (div-terms a b)))
+  (define (gcd-terms a b)
+    (if (empty-termlist?-termlist b)
+        a
+        (gcd-terms b (remainder-terms a b))))
+  (define (neg-terms term-list)
+    (neg term-list))
+  ;; Procedure that compares two terms
+  (define (equ?-term t1 t2)
+    (let ([order1 (order t1)]
+          [order2 (order t2)]
+          [coeff1 (coeff t1)]
+          [coeff2 (coeff t2)])
+      (and (equ? order1 order2) (equ? coeff1 coeff2))))
+  ;; Procedure that compares two termlists
+  (define (equ?-terms t1 t2)
+    (define (iter terms1 terms2)
+      (cond [(and (empty-termlist?-termlist terms1) (empty-termlist?-termlist terms2)) true]
+            [(or (empty-termlist?-termlist terms1) (empty-termlist?-termlist terms2)) false]
+            [else (let ([head1 (first-term-termlist terms1)]
+                        [head2 (first-term-termlist terms2)])
+                    (if (equ?-term head1 head2)
+                        (iter (rest-terms-termlist terms1) (rest-terms-termlist terms2))
+                        false))]))
+    (iter t1 t2))
+  (define (tag x)
+    (attach-tag 'termlist x))
+  (put 'make-from-coeffs 'termlist (lambda (x) (tag (make-from-coeffs x))))
+  (put 'make-from-terms 'termlist (lambda (x) (tag (make-from-terms x))))
+  (put 'empty-termlist? '(termlist) empty-termlist?-termlist)
+  (put 'first-term '(termlist) first-term-termlist)
+  (put 'rest-terms '(termlist) (lambda (term-list) (tag (rest-terms-termlist term-list))))
+  (put 'add '(termlist termlist) (lambda (t1 t2) (tag (add-terms t1 t2))))
+  (put 'sub '(termlist termlist) (lambda (t1 t2) (tag (sub-terms t1 t2))))
+  (put 'mul '(termlist termlist) (lambda (t1 t2) (tag (mul-terms t1 t2))))
+  (put 'equ? '(termlist termlist) equ?-terms)
+  (put 'div
+       '(termlist termlist)
+       (lambda (t1 t2)
+         (let ([div-res (div-terms t1 t2)]) (list (tag (car div-res)) (tag (cadr div-res))))))
+  (put 'greatest-common-divisor '(termlist termlist) (lambda (t1 t2) (tag (gcd-terms t1 t2))))
+  (put 'neg '(termlist) (lambda (x) (tag (neg-terms x))))
+  (put 'adjoin-term '(term termlist) (lambda (t tl) (tag (adjoin-term-termlist t tl))))
+  'done)
+
+;; Forcing the user to pass in a parameter for the type being constructed
+(define (the-empty-termlist x)
+  ((get 'the-empty-termlist x)))
+
+;; constructor that operates on a list of integers, where the position in the
+;; gives order information, and the elements of the list are the coefficients.
+(define (make-termlist-from-coeffs x)
+  ((get 'make-from-coeffs 'termlist) x))
+;; Constructor that operates on list of term objects.
+(define (make-termlist-from-terms x)
+  ((get 'make-from-terms 'termlist) x))
+(define (empty-termlist? term-list)
+  (apply-generic 'empty-termlist? term-list))
+(define (first-term term-list)
+  (apply-generic 'first-term term-list))
+(define (rest-terms term-list)
+  (apply-generic 'rest-terms term-list))
+(define (adjoin-term term term-list)
+  (apply-generic 'adjoin-term term term-list))
+#+end_src
+
+**** Import
+
+A centralized location for importing the source code. Left visible so readers could trace the code.
+#+name: 2.94-imports
+#+begin_src racket :exports code :noweb yes
+#lang sicp
+<<put-get-implementation>>
+<<assertion-suite>>
+<<coercion-put-get-implementation>>
+<<2.80-tag-system>>
+<<2.92-apply-generic>>
+<<2.88-complex-implementation>>
+<<2.93-rational-implementation>>
+<<2.88-generic-arithmetic>>
+<<2.88-integer-type-package>>
+<<2.88-real-type-package>>
+<<basic-coercions-package>>
+<<raise-tower-of-types>>
+<<2.84-type-comparison>>
+<<functional-interface>>
+<<2.88-scheme-implementation>>
+<<2.93-drop>>
+<<2.83-type-rank>>
+<<2.83-default-rank-type>>
+<<2.94-poly-package>>
+<<2.94-term-list>>
+<<2.90-term-list-concrete>>
+<<2.90-term>>
+<<2.92-hash-of-variable>>
+<<2.92-bitwise-operator>>
+<<2.92-assert-polynomial-equal>>
+<<2.93-assert-generic-arithmetic-equal>>
+<<2.94-ordinary-gcd>>
+
+(install-rational-package)
+(install-integer-package)
+(install-real-package)
+(install-complex-package)
+(install-rectangular-package)
+(install-polar-package)
+(install-raise)
+(install-project)
+(install-scheme-number-package)
+(install-polynomial-package)
+(install-termlist-package)
+(install-term-package)
+(install-dense-termlist-package)
+(install-sparse-termlist-package)
+(install-ordinary-gcd)
+
+(define (display-hline-=)
+  (display "=========================================")
+  (newline))
+(define (display-hline--)
+  (display "-----------------------------------------")
+  (newline))
+#+end_src
+
+**** Testing
+***** Regression
+
+#+caption: Regression testing.
+#+begin_src racket :exports both :noweb yes
+<<2.94-imports>>
+(newline)
+(display "testing polynomial construction")
+(newline)
+(display-hline-=)
+(display "Basic polynomials") (newline)
+(display-hline--)
+(define test-poly1 (make-polynomial 'x (make-termlist-from-coeffs (list 4 1 4 6))))
+(define test-poly2 (make-polynomial 'x (make-termlist-from-terms (list (make-term 3 2) (make-term 1 2) (make-term 0 8)))))
+test-poly1
+test-poly2
+(define test-poly3 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly1 test-poly2 0))))
+(define test-poly4 (make-polynomial 'y (make-termlist-from-coeffs (list test-poly2 0 test-poly1))))
+test-poly3
+test-poly4
+(contain? 'polynomial default-ranks)
+(newline)
+(display "testing polynomial combinations")
+(newline)
+(display-hline-=)
+(add test-poly1 test-poly2)
+(add test-poly2 test-poly1)
+(mul test-poly1 test-poly2)
+(mul test-poly2 test-poly1)
+(sub test-poly1 test-poly2)
+(sub test-poly2 test-poly1)
+(display "testing polynomial division")
+(newline)
+(display-hline--)
+(div test-poly1 test-poly2)
+(div test-poly2 test-poly1)
+
+(newline)
+(display "testing polynomial with polynomial coefficient combination")
+(newline)
+(display-hline-=)
+(add test-poly3 test-poly4)
+(mul test-poly3 test-poly4)
+(sub test-poly3 test-poly4)
+(add test-poly4 test-poly3)
+(mul test-poly4 test-poly3)
+(sub test-poly4 test-poly3)
+(add test-poly3 test-poly3)
+(mul test-poly3 test-poly3)
+(sub test-poly3 test-poly3)
+(add test-poly4 test-poly4)
+(mul test-poly4 test-poly4)
+(sub test-poly4 test-poly4)
+
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+
+testing polynomial construction
+=========================================
+Basic polynomials
+-----------------------------------------
+(polynomial x termlist dense-termlist 4 1 4 6)
+(polynomial x termlist sparse-termlist (3 2) (1 2) (0 8))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 4 1 4 6) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) 0 (polynomial x termlist dense-termlist 4 1 4 6))
+#f
+
+testing polynomial combinations
+=========================================
+(polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14))
+(polynomial x termlist dense-termlist 6 1 6 14)
+(polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))
+(polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2))
+(polynomial x termlist dense-termlist -2 -1 -2 2)
+testing polynomial division
+-----------------------------------------
+((polynomial x termlist sparse-termlist (0 2)) (polynomial x termlist sparse-termlist (2 1) (0 -10)))
+((polynomial x termlist sparse-termlist (0 1/2)) (polynomial x termlist sparse-termlist (2 -1/2) (0 5)))
+
+testing polynomial with polynomial coefficient combination
+=========================================
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 6) (2 1) (1 6) (0 14)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 2) (2 1) (1 2) (0 -2)) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist -4 -1 -4 -6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 6 1 6 14) (polynomial x termlist sparse-termlist (3 2) (1 2) (0 8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))) (3 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (1 (polynomial x termlist sparse-termlist (6 8) (5 2) (4 16) (3 46) (2 16) (1 44) (0 48))))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist -2 -1 -2 2) (polynomial x termlist sparse-termlist (3 -2) (1 -2) (0 -8)) (polynomial x termlist dense-termlist 4 1 4 6))
+(polynomial y termlist dense-termlist (polynomial x termlist dense-termlist 8 2 8 12) (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0)
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))) (3 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (2 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))))
+(polynomial y termlist dense-termlist)
+(polynomial y termlist dense-termlist (polynomial x termlist sparse-termlist (3 4) (1 4) (0 16)) 0 (polynomial x termlist dense-termlist 8 2 8 12))
+(polynomial y termlist sparse-termlist (4 (polynomial x termlist sparse-termlist (6 4) (4 8) (3 32) (2 4) (1 32) (0 64))) (2 (polynomial x termlist sparse-termlist (6 16) (5 4) (4 32) (3 92) (2 32) (1 88) (0 96))) (0 (polynomial x termlist sparse-termlist (6 16) (5 8) (4 33) (3 56) (2 28) (1 48) (0 36))))
+(polynomial y termlist dense-termlist)
+#+end_example
+
+***** Termlist Testing
+
+We could start with testing the given testcase, and expand the testing as needed.
+
+#+caption: Automated testing for gcd of termlists
+#+begin_src racket :exports both :noweb yes
+<<2.94-imports>>
+(define test-term1 (make-termlist-from-coeffs '(1 -1 -2 2 0)))
+(define test-term2 (make-termlist-from-coeffs '(1 0 -1 0)))
+
+(assert-equ? "gcd should be (1 -1 0)" (greatest-common-divisor test-term1 test-term2) (neg (make-termlist-from-coeffs '(1 -1 0))))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+pass: gcd should be (1 -1 0) value: (termlist sparse-termlist (2 -1) (1 1)) expected: (termlist dense-termlist -1 1 0)
 #+end_example
