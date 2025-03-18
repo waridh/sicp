@@ -10660,8 +10660,7 @@ Option 2 would be elegant, but I simply do not have the time to do this. Option 
   ;; readd the type tag for a complex value in. This is not robust code, and we
   ;; should really think about how to fix this.
   (define (add-poly-complex p1 c1)
-    (add-poly p1
-              (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c1))))))
+    (add-poly p1 (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c1))))))
   (define (add-poly p1 p2)
     ;; (display "add-poly ") (display (list p1 p2)) (newline)
     (if (same-variable? (variable p1) (variable p2))
@@ -10672,8 +10671,7 @@ Option 2 would be elegant, but I simply do not have the time to do this. Option 
     (let ([norm-polies (normalize-poly p1 p2)]) (mul-poly (car norm-polies) (cadr norm-polies))))
   (define (mul-poly-complex p1 c2)
     ;; (display "mul-poly-complex ") (display (list p1 c2)) (newline)
-    (mul-poly p1
-              (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c2))))))
+    (mul-poly p1 (make-poly (variable p1) (make-termlist-from-coeffs (list (tag-complex c2))))))
   (define (mul-poly p1 p2)
     ;; (display "mul-poly ")
     ;; (display (list p1 p2))
@@ -10697,6 +10695,12 @@ Option 2 would be elegant, but I simply do not have the time to do this. Option 
                             "Polys not in same var: DIV-POLY"
                             p1
                             p2))
+  (define (gcd-poly p1 p2)
+    (univariant-application
+     (lambda () (make-poly (variable p1) (greatest-common-divisor (term-list p1) (term-list p2))))
+     "polys not in same var: GCD-POLY"
+     p1
+     p2))
   (define (neg-poly p)
     (make-poly (variable p) (neg (term-list p))))
   ;; Might have to do a little modification to do a linear check on empty term-list
@@ -10718,6 +10722,7 @@ Option 2 would be elegant, but I simply do not have the time to do this. Option 
   (put 'mul '(complex polynomial) (lambda (c1 p2) (tag (mul-poly-complex p2 c1))))
   (put 'mul '(polynomial complex) (lambda (p1 c2) (tag (mul-poly-complex p1 c2))))
   (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+  (put 'greatest-common-divisor '(polynomial polynomial) (lambda (p1 p2) (tag (gcd-poly p1 p2))))
   (put 'div
        '(polynomial polynomial)
        (lambda (p1 p2)
@@ -11071,3 +11076,33 @@ done
 done
 pass: gcd should be (1 -1 0) value: (termlist sparse-termlist (2 -1) (1 1)) expected: (termlist dense-termlist -1 1 0)
 #+end_example
+***** Polynomial Testing
+#+caption: Automated testing for GCD of termlists
+#+begin_src racket :exports both :noweb yes
+<<2.94-imports>>
+(define test-poly1 (make-polynomial-from-coeffs 'x '(1 -1 -2 2 0)))
+(define test-poly2 (make-polynomial-from-coeffs 'x '(1 0 -1 0)))
+(assert-equ? "gcd should be the same as the termlist test" (greatest-common-divisor test-poly1 test-poly2) (neg (make-polynomial-from-coeffs 'x '(1 -1 0))))
+#+end_src
+
+#+RESULTS:
+#+begin_example
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+done
+pass: gcd should be the same as the termlist test value: (polynomial x termlist sparse-termlist (2 -1) (1 1)) expected: (polynomial x termlist dense-termlist -1 1 0)
+#+end_example
+
+***** Ordinary number GCD
