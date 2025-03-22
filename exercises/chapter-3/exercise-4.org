@@ -1,6 +1,6 @@
 #+title: Exercise 4
 * Prompt
-Modify the ~make-account~ procedure from the previous exercise so that if there are 7 consecutive password misinput, you will call the cops.
+Modify the ~make-account~ procedure from the previous exercise so that if there are 7 consecutive password miss-input, you will call the cops.
 * Solution
 :PROPERTIES:
 :header-args:racket: :tangle ./src/exercise-4.rkt

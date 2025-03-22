@@ -1,0 +1,133 @@
+#+title: Exercise 5
+* Prompt
+Monte Carlo integration is a method of estimating definite integrals by means of Monte Carlo simulation. consider computing the area of a region of space described by a predicate $P \left( x, y \right)$ that is true for points $\left( x, y \right)$ in the region and false for points not in the region. For example, the region contained within a circle of radius 3 centered at $\left( 5, 7 \right)$ is described by the predicate that tests whether $\left( x - 5 \right)^2 + \left( y - 7 \right)^2 \leq 3^2$. to estimate the area of the region described by such a predicate, begin by choosing a rectangle that contains the region. For example, a rectangle with diagonally opposite corners at $\left( 2, 4 \right)$ and $\left( 8, 10 \right)$ contains the circle above. The desired integral is the area of that portion of the rectangle that lies in the region. We can estimate the integral by picking, at random, points $\left( x, y \right)$ that lie in the rectangle, and testing $P \left( x, y \right)$ for each point to determine whether the point lies in the region. If we try this with many points, then the fraction of points that fall in the region should give an estimate of the proportion of the rectangle that lies in the region. Hence, multiplying this fraction by the area of the entire rectangle should produce an estimate of the integral.
+
+Implement Monte Carlo integration as a procedure ~estimate-integral~ that takes as arguments a predicate ~P~, upper and lower bounds ~x1~, ~x2~, ~y1~, and ~y2~ for the rectangle, and the number of trials to perform in order to produce the estimate. Your procedure should use the same ~monte-carlo~ procedure that was used above to estimate $\pi$. Use your ~estimate-integral~ to produce an estimate of $\pi$ by measuring the area of a unit circle.
+
+You will find it useful to have a procedure that returns a number chosen at random from a given range. The following ~random-in-range~ procedure used in section 1.2.6 which returns a non-negative number less than its input.
+
+#+begin_src racket :exports code
+(define (random-in-range low high)
+  (let ((range (- high low)))
+    (+ low (random range))))
+#+end_src
+
+* Solution
+
+** Implementation
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-5.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+*** Monte Carlo procedure
+This is the given ~monte-carlo~ procedure provided by SICP. To just reiterate how we use the Monte Carlo simulation, we are running an experiment on a series of random input in a sample space, and then taking the ratio of successful experiment to all experiments to converge on some result.
+
+#+begin_src racket
+(define (monte-carlo trials experiment)
+  (define (iter trials-remaining trials-passed)
+    (cond
+      [(= trials-remaining 0) (/ trials-passed trials)]
+      [(experiment) (iter (- trials-remaining 1) (+ trials-passed 1))]
+      [else (iter (- trials-remaining 1) trials-passed)]))
+  (iter trials 0))
+#+end_src
+
+*** Random in range
+This is the random in range procedure, also provided to us by SICP
+
+#+begin_src racket
+(define (random-in-range low high)
+  (let ((range (- high low)))
+    (+ low (random range))))
+#+end_src
+*** Monte Carlo Integration
+
+#+begin_src racket
+(define (estimate-integral trials P x1 x2 y1 y2)
+  ;; This is the experiment for finding the if a random value would fall in the
+  ;; bound that was defined by the predicate. If we were to talk a little about
+  ;; what it is that we are doing here, we say that we are making a closure that
+  ;; tests out
+  (define (expri)
+    (let ([x (random-in-range x1 x2)]
+          [y (random-in-range y1 y2)])
+      (P x y)))
+  ;; We could definitely lazily evaluate the total-area
+  (define (total-area)
+    (abs (* (- x2 x1) (- y2 y1))))
+  (* (monte-carlo trials expri) (total-area)))
+#+end_src
+*** Estimate Pi
+
+We should really build the predicate for the area of a circle, before trying to retrieve pi. We want to work with what is simple, therefore, we are going to try and work with a unit circle.
+
+First, let's define the predicate for a unit circle centered around origin:
+
+$x^2 + y^2 \leq r^2 \rightarrow x^2 + y^2 \leq 1$
+
+Now to be cheap, we could just look at the circle and a rectangle in the first quadrant, which would be where $x$ and $y$ satisfies the following:
+
+$x \in \left[ 0, 1 \right],~ y \in \left[ 0, 1 \right]$
+
+Which allows us to say that $1 = r = (x_u - x_l) = (y_u - y_l)$
+
+We now have to look at what the area of both the square and the circle segment would be in this region.
+
+$A_s= (y_u - y_l) \times \left( x_u - x_l \right) = r \times r = r^2$
+
+
+$A_c = \frac{\pi \times r^2}{4}$
+
+The ratio of these two areas would be the following:
+
+$R = \frac{A_c}{A_s} = \frac{ \frac{\pi \times r^2}{4}}{r^2} = \frac{\pi \times r^2}{4} \times \frac{1}{r^2} = \frac{\pi}{4}$
+
+Now isolating for $\pi$, we have the following:
+
+$\pi = 4 \times R$
+
+Now with the Monte Carlo method, we can solve for $R$ with the ratio of random sampling hitting the circle to the total number of random samplings.
+
+**** Circle predicate
+
+We are going to go with making a higher order procedure to define our predicate so that we could manage the radius being used from a different scope.
+
+#+begin_src racket
+(define (make-circle-predicate radius)
+  (define (square x)
+    (* x x))
+  (lambda (x y)
+    (<= (+ (square x) (square y)) radius)))
+#+end_src
+**** Estimating Pi
+Now we just have to put everything together.
+
+#+begin_src racket
+(define (estimate-pi trials)
+  (let ([radius 1.0])
+    (* 4.0 (estimate-integral trials (make-circle-predicate radius) 0.0 radius 0.0 radius))))
+#+end_src
+
+
+
+** Testing
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-5.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket
+(estimate-pi 10000000)
+#+end_src
+
+
+** Result
+#+begin_src sh :exports both
+racket ./src/exercise-5.rkt
+#+end_src
+
+#+RESULTS:
+: 3.1416432
