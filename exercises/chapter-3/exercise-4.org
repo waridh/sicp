@@ -1,4 +1,4 @@
-#+title: Exercise 3
+#+title: Exercise 4
 * Prompt
 Modify the ~make-account~ procedure from the previous exercise so that if there are 7 consecutive password misinput, you will call the cops.
 * Solution
