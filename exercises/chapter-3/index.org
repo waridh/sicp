@@ -1,2 +1,7 @@
 #+title: Index
 * Links
+** Exercises
+- [[org:../proj/sicp/exercises/chapter-3/exercise-1.org][Exercise 1]]
+- [[org:../proj/sicp/exercises/chapter-3/exercise-2.org][Exercise 2]]
+- [[file:exercise-3.org][Exercise 3]]
+- [[file:exercise-4.org][Exercise 4]]

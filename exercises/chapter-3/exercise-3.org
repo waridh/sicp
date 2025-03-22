@@ -1,0 +1,63 @@
+#+title: Exercise 3
+* Prompt
+Modify the ~make-account~ procedure so that it creates password-protected accounts. That is, ~make-account~ should take a symbol as an additional argument, as in
+
+#+begin_src racket :exports code
+(define acc (make-account 100 'secret-password))
+#+end_src
+
+The resulting account object should process a request only if it is accompanies by the password with which the account was created, and should other wise return a complaint.
+
+#+begin_src racket :exports code
+((acc 'secret-password 'withdraw) 40)
+60
+((acc 'some-other-passwordf 'deposit) 50)
+"Incorrect password"
+#+end_src
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-3.rkt
+:END:
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+#lang sicp
+
+(define (make-account balance password)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount)) balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (define (incorrect-password . x)
+    "Incorrect password")
+  (lambda (p m)
+    (if (not (and (symbol? p) (eq? p password)))
+        incorrect-password
+        (cond [(eq? m 'withdraw)  withdraw]
+          [(eq? m 'deposit) deposit ]
+          [else (error "Unknown request: MAKE-ACCOUNT" m)])))
+  )
+
+#+end_src
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+(define acc (make-account 100 'secret-password))
+((acc 'secret-password 'withdraw) 40)
+((acc 'some-other-passwordf 'deposit) 50)
+#+end_src
+
+
+#+begin_src sh :exports both
+racket ./src/exercise-2.rkt
+#+end_src
+
+#+RESULTS:
+| 10 |
+|  1 |
+|  0 |
+|  0 |
+
+Yep, this is what we expected.
