@@ -1,0 +1,142 @@
+#+title: Exercise 7
+* Prompt
+Consider the bank account objects created by ~make-account~, with the password modification from [[file:exercise-3.org][exercise 3.3]]. Suppose that our banking system requires the ability to make joint accounts. Define a procedure ~make-joint~ that accomplishes this. ~make-joint~ should take in three arguments. The first is a password-protected account, the second argument must match the password with which the account was defined in order for the ~make-joint~ procedure to proceed. The third argument is the new password. ~make-joint~ is to create an additional access to the original account using the new password. For example, if ~peter-acc~ is a bank account with password ~open-sesame~, then
+
+#+begin_src racket :exports code
+(define paul-acc (make-joint peter-acc 'open-sesame 'rosebud))
+#+end_src
+
+will allow one to make transactions on ~peter-acc~ using the name ~paul-acc~ and the password ~rosebud~. You may wish to modify your solution to [[file:exercise-3.org][exercise 3.3]] to accommodate this new feature.
+
+Refer to the following code for the solution for [[file:exercise-3.org][exercise 3.3]].
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+(define (make-account balance password)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin
+          (set! balance (- balance amount))
+          balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (define (incorrect-password . x)
+    "Incorrect password")
+  (lambda (p m)
+    (if (not (and (symbol? p) (eq? p password)))
+        incorrect-password
+        (cond
+          [(eq? m 'withdraw) withdraw]
+          [(eq? m 'deposit) deposit]
+          [else (error "Unknown request: MAKE-ACCOUNT" m)]))))
+#+end_src
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+(define acc (make-account 100 'secret-password))
+((acc 'secret-password 'withdraw) 40)
+((acc 'some-other-passwordf 'deposit) 50)
+#+end_src
+
+
+* Solution
+
+Note with this question. We cannot test this exercise, so I will write a toy solution. The SICP library for racket does not have a rand-update procedure. We could make a makeshift version of this procedure to see if we built the interface correctly.
+
+** Implementation
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-7.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+*** Account object change
+We have a few things that we would like to do.
+1. Account objects must have internal management of passwords
+2. Account objects must expose a way for more passwords to be added
+3. For the sake of debuggability, there should be a getter for the balance held by an account
+
+#+begin_src racket
+(define (make-account balance password)
+  (let ([passwords (list password)])
+    (define (withdraw amount)
+      (if (>= balance amount)
+          (begin
+            (set! balance (- balance amount))
+            balance)
+          "Insufficient funds"))
+    (define (deposit amount)
+      (set! balance (+ balance amount))
+      balance)
+    ;; This is a predicate that will return true if the input password is
+    ;; registered with our system.
+    (define (password-registered? other-password)
+      (define (iter tail)
+        (cond
+          [(null? tail) false]
+          [(eq? other-password (car tail)) true]
+          [else (iter (cdr tail))]))
+      (if (symbol? other-password)
+          (iter passwords)
+          false))
+    (define (add-password new-password)
+      (if (symbol? new-password)
+          (set! passwords (cons new-password passwords))
+          (error "new password must be a symbol: ADD-PASSWORD" new-password)))
+    (define (incorrect-password . x)
+      "Incorrect password")
+    (lambda (p m)
+      (if (not (password-registered? p))
+          incorrect-password
+          (cond
+            [(eq? m 'withdraw) withdraw]
+            [(eq? m 'deposit) deposit]
+            [(eq? m 'balance) balance]
+            [(eq? m 'add-password) add-password]
+            [else (error "Unknown request: MAKE-ACCOUNT" m)])))))
+#+end_src
+
+*** Joint account creation
+
+Make joint will act like a service layer function that calls the appropriate method required to add the new password to the account, and then return the account object back.
+#+begin_src racket
+(define (make-joint account password new-password)
+  ((account password 'add-password) new-password)
+  account)
+#+end_src
+
+** Testing
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-7.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+(define peter-acc (make-account 100 'open-sesame))
+((peter-acc 'open-sesame 'withdraw) 40)
+((peter-acc 'some-other-password 'deposit) 50)
+(define paul-acc (make-joint peter-acc 'open-sesame 'rosebud))
+((paul-acc 'rosebud 'deposit) 50)
+(paul-acc 'rosebud 'balance)
+(peter-acc 'open-sesame 'balance)
+#+end_src
+
+
+** Result
+#+begin_src sh :exports both
+racket ./src/exercise-7.rkt
+#+end_src
+
+#+RESULTS:
+|         60 |           |
+| "Incorrect | password" |
+|        110 |           |
+|        110 |           |
+|        110 |           |
+
+This is behaving as we specified, but there are caveats that we are going to discuss in the next section.
+** Discussion
+We extended the account system so that we can add additional passwords to the account, creating a joint account. There is a privacy concern in our current implementation, in that we are able to log in to the account using both passwords, as in, Paul can log into his own account using his own password, but he could also log into his account using Peter's password, which is a breach of security.
+
+Realistically, we would store the database and the actual user account is a separate subsystem, and just link them to different balance accounts. This does require some rearchitecturing of the system.
