@@ -1,0 +1,53 @@
+#+title: Exercise 8
+* Prompt
+When we defined the evaluation model in section 1.1.3, we said that the first step in evaluating an expression is to evaluate its subexpressions. But we never specified the order in which the subexpressions should be evaluated (e.g., left to right or right to left). When we introduce assignment, the order in which the assignments to a procedure are evaluated can make a difference to the result. Define a simple procedure ~f~ such that evaluating.
+
+#+begin_src racket :exports code
+(+ (f 0) (f 1))
+#+end_src
+
+* Solution
+
+Note with this question. We cannot test this exercise, so I will write a toy solution. The SICP library for racket does not have a rand-update procedure. We could make a makeshift version of this procedure to see if we built the interface correctly.
+
+** Implementation
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-8.rkt  :mkdirp yes :comments both
+:END:
+
+We are going to make a latch for this. The idea is that we are going to input a value into the latch function, and subsequent calls into this function will result in the first value being returned. Then we would know which would be evaluated first.
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+#+begin_src racket
+;; Let 'sentinel be the sentinel value.
+(define (make-latch)
+  (let ([internal 'sentinel])
+    (lambda (x)
+      (if (and (symbol? internal) (eq? internal 'sentinel))
+          (begin (set! internal x) internal)
+          internal))))
+#+end_src
+
+** Testing
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-8.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket :exports code :mkdirp yes :comments both
+(define f (make-latch))
+(+ (f 0) (f 1))
+#+end_src
+
+
+** Result
+#+begin_src sh :exports both
+racket ./src/exercise-8.rkt
+#+end_src
+
+#+RESULTS:
+: 0
+
+Seeing 0 here means that the order of evaluation for the procedure arguments is left to right.
