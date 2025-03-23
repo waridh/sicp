@@ -1,0 +1,70 @@
+#+title: Exercise 6
+* Prompt
+It is useful to be able to reset a random-number generator to produce a sequence starting from a given value. Design a new ~rand~ procedure that is called with an argument that is either the symbol ~generate~ or the symbol ~reset~ and behaves as follows: ~(rand 'generate)~ produces a new random number; ~((rand 'reset) <new-value>)~ resets the internal state variable to the designated ~<new-value>~. Thus, by resetting the state, one can generate repeatable sequences. These are very handy to have when testing and debugging programs that use random numbers.
+
+For reference, here is the original ~rand~ procedure.
+
+#+begin_src racket
+(define rand (let ([x random-init])
+               (lambda ()
+                 (set! x (rand-update x))
+                 x)))
+#+end_src
+
+* Solution
+
+Note with this question. We cannot test this exercise, so I will write a toy solution. The SICP library for racket does not have a rand-update procedure. We could make a makeshift version of this procedure to see if we built the interface correctly.
+
+** Implementation
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-6.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+#+begin_src racket
+(define random-init 0)
+
+(define rand
+  (let ([x random-init])
+    (lambda (cmd)
+      (cond [(and (symbol? cmd) (eq? cmd 'generate)) (begin (set! x (rand-update x)) x)]
+            [(and (symbol? cmd) (eq? cmd 'reset)) (lambda (y) (set! x y))]
+            [else (error "invalid command: RAND" cmd)]))))
+#+end_src
+
+Since we are lacking a proper ~rand-update~ procedure that satisfies the stated property, we will make a makeshift debugging version that simply makes a random number.
+
+#+begin_src racket
+(define (rand-update x)
+  (display "rand-update sees: ") (display x) (newline)
+  (random 100.0))
+#+end_src
+
+** Testing
+:PROPERTIES:
+:header-args:racket: :exports code :tangle ./src/exercise-6.rkt  :mkdirp yes :comments both
+:END:
+
+#+begin_src racket
+(rand 'generate)
+(rand 'generate)
+((rand 'reset) 8)
+(rand 'generate)
+#+end_src
+
+
+** Result
+#+begin_src sh :exports both
+racket ./src/exercise-6.rkt
+#+end_src
+
+#+RESULTS:
+|       rand-update | sees: |                 0 |
+| 11.49488470771723 |       |                   |
+|       rand-update | sees: | 11.49488470771723 |
+| 67.24897925457631 |       |                   |
+|       rand-update | sees: |                 8 |
+| 68.96004612643496 |       |                   |

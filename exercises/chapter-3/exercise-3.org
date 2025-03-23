@@ -51,13 +51,11 @@ The resulting account object should process a request only if it is accompanies 
 
 
 #+begin_src sh :exports both
-racket ./src/exercise-2.rkt
+racket ./src/exercise-3.rkt
 #+end_src
 
 #+RESULTS:
-| 10 |
-|  1 |
-|  0 |
-|  0 |
+|         60 |           |
+| "Incorrect | password" |
 
 Yep, this is what we expected.
