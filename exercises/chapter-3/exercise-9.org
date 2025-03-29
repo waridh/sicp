@@ -1,0 +1,839 @@
+#+title: Exercise 9
+* Prompt
+In section 1.2.1, we used the substitution model to analyze two procedures for computing factorials, a recursive version:
+
+#+begin_src racket :exports code
+(define (factorial n)
+  (if (= n 1) 1 (* n (factorial (- n 1)))))
+#+end_src
+
+and an iterative version
+
+#+begin_src racket :exports code
+(define (factorial n) (fact-iter 1 1 n))
+(define (fact-iter product counter max-count)
+  (if (> counter max-count)
+      product
+      (fact-iter (* counter product)
+                 (+ counter 1)
+                 max-counter)))
+#+end_src
+
+Show the environment structures created by evaluating src_racket{(factorial 6)} using each version of the factorial procedure.
+
+* Solution
+It looks like the exercise would like us to make a diagram. We can achieve this by using plantuml.
+
+** Recursive implementation
+
+We are going to start with the evaluation of the environment, which can be seen in <<3.9-rec-1>>
+
+#+name: 3.9-rec-1
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-1.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-1
+[[file:./images/3.9-recursive-1.png]]
+
+
+Now evaluating src_racket{(factorial 6)}, we will make a new environment that builds the body of the ~factorial~ procedure as an environment frame.
+
+#+name: 3.9-rec-2
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-2.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-2
+[[file:./images/3.9-recursive-2.png]]
+
+#+name: 3.9-rec-3
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-3.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (* n (factorial (- n 1)))
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-3
+[[file:./images/3.9-recursive-3.png]]
+
+#+name: 3.9-rec-4
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-4.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (* n (factorial (- n 1)))
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+        body:  (* n (factorial (- n 1)))
+]
+card e3_env [
+        E3
+        ===
+        n: 4
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+glob_env <-- e3_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-4
+[[file:./images/3.9-recursive-4.png]]
+
+#+name: 3.9-rec-5
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-5.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (* n (factorial (- n 1)))
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+        body: (* n (factorial (- n 1)))
+]
+card e3_env [
+        E3
+        ===
+        n: 4
+        body: (* n (factorial (- n 1)))
+]
+card e4_env [
+        E4
+        ===
+        n: 3
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+glob_env <-- e3_env
+glob_env <- e4_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-5
+[[file:./images/3.9-recursive-5.png]]
+
+#+name: 3.9-rec-6
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-6.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (* n (factorial (- n 1)))
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+        body: (* n (factorial (- n 1)))
+]
+card e3_env [
+        E3
+        ===
+        n: 4
+        body: (* n (factorial (- n 1)))
+]
+card e4_env [
+        E4
+        ===
+        n: 3
+        body: (* n (factorial (- n 1)))
+]
+card e5_env [
+        E5
+        ===
+        n: 2
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+glob_env <-- e3_env
+glob_env <- e4_env
+e5_env --> glob_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-6
+[[file:./images/3.9-recursive-6.png]]
+
+#+name: 3.9-rec-7
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-7.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+        body: (* n (factorial (- n 1)))
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+        body: (* n (factorial (- n 1)))
+]
+card e3_env [
+        E3
+        ===
+        n: 4
+        body: (* n (factorial (- n 1)))
+]
+card e4_env [
+        E4
+        ===
+        n: 3
+        body: (* n (factorial (- n 1)))
+]
+card e5_env [
+        E5
+        ===
+        n: 2
+        body: (* n (factorial (- n 1)))
+]
+card e6_env [
+        E6
+        ===
+        n: 1
+        body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+glob_env <-- e3_env
+glob_env <- e4_env
+e5_env --> glob_env
+e6_env --> glob_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-7
+[[file:./images/3.9-recursive-7.png]]
+
+
+Now that we have reached the base case of the base case, we are able to evaluate the combinations.
+
+#+name: 3.9-rec-8
+#+begin_src plantuml :exports file :file ./images/3.9-recursive-7.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+}
+card e1_env [
+        E1
+        ===
+        This is the (factorial 6) call
+        ---
+        n: 6
+body: 720
+]
+card e2_env [
+        E2
+        ===
+        n: 5
+body: 120
+]
+card e3_env [
+        E3
+        ===
+        n: 4
+body: 24
+]
+card e4_env [
+        E4
+        ===
+        n: 3
+body: 6
+]
+card e5_env [
+        E5
+        ===
+        n: 2
+body: 2
+]
+card e6_env [
+        E6
+        ===
+        n: 1
+body: 1
+]
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+circle fact_node
+fact_proc --> fact_node
+fact_node -> glob_env
+fact_node --> factorial
+glob_env <-- e1_env
+glob_env <-- e2_env
+glob_env <-- e3_env
+glob_env <- e4_env
+e5_env --> glob_env
+e6_env --> glob_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-rec-8
+[[file:./images/3.9-recursive-7.png]]
+
+And from here, we see that we the application of the combination results in the value of ~720~.
+
+** Iterative Implementation
+Here, we are going to be starting from the evaluation of the environment again.
+
+#+name: 3.9-iter-1
+#+begin_src plantuml :exports file :file ./images/3.9-iterative-1.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+        rectangle "fact-iter" as fact_iter_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card fact_iter [
+parameters: product counter max-count
+---
+body: (if (> counter max-count)
+    product
+    (fact-iter (* counter product)
+               (+ counter 1)
+               max-count))
+]
+circle fact_node
+circle fact_iter_node
+fact_proc --> fact_node
+fact_iter_proc --> fact_iter_node
+fact_node -> glob_env
+fact_node --> factorial
+fact_iter_node -> glob_env
+fact_iter_node --> fact_iter
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-iter-1
+[[file:./images/3.9-iterative-1.png]]
+
+So now, we are going to evaluate src_racket{(factorial 6)} here.
+
+#+name: 3.9-iter-2
+#+begin_src plantuml :exports file :file ./images/3.9-iterative-2.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+        rectangle "fact-iter" as fact_iter_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card fact_iter [
+parameters: product counter max-count
+---
+body: (if (> counter max-count)
+    product
+    (fact-iter (* counter product)
+               (+ counter 1)
+               max-count))
+]
+
+card fact_env [
+E1
+---
+(factorial 6)
+===
+n: 6
+body: (fact-iter 1 1 n)
+]
+circle fact_node
+circle fact_iter_node
+fact_proc --> fact_node
+fact_iter_proc --> fact_iter_node
+fact_node -> glob_env
+fact_node --> factorial
+fact_iter_node -> glob_env
+fact_iter_node --> fact_iter
+
+glob_env <-- fact_env
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-iter-2
+[[file:./images/3.9-iterative-2.png]]
+
+
+Well, now, the entry procedure will call the iterator procedure. Current environment frame is not able to see the ~fact-iter~ procedure, so we move to the enclosing environment, which is the global environment, where we can see the ~fact-iter~ procedure. We make an environment frame from this, and then bind the argument to the formal parameters of this procedure environment frame.
+
+#+name: 3.9-iter-3
+#+begin_src plantuml :exports file :file ./images/3.9-iterative-3.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+        rectangle "fact-iter" as fact_iter_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card fact_iter [
+parameters: product counter max-count
+---
+body: (if (> counter max-count)
+    product
+    (fact-iter (* counter product)
+               (+ counter 1)
+               max-count))
+]
+
+card fact_env [
+E1
+---
+(factorial 6)
+===
+n: 6
+body: (fact-iter 1 1 n)
+]
+card fact_iter_env1 [
+E2
+---
+(fact-iter 1 1 6)
+===
+product: 1
+counter: 1
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+circle fact_node
+circle fact_iter_node
+fact_proc --> fact_node
+fact_iter_proc --> fact_iter_node
+fact_node -> glob_env
+fact_node --> factorial
+fact_iter_node -> glob_env
+fact_iter_node --> fact_iter
+
+glob_env <-- fact_env
+glob_env <-- fact_iter_env1
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-iter-3
+[[file:./images/3.9-iterative-3.png]]
+
+Now that we are iterating, we will keep evaluating until the counter has exceeded ~6~. At the end of all of that, we are going to see the following.
+
+#+name: 3.9-iter-4
+#+begin_src plantuml :exports file :file ./images/3.9-iterative-4.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+        rectangle "fact-iter" as fact_iter_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card fact_iter [
+parameters: product counter max-count
+---
+body: (if (> counter max-count)
+    product
+    (fact-iter (* counter product)
+               (+ counter 1)
+               max-count))
+]
+
+card fact_env [
+E1
+---
+(factorial 6)
+===
+n: 6
+body: (fact-iter 1 1 n)
+]
+card fact_iter_env1 [
+E2
+---
+(fact-iter 1 1 6)
+===
+product: 1
+counter: 1
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env2 [
+E3
+---
+(fact-iter 1 2 6)
+===
+product: 1
+counter: 2
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env3 [
+E4
+---
+(fact-iter 2 3 6)
+===
+product: 2
+counter: 3
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env4 [
+E5
+---
+(fact-iter 6 4 6)
+===
+product: 6
+counter: 4
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env5 [
+E6
+---
+(fact-iter 24 5 6)
+===
+product: 24
+counter: 5
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env6 [
+E7
+---
+(fact-iter 120 6 6)
+===
+product: 120
+counter: 6
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+card fact_iter_env7 [
+E8
+---
+(fact-iter 720 7 6)
+===
+product: 720
+counter: 7
+max-count: 6
+body: (if (> counter max-count)
+       product
+       (fact-iter (* counter product)
+                  (+ counter 1)
+                  max-count))
+]
+circle fact_node
+circle fact_iter_node
+fact_proc --> fact_node
+fact_iter_proc --> fact_iter_node
+fact_node -> glob_env
+fact_node --> factorial
+fact_iter_node -> glob_env
+fact_iter_node --> fact_iter
+
+glob_env <-- fact_env
+glob_env <-- fact_iter_env1
+glob_env <-- fact_iter_env2
+glob_env <-- fact_iter_env3
+glob_env <-- fact_iter_env4
+glob_env <-- fact_iter_env5
+glob_env <-- fact_iter_env6
+glob_env <-- fact_iter_env7
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-iter-4
+[[file:./images/3.9-iterative-4.png]]
+
+Finally, as we have finally reached the base case, we can retrieve the final value of ~720~.
+
+#+name: 3.9-iter-5
+#+begin_src plantuml :exports file :file ./images/3.9-iterative-5.png
+@startuml
+rectangle "Global Environment" as glob_env {
+        rectangle "factorial" as fact_proc
+        rectangle "fact-iter" as fact_iter_proc
+}
+card factorial [
+parameters n
+---
+body: (if (= n 1) 1 (* n (factorial (- n 1))))
+]
+card fact_iter [
+parameters: product counter max-count
+---
+body: (if (> counter max-count)
+product
+(fact-iter (* counter product)
+(+ counter 1)
+max-count))
+]
+
+card fact_env [
+E1
+---
+(factorial 6)
+===
+n: 6
+body: 720
+]
+card fact_iter_env1 [
+E2
+---
+(fact-iter 1 1 6)
+===
+product: 1
+counter: 1
+max-count: 6
+body: 720
+]
+card fact_iter_env2 [
+E3
+---
+(fact-iter 1 2 6)
+===
+product: 1
+counter: 2
+max-count: 6
+body: 720
+]
+card fact_iter_env3 [
+E4
+---
+(fact-iter 2 3 6)
+===
+product: 2
+counter: 3
+max-count: 6
+body: 720
+]
+card fact_iter_env4 [
+E5
+---
+(fact-iter 6 4 6)
+===
+product: 6
+counter: 4
+max-count: 6
+body: 720
+]
+card fact_iter_env5 [
+E6
+---
+(fact-iter 24 5 6)
+===
+product: 24
+counter: 5
+max-count: 6
+body: 720
+]
+card fact_iter_env6 [
+E7
+---
+(fact-iter 120 6 6)
+===
+product: 120
+counter: 6
+max-count: 6
+body: 720
+]
+card fact_iter_env7 [
+E8
+---
+(fact-iter 720 7 6)
+===
+product: 720
+counter: 7
+max-count: 6
+body: 720
+]
+circle fact_node
+circle fact_iter_node
+fact_proc --> fact_node
+fact_iter_proc --> fact_iter_node
+fact_node -> glob_env
+fact_node --> factorial
+fact_iter_node -> glob_env
+fact_iter_node --> fact_iter
+
+glob_env <-- fact_env
+glob_env <-- fact_iter_env1
+glob_env <-- fact_iter_env2
+glob_env <-- fact_iter_env3
+glob_env <-- fact_iter_env4
+glob_env <-- fact_iter_env5
+glob_env <-- fact_iter_env6
+glob_env <-- fact_iter_env7
+@enduml
+#+end_src
+
+#+RESULTS: 3.9-iter-5
+[[file:./images/3.9-iterative-5.png]]
+
+
+Now we have to solution, and the exercise concludes.
