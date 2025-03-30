@@ -31,13 +31,10 @@ Use the environment model to analyze this alternate version of ~make-withdraw~, 
 #+end_src
 
 * Solution
-:PROPERTIES:
-:header-args:plantuml: :exports results :results file
-:END:
 
 Looks like the main difference here is that using ~let~ will cause additional environment frames to be created.
 
-#+begin_src plantuml :file ./images/3.10-env1.png
+#+begin_src plantuml :exports results :results file :file ./images/3.10-env1.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
