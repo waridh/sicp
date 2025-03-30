@@ -32,7 +32,7 @@ Use the environment model to analyze this alternate version of ~make-withdraw~, 
 
 * Solution
 :PROPERTIES:
-:header-args:plantuml: :exports results
+:header-args:plantuml: :exports results :results file
 :END:
 
 Looks like the main difference here is that using ~let~ will cause additional environment frames to be created.
