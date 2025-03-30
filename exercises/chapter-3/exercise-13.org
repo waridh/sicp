@@ -1,0 +1,51 @@
+#+title: Exercise 13
+* Prompt
+Consider the following ~make-cycle~ procedure, which uses the ~last-pair~ procedure defined in the previous exercise.
+
+#+begin_src racket :exports code
+(define (make-cycle x)
+  (set-cdr! (last-pair x) x)
+  x)
+#+end_src
+
+Draw a box-and-pointer diagram that shows the structure ~z~ created by
+
+#+begin_src racket :exports code
+(define z (make-cycle (list 'a 'b 'c)))
+#+end_src
+
+What happens if we try to compute ~(last-pair z)~?
+* Solution
+Oh, this is interesting. We're using a little bit of mutation to make an infinite datastructure.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.13-box-and-pointer.png
+@startuml
+label x
+label z
+
+label a
+label b
+label c
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+
+pair_1 -right-> pair_2: cdr
+pair_2 -down-> pair_3: cdr
+pair_3 -up-> pair_1: cdr
+
+pair_1 -down-> a: car
+pair_2 -right-> b: car
+pair_3 -down-> c: car
+
+x -right-> pair_1
+z -down-> pair_1
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.13-box-and-pointer.png]]
+
+
+Yes, so we have sacrificed our sentinel value for a cyclic datastructure. The next question is what happens when we try to evaluate ~(last-pair z)~, and the answer is that the program will evaluate forever, and never terminate, since there is no ~nil~ in the list anymore (if we could even all it a list anymore).
