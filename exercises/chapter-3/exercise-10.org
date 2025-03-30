@@ -34,7 +34,7 @@ Use the environment model to analyze this alternate version of ~make-withdraw~, 
 
 Looks like the main difference here is that using ~let~ will cause additional environment frames to be created.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env1.png
+#+begin_src plantuml :file ./images/3.10-env1.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
@@ -67,7 +67,7 @@ Okay, now let's make an object with a balance of ~100~.
 
 First, we need to evaluate the ~let~ statement, which would cause the environment to look like this.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env2.png
+#+begin_src plantuml :file ./images/3.10-env2.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
@@ -112,7 +112,7 @@ e1_env -> e1_body
 
 Now this is interesting, the body of ~make-withdraw~ has a lambda, but it is not bound to a variable, an instead, we immediately evaluate this value. We get another environment frame for the body of the lambda, with the formal parameter of ~balance~ bound to the argument of ~initial-amount~. Then the inner lambda expression is evaluated, which completes the ~make-withdraw~ procedure, and binding that final procedure to ~W1~.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env3.png
+#+begin_src plantuml :file ./images/3.10-env3.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
@@ -171,7 +171,7 @@ e1_env <-- e2_env
 
 Now when we apply src_racket{(W1 50)}, we get mostly the same logic as with the other version of ~make-withdraw~ from the SICP text.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env4.png
+#+begin_src plantuml :file ./images/3.10-env4.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
@@ -249,7 +249,7 @@ And so the evaluation of the E3 body will move back to the enclosing environment
 
 After the evaluation of ~W1~, the ~E3~ environment frame will deallocate (I think?), and we will be left with the following environment.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env5.png
+#+begin_src plantuml :file ./images/3.10-env5.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
@@ -310,7 +310,7 @@ e1_env <-- e2_env
 
 As for building the next object, ~W2~, we just take the same steps as what we did to instantiate ~W1~.
 
-#+begin_src plantuml :exports file :file ./images/3.10-env6.png
+#+begin_src plantuml :file ./images/3.10-env6.png
 @startuml
 card global_env {
         label "make-withdraw" as make_withdraw
