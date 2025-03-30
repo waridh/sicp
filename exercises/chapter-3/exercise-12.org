@@ -1,0 +1,183 @@
+#+title: Exercise 12
+* Prompt
+The following procedure for appending lists was introduced in the previous chapter:
+
+#+begin_src racket :exports code
+(define (append x y)
+  (if (null? x)
+      y
+      (cons (car x) (append (cdr x) y))))
+#+end_src
+
+~append~ forms a new list by successively consing the elements of x onto y. The procedure ~append!~ is similar to ~append~, but it is a mutator rather than a constructor. It appends the lists by splicing them together, modifying the final pair of x so that its ~cdr~ is now y. (It is an error to call ~append!~ with an empty x.)
+
+#+begin_src racket :exports code
+(define (append! x y)
+  (set-cdr! (last-pair x) y)
+  x)
+#+end_src
+
+Here, the ~last-pair~ is a procedure that returns the last pair in its argument:
+
+#+begin_src racket :exports code
+(define (last-pair x)
+  (if (null? (cdr x)) x (last-pair (cdr x))))
+#+end_src
+
+Consider the interaction
+
+#+begin_src racket :exports code
+(define x (list 'a 'b))
+(define y (list 'c 'd))
+(define z (append x y))
+z
+(a b c d)
+(cdr x)
+<response>
+(define w (append! x y))
+w
+(a b c d)
+(cdr x)
+<response>
+#+end_src
+
+What are the missing <response>s? Draw box-and-pointer diagrams to explain your answer.
+
+* Solution
+** Immutable
+Result of src_racket{(cdr x)} after ~append~ is src_racket{'(b)}.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.12-immutable.png
+@startuml
+label x
+label y
+label z
+
+label a
+label b
+label c
+label d
+
+rectangle "pair" as a_1
+rectangle "pair" as b_1
+rectangle "nil" as nil_1
+
+rectangle "pair" as c_1
+rectangle "pair" as d_1
+rectangle "nil" as nil_2
+
+rectangle "pair" as z_pair_1
+rectangle "pair" as z_pair_2
+
+a_1 -right-> b_1
+a_1 -down-> a
+b_1 -right-> nil_1
+b_1 -down-> b
+
+c_1 -right-> d_1
+c_1 -down-> c
+d_1 -right-> nil_2
+d_1 -down-> d
+
+z_pair_1 -right-> z_pair_2
+z_pair_1 -up-> a
+z_pair_2 -down-> c_1
+z_pair_2 -up-> b
+
+x -right-> a_1
+y -right-> c_1
+z -right-> z_pair_1
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.12-immutable.png]]
+
+So, we see that ~x~ does not get mutated, therefore, the application of src_racket{(cdr x)} would return the second pair in the list.
+
+** Mutable
+Result of src_racket{(cdr x)} after ~append!~ is src_racket{'(b c d)}. Let's talk about why. For this explanation, we will discard ~z~ as it is no longer interacting with our relevant class.
+
+We will show the initial state of ~x~ and ~y~, which are intependent lists.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.12-mutable.png
+@startuml
+label x
+label y
+
+label a
+label b
+label c
+label d
+
+rectangle "pair" as a_1
+rectangle "pair" as b_1
+rectangle "nil" as nil_1
+
+rectangle "pair" as c_1
+rectangle "pair" as d_1
+rectangle "nil" as nil_2
+
+
+a_1 -right-> b_1
+a_1 -up-> a
+b_1 -right-> nil_1
+b_1 -up-> b
+
+c_1 -right-> d_1
+c_1 -down-> c
+d_1 -right-> nil_2
+d_1 -down-> d
+
+x -right-> a_1
+y -right-> c_1
+x -[hidden]down- y
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.12-mutable.png]]
+
+
+Now, applying src_racket{(append! x y)}, the last pair of ~x~ will have its ~cdr~ pointing to the first pair of ~y~. We show that in the following diagram.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.12-mutable-final.png
+@startuml
+label x
+label y
+label w
+
+label a
+label b
+label c
+label d
+
+rectangle "pair" as a_1
+rectangle "pair" as b_1
+
+rectangle "pair" as c_1
+rectangle "pair" as d_1
+rectangle "nil" as nil_2
+
+
+a_1 -right-> b_1
+a_1 -down-> a
+b_1 -right-> c_1
+b_1 -down-> b
+
+c_1 -right-> d_1
+c_1 -down-> c
+d_1 -right-> nil_2
+d_1 -down-> d
+
+
+x -right-> a_1
+y -down-> c_1
+w -down-> a_1
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.12-mutable-final.png]]
+
+So, we see that ~append!~ mutates ~x~ and then returns it, meaning that ~w~ is bound to the exact same pair as ~x~, and that ~x~ has been mutated to be the appended list.
