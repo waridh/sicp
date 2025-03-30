@@ -1,0 +1,121 @@
+#+title: Exercise 14
+* Prompt
+The following procedure is quite useful, although obscure.
+#+begin_src racket :exports code
+(define (mystery x)
+  (define (loop x y)
+    (if (null? x)
+        y
+        (let ([temp (cdr x)])
+          (set-cdr! x y)
+          (loop temp x))))
+  (loop x '()))
+#+end_src
+
+~loop~ uses the "temporary" variable ~temp~ to hold the old value of the ~cdr~ of ~x~, since the ~set-cdr!~ on the next line destroys the ~cdr~. Explain what ~mystery~ does in general. Suppose ~v~ is defined by ~(define v (list 'a 'b 'c 'd))~. Draw the box-and-pointer diagram that represents the list to which ~v~ is bound. Suppose that we now evaluate ~(define w (mystery v))~. Draw box-and-pointer diagrams that show the structures ~v~ and ~w~ after evaluating this expression. What would be printed as the values of ~v~ and ~w~?
+
+* Solution
+** What does the mystery procedure do?
+The ~mystery~ procedure uses a mutating algorithm to return the input list, but reversed. This procedure then returns the new list. This procedure is able to avoid creating any new pairs.
+** Box-And-Pointer diagrams
+We will now draw a box-and-pointer diagram for both ~v~ and ~w~.
+
+First, we will show the box-and-pointer diagram for ~v~ before the mystery procedure is applyed on it.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.14-just-v.png
+@startuml
+label v
+
+label a
+label b
+label c
+label d
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "pair" as pair_4
+rectangle nil
+
+pair_1 -down-> a
+pair_2 -down-> b
+pair_3 -down-> c
+pair_4 -down-> d
+
+v -right-> pair_1
+pair_1 -right-> pair_2
+pair_2 -right-> pair_3
+pair_3 -right-> pair_4
+pair_4 -right-> nil
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.14-just-v.png]]
+
+Now, we are going to draw the box-and-pointer diagram of ~v~ and ~w~.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.14-v-and-w.png
+@startuml
+label v
+label w
+
+label a
+label b
+label c
+label d
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "pair" as pair_4
+rectangle nil
+
+pair_1 -down-> a: car
+pair_2 -down-> b: car
+pair_3 -down-> c: car
+pair_4 -down-> d: car
+
+v -down-> pair_1
+w -right-> pair_4
+pair_1 <-left- pair_2: cdr
+pair_2 <-left- pair_3: cdr
+pair_3 <-left- pair_4: cdr
+pair_1 -right-> nil: cdr
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.14-v-and-w.png]]
+
+This means that although this is a much more efficient algorithm, in terms of space, on linked lists, it breaks the input argument, as mutation changes the form of the pair. Yes, this is not ideal for many systems.
+** Testing
+
+We are going to make sure that what we wrote is correct by just evaluating the expression in the interpreter.
+
+#+begin_src racket :exports both
+#lang sicp
+(define (mystery x)
+  (define (loop x y)
+    (if (null? x)
+        y
+        (let ([temp (cdr x)])
+          (set-cdr! x y)
+          (loop temp x))))
+  (loop x '()))
+
+(define v (list 'a 'b 'c 'd))
+v
+(define w (mystery v))
+w
+v
+#+end_src
+
+#+RESULTS:
+: (a b c d)
+: (d c b a)
+: (a)
+
+Yep, we verified our correctness.
