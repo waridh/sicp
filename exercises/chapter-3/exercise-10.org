@@ -1,0 +1,405 @@
+#+title: Exercise 10
+* Prompt
+In the ~make-withdraw~ procedure, the local variable ~balance~ is created as a parameter of ~make-withdraw~. We could also create the local state variable explicitly, using ~let~, as follows:
+#+begin_src racket :exports code
+(define (make-withdraw initial-amount)
+  (let ([balance initial-amount])
+    (lambda (amount)
+      (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds"))))
+#+end_src
+Recall that ~let~ is simply syntactic sugar for a procedure call:
+
+#+begin_src racket :exports code
+(let ([<var> <exp>]) <body>)
+#+end_src
+
+is interpreted as alternate syntax for
+
+#+begin_src racket :exports code
+((lambda (<var>) <body>) <exp>)
+#+end_src
+
+Use the environment model to analyze this alternate version of ~make-withdraw~, drawing figures like the ones above to illustrate the interactions
+
+#+begin_src racket :exports code
+(define W1 (make-withdraw 100))
+(W1 50)
+(define W2 (make-withdraw 100))
+#+end_src
+
+* Solution
+
+Looks like the main difference here is that using ~let~ will cause additional environment frames to be created.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env1.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: initial-amount
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env1.png]]
+
+Okay, now let's make an object with a balance of ~100~.
+
+#+begin_src racket :exports code
+(define W1 (make-withdraw 100))
+(W1 50)
+#+end_src
+
+First, we need to evaluate the ~let~ statement, which would cause the environment to look like this.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env2.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: balance
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+card e1_env [
+E1
+---
+(make-withdraw 100)
+===
+initial-amount: 100
+]
+card e1_body [
+body: ((lambda (balance)
+               (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds"))) initial-amount)
+]
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+
+global_env <-- e1_env
+e1_env -> e1_body
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env2.png]]
+
+Now this is interesting, the body of ~make-withdraw~ has a lambda, but it is not bound to a variable, an instead, we immediately evaluate this value. We get another environment frame for the body of the lambda, with the formal parameter of ~balance~ bound to the argument of ~initial-amount~. Then the inner lambda expression is evaluated, which completes the ~make-withdraw~ procedure, and binding that final procedure to ~W1~.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env3.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+        label W1
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: balance
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+card e1_env [
+E1
+---
+(make-withdraw 100)
+===
+initial-amount: 100
+]
+
+card e2_env [
+E2
+===
+balance: 100
+]
+
+circle w1_node
+card w1_proc [
+parameters: amount
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+
+global_env <-- e1_env
+
+W1 --> w1_node
+e2_env <-- w1_node
+w1_node -> w1_proc
+
+e1_env <-- e2_env
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env3.png]]
+
+Now when we apply src_racket{(W1 50)}, we get mostly the same logic as with the other version of ~make-withdraw~ from the SICP text.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env4.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+        label W1
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: balance
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+card e1_env [
+E1
+---
+(make-withdraw 100)
+===
+initial-amount: 100
+]
+
+card e2_env [
+E2
+===
+balance: 100
+]
+
+card e3_env [
+E3
+===
+amount: 50
+]
+
+card e3_body [
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+circle w1_node
+card w1_proc [
+parameters: amount
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+
+global_env <-- e1_env
+
+W1 --> w1_node
+e2_env <-- w1_node
+w1_node -> w1_proc
+
+e3_env --> e3_body
+
+e1_env <-- e2_env
+e2_env <-- e3_env
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env4.png]]
+
+
+And so the evaluation of the E3 body will move back to the enclosing environment frame, where the ~balance~ variable will be assigned to.
+
+After the evaluation of ~W1~, the ~E3~ environment frame will deallocate (I think?), and we will be left with the following environment.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env5.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+        label W1
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: balance
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+card e1_env [
+E1
+---
+(make-withdraw 100)
+===
+initial-amount: 100
+]
+
+card e2_env [
+E2
+===
+balance: 50
+]
+
+circle w1_node
+card w1_proc [
+parameters: amount
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+
+global_env <-- e1_env
+
+W1 --> w1_node
+e2_env <-- w1_node
+w1_node -> w1_proc
+
+
+e1_env <-- e2_env
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env5.png]]
+
+
+As for building the next object, ~W2~, we just take the same steps as what we did to instantiate ~W1~.
+
+#+begin_src plantuml :exports file :file ./images/3.10-env6.png
+@startuml
+card global_env {
+        label "make-withdraw" as make_withdraw
+        label W1
+        label W2
+}
+circle make_withdraw_node
+card make_with_proc [
+parameters: balance
+body: (let ([balance initial-amount])
+           (lambda (amount)
+                   (if (>= balance amount)
+                       (begin (set! balance (- balance amount))
+                              balance)
+                       "insufficient funds")))
+]
+card e1_env [
+E1
+---
+(make-withdraw 100)
+===
+initial-amount: 100
+]
+
+card e2_env [
+E2
+===
+balance: 50
+]
+
+card e3_env [
+E3
+===
+initial-amount: 100
+]
+
+card e4_env [
+E4
+===
+balance: 100
+]
+
+circle w1_node
+card w1_proc [
+parameters: amount
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+circle w2_node
+card w2_proc [
+parameters: amount
+body: (if (>= balance amount)
+          (begin (set! balance (- balance amount))
+                 balance)
+          "insufficient funds")
+]
+
+make_withdraw --> make_withdraw_node
+make_withdraw_node -> global_env
+make_withdraw_node --> make_with_proc
+
+global_env <-left- e1_env
+global_env <-right- e3_env
+
+W1 --> w1_node
+e2_env <-- w1_node
+w1_node -down-> w1_proc
+
+W2 --> w2_node
+e4_env <-- w2_node
+w2_node --> w2_proc
+
+e1_env <-- e2_env
+e3_env <-- e4_env
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.10-env6.png]]
+
+ 
+** Let vs no let
+
+Lets dig into how the environment are different between having the ~let~ statement and not having the ~let~ statement in the ~make-withdraw~ procedure.
+
+Firstly, we should talk about if the procedures have the same behaviour. Well, yes, both implementation have a local scope that stores the balance variable, and the accessor procedure is identical.
+
+The difference between the ~let~ and original implementation is that there is an extra environment frame that is created in the ~let~ implementation of the ~make-withdraw~ that is used to create a frame with the mutable ~balance~ variable.
