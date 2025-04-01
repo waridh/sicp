@@ -1,0 +1,164 @@
+#+title: Exercise 15
+* Prompt
+Draw box-and-pointer diagrams to explain the effect of ~set-to-wow!~ on the structures ~z1~ and ~z2~ above.
+* Solution
+We are going to do the diagrams for each of the structures separately.
+
+As a reminder, ~set-to-wow!~ has the following defintions:
+
+#+begin_src racket :exports code
+(define (set-to-wow! x) (set-car! (car x) 'wow) x)
+#+end_src
+** Z1
+
+We are going to start with a diagram of ~z1~ before applying ~set-to-wow!~ on it.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.15-z1-1.png
+@startuml
+label z1
+label x
+
+rectangle a
+rectangle b
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "nil" as nil_1
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> nil_1: cdr
+
+pair_1 -down-> a: car
+pair_2 -down-> b: car
+
+x -right-> pair_1
+z1 -right-> pair_3
+pair_3 -down-> pair_1: car
+pair_3 -down-> pair_1: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.15-z1-1.png]]
+
+Now we are going to apply ~set-to-wow!~ on the ~z1~ datastructure.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.15-z1-2.png
+@startuml
+label z1
+label x
+
+rectangle wow
+note left
+        wow assigned to the car of the
+        first pair of x
+end note
+rectangle b
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "nil" as nil_1
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> nil_1: cdr
+
+pair_1 -down-> wow: car
+pair_2 -down-> b: car
+
+x -right-> pair_1
+z1 -right-> pair_3
+pair_3 -down-> pair_1: car
+pair_3 -down-> pair_1: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.15-z1-2.png]]
+
+And therefore, we see that z1 will see both of its car and cdr have their car replaced with ~wow~.
+
+** Z2
+
+#+begin_src plantuml :exports results :results file :file ./images/3.15-z2-1.png
+@startuml
+label z2
+
+rectangle a
+rectangle b
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "pair" as pair_4
+rectangle "pair" as pair_5
+rectangle "nil" as nil_1
+rectangle "nil" as nil_2
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> nil_1: cdr
+
+pair_4 -right-> pair_5: cdr
+pair_5 -right-> nil_2: cdr
+
+pair_1 -down-> a: car
+pair_2 -down-> b: car
+
+pair_4 -up-> a: car
+pair_5 -up-> b: car
+
+z2 -right-> pair_3
+pair_3 -up-> pair_1: car
+pair_3 -[hidden]right- a
+pair_3 -down-> pair_4: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.15-z2-1.png]]
+
+
+Now we can see the ~z2~ datastructure before applying the ~set-to-wow!~ procedure on it. After doing that, only one of the car pointers change, and since the ~z2~ pair pointers does not both point to the same location, there will not be unexpected change in the data structure.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.15-z2-2.png
+@startuml
+label z2
+
+rectangle a
+rectangle b
+rectangle wow
+
+rectangle "pair" as pair_1
+rectangle "pair" as pair_2
+rectangle "pair" as pair_3
+rectangle "pair" as pair_4
+rectangle "pair" as pair_5
+rectangle "nil" as nil_1
+rectangle "nil" as nil_2
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> nil_1: cdr
+
+pair_4 -right-> pair_5: cdr
+pair_5 -right-> nil_2: cdr
+
+pair_1 -down-> wow: car
+pair_2 -down-> b: car
+
+pair_4 -up-> a: car
+pair_5 -up-> b: car
+
+z2 -right-> pair_3
+pair_3 -up-> pair_1: car
+pair_3 -[hidden]right- a
+pair_3 -[hidden]right- wow
+pair_3 -down-> pair_4: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.15-z2-2.png]]
+
+
+And now, we have satisfied the requirements of the procedure.
