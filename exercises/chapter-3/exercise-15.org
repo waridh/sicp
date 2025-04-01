@@ -77,7 +77,7 @@ pair_3 -down-> pair_1: cdr
 #+RESULTS:
 [[file:./images/3.15-z1-2.png]]
 
-And therefore, we see that z1 will see both of its car and cdr have their car replaced with ~wow~.
+And therefore, we see that z1 will see both of its car and cdr have their car replaced with ~wow~. ~((wow b) wow b)~
 
 ** Z2
 
@@ -161,4 +161,4 @@ pair_3 -down-> pair_4: cdr
 [[file:./images/3.15-z2-2.png]]
 
 
-And now, we have satisfied the requirements of the procedure.
+And now, we have satisfied the requirements of the procedure. This is why the data structure ends up looking like the following: ~((wow b) a b)~.
