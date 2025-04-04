@@ -22,7 +22,9 @@
 
 
 
-;; This should be enough
+;; This should be enough, now we could use a mutating architecture to update the seen list structure. If we see a pair that already has been seen, we will end the recursion, and not count the seen pair.
+
+;; Since we are using a mutating architecture, we have to set up a local variable that we will be mutating for each application of ~count-pairs~. Just to be nice and precise, I will be making a procedure for adding a seen value to the ~seen~ collection.
 
 
 ;; [[file:../exercise-17.org::*Solution][Solution:3]]
@@ -39,6 +41,11 @@
            (+ (count-pairs-aux (car y)) (count-pairs-aux (cdr y)) 1))]))
     (count-pairs-aux x)))
 ;; Solution:3 ends here
+
+
+
+;; Now, we are going to test against all the values from [[file:exercise-16.org][exercise 3.16]].
+
 
 ;; [[file:../exercise-17.org::*Solution][Solution:4]]
 (define three-pairs-count-three (cons 'a (cons 'b (cons 'c nil))))
@@ -60,6 +67,7 @@
   (newline)
   (display "number of pairs: ")
   (display (count-pairs test-value))
+  (newline)
   (newline))
 
 (printout-cases "three-pairs-count-three" three-pairs-count-three)
