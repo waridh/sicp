@@ -1,0 +1,193 @@
+#+title: Exercise 16
+* Prompt
+Ben Bitdiddle decides to write a procedure to count the number of pairs in any list structures. "It's easy," he reasons. "The number of pairs in any structure is the number of the ~car~ plus the number in the ~cdr~ plus one more to count the current pair." So Ben writes the following procedure:
+
+#+name: 3.16-ben-procedure
+#+begin_src racket :exports code
+#lang sicp
+(define (count-pairs x)
+  (if (not (pair? x))
+      0
+      (+ (count-pairs (car x))
+         (count-pairs (cdr x))
+         1)))
+#+end_src
+
+Show that this procedure is not correct. In particular, draw box-and-pointer diagrams representing list structures made up of exactly three pairs for which Ben's procedure would return 3, return 4, return 7; never at all.
+* Solution
+:PROPERTIES:
+:header-args:racket: :noweb yes
+:END:
+Right, it looks like the premise of this question is that Ben is looking entirely at what the structure would have you believe, while we should really be identifying unique instances of pairs. The idea here is that you could have allocated three pairs, but have this procedure return different values depending on how the pairs are pointing to each other.
+
+We'll go over the different topology.
+** Returning 3
+The case of returning three items is the expected case for a simple list. Here, we will make such an object, and evaluate this procedure for testing.
+
+#+begin_src racket :exports both
+<<3.16-ben-procedure>>
+
+(define three-pairs-count-three (cons 'a (cons 'b (cons 'c nil))))
+three-pairs-count-three
+(count-pairs three-pairs-count-three)
+#+end_src
+
+#+RESULTS:
+: (a b c)
+: 3
+
+Technically, we don't even need to convert this procedure into a list, the last pair could simply have multiple non-pair values.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.16-3-case.png
+@startuml
+label "three-pairs-count-three" as name
+
+rectangle pair_1
+rectangle pair_2
+rectangle pair_3
+
+rectangle a
+rectangle b
+rectangle c
+rectangle nil
+
+name -right-> pair_1
+
+pair_1 -down-> a: car
+pair_2 -down-> b: car
+pair_3 -down-> c: car
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> pair_3: cdr
+pair_3 -right-> nil: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.16-3-case.png]]
+
+Unfortunately, not all pair structures are built with unique pair instances like this.
+** Returning 4
+So, what happens if one of the pairs point to the same pair twice? This procedure would double count the pairs, since it is not counting by instance. Say the second pair is pointing to the same terminating pair in both its ~car~ and ~cdr~.
+
+#+begin_src racket :exports both
+<<3.16-ben-procedure>>
+
+(define terminating-pair (cons 'c nil))
+(define three-pairs-count-four (cons 'a (cons terminating-pair terminating-pair)))
+
+three-pairs-count-four
+(count-pairs three-pairs-count-four)
+#+end_src
+
+#+RESULTS:
+: (a (c) c)
+: 4
+
+Here is the box-and-pointer diagram showing how the pair topology would cause the process to count twice, even if there is only three pairs allocated in memory.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.16-4-case.png
+@startuml
+label "three-pairs-count-four" as name
+
+rectangle pair_1
+rectangle pair_2
+rectangle pair_3
+
+rectangle a
+rectangle c
+rectangle nil
+
+name -right-> pair_1
+
+pair_1 -down-> a: car
+pair_2 -right-> pair_3: car
+pair_3 -down-> c: car
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> pair_3: cdr
+pair_3 -right-> nil: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.16-4-case.png]]
+
+This topology causes the process to count ~pair_3~ twice.
+
+** Return 7
+
+Actually, we just expand on the idea of returning 4, but now, the first pair is also pointing to the second pair twice. This would cause a double count of a double count to occur.
+
+Here is a code snippet that shows this behavior.
+
+#+begin_src racket :exports both
+<<3.16-ben-procedure>>
+(define termination (cons 'a nil))
+(define pair-2 (cons termination termination))
+(define three-pairs-count-seven (cons pair-2 pair-2))
+three-pairs-count-seven
+(count-pairs three-pairs-count-seven)
+#+end_src
+
+#+RESULTS:
+: (((a) a) (a) a)
+: 7
+
+And we see that the resulting count is 7, since each of the second pairs will give a count of 3, and the top level pair counts these twice. This, and the count of the top level pair itself results in a value of 7.
+#+begin_src plantuml :exports results :results file :file ./images/3.16-7-case.png
+@startuml
+label "three-pairs-count-seven" as name
+
+rectangle pair_1
+rectangle pair_2
+rectangle pair_3
+
+rectangle c
+rectangle nil
+
+name -right-> pair_1
+
+pair_1 -down-> pair_2: car
+pair_2 -right-> pair_3: car
+pair_3 -down-> c: car
+
+pair_1 -right-> pair_2: cdr
+pair_2 -right-> pair_3: cdr
+pair_3 -right-> nil: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.16-7-case.png]]
+** Never Return
+This is the case where the system will never return. All that has to be done is removing the terminating pair, which just means that the ~cdr~ or the ~car~ of the old terminating pair should now be pointing to another pair in the chain.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.16-never-return.png
+@startuml
+label "three-pairs-never-return" as name
+
+rectangle pair_1
+rectangle pair_2
+rectangle pair_3
+
+rectangle a
+rectangle b
+rectangle c
+
+name -right-> pair_1
+
+pair_1 -down-> a: car
+pair_2 -right-> b: car
+pair_3 -down-> c: car
+
+pair_1 -right-> pair_2: cdr
+pair_2 -down-> pair_3: cdr
+pair_3 -right-> pair_1: cdr
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.16-never-return.png]]
+
+And this concludes the requirements of the procedure.
