@@ -1,0 +1,667 @@
+#+title: Exercise 20
+* Prompt
+Draw environment diagrams to illustrate the evaluation of the sequence of expressions
+
+#+begin_src racket :exports code
+(define x (cons 1 2))
+(define z (cons x x))
+(set-car! (cdr z) 17)
+(car x)
+#+end_src
+
+Using the procedural implementation of pairs given above.
+
+* Solution
+We will draw an environment variable for each line.
+
+** Base pair construction
+
+#+begin_src plantuml :exports results :results file :file ./images/3.20-first.png
+@startuml
+
+rectangle "pair" as pair1
+rectangle "pair" as pair2
+rectangle "pair" as pair3
+rectangle "pair" as pair4
+rectangle "pair" as pair5
+rectangle "pair" as pair6
+rectangle "pair" as pair7
+
+node global_env {
+        label x
+        label car
+        label cdr
+        label "set-car!" as set_car
+        label "set-cdr!" as set_cdr
+}
+
+node e1_env {
+        label "x" as x1
+        label "y" as y1
+        label "set-x!" as set_x1
+        label "set-y!" as set_y1
+        label "dispatch" as dispatch1
+}
+
+card set_x1_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y1_proc [
+parameter: v
+body: (set! y v)
+]
+card car_proc [
+parameter: z
+body: (z 'car)
+]
+card cdr_proc [
+parameter: z
+body: (z 'cdr)
+]
+card set_car_proc [
+parameter: z new-value
+body: ((z 'set-car!) new-value) z
+]
+card set_cdr_proc [
+parameter: z new-value
+body: ((z 'set-cdr!) new-value) z
+]
+card dispatch_proc [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+
+global_env <-down- e1_env
+global_env <-down- pair3: cdr
+global_env <-down- pair4: cdr
+global_env <-down- pair5: cdr
+global_env <-down- pair6: cdr
+
+x -down-> pair7
+car -down-> pair3
+cdr -down-> pair4
+set_car -down-> pair5
+set_cdr -down-> pair6
+
+pair3 -down-> car_proc: car
+pair4 -down-> cdr_proc: car
+pair5 -down-> set_car_proc: car
+pair6 -down-> set_cdr_proc: car
+
+label 1
+label 2
+
+e1_env <-down- pair1: cdr
+e1_env <-down- pair2: cdr
+e1_env <-down- pair7: cdr
+
+x1 -left-> 1
+y1 -left-> 2
+x1 -[hidden]down- y1
+set_x1 -[hidden]down- set_y1
+set_x1 -[hidden]down- dispatch1
+set_x1 -down-> pair1
+set_y1 -down-> pair2
+dispatch1 -down-> pair7
+
+pair1 -down-> set_x1_proc: car
+pair2 -down-> set_y1_proc: car
+pair7 -down-> dispatch_proc: car
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.20-first.png]]
+
+So from here, we have described the environment using the environment model after the first line of the program. Pretty complicated, but we are using plantuml to build the diagram, so we can manage.
+
+** Second cons
+
+#+begin_src plantuml :exports results :results file :file ./images/3.20-second.png
+@startuml
+
+rectangle "pair" as pair1
+rectangle "pair" as pair2
+rectangle "pair" as pair3
+rectangle "pair" as pair4
+rectangle "pair" as pair5
+rectangle "pair" as pair6
+rectangle "pair" as pair7
+
+rectangle "pair" as pair8
+rectangle "pair" as pair9
+rectangle "pair" as pair10
+
+node global_env {
+        label x
+        label z
+        label car
+        label cdr
+        label "set-car!" as set_car
+        label "set-cdr!" as set_cdr
+}
+
+node e1_env {
+        label "x" as x1
+        label "y" as y1
+        label "set-x!" as set_x1
+        label "set-y!" as set_y1
+        label "dispatch" as dispatch1
+}
+
+node e2_env {
+        label "x" as x2
+        label "y" as y2
+        label "set-x!" as set_x2
+        label "set-y!" as set_y2
+        label "dispatch" as dispatch2
+}
+
+card set_x1_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y1_proc [
+parameter: v
+body: (set! y v)
+]
+card car_proc [
+parameter: z
+body: (z 'car)
+]
+card cdr_proc [
+parameter: z
+body: (z 'cdr)
+]
+card set_car_proc [
+parameter: z new-value
+body: ((z 'set-car!) new-value) z
+]
+card set_cdr_proc [
+parameter: z new-value
+body: ((z 'set-cdr!) new-value) z
+]
+card dispatch_proc [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+card set_x2_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y2_proc [
+parameter: v
+body: (set! y v)
+]
+card dispatch_proc2 [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+
+global_env <-down- e1_env
+global_env <-down- e2_env
+global_env <-down- pair3: cdr
+global_env <-down- pair4: cdr
+global_env <-down- pair5: cdr
+global_env <-down- pair6: cdr
+
+x -down-> pair7
+car -down-> pair3
+cdr -down-> pair4
+set_car -down-> pair5
+set_cdr -down-> pair6
+
+pair3 -down-> car_proc: car
+pair4 -down-> cdr_proc: car
+pair5 -down-> set_car_proc: car
+pair6 -down-> set_cdr_proc: car
+
+label 1
+label 2
+
+e1_env <-down- pair1: cdr
+e1_env <-down- pair2: cdr
+e1_env <-down- pair7: cdr
+
+e2_env <-down- pair8: cdr
+e2_env <-down- pair9: cdr
+e2_env <-down- pair10: cdr
+
+x1 -left-> 1
+y1 -left-> 2
+x1 -[hidden]down- y1
+set_x1 -[hidden]down- set_y1
+set_x1 -[hidden]down- dispatch1
+set_x1 -down-> pair1
+set_y1 -down-> pair2
+dispatch1 -down-> pair7
+
+x2 -down-> pair7
+y2 -down-> pair7
+x2 -[hidden]down- y2
+set_x2 -[hidden]down- set_y2
+set_x2 -[hidden]down- dispatch2
+set_x2 -down-> pair8
+set_y2 -down-> pair9
+dispatch2 -down-> pair10
+
+pair1 -down-> set_x1_proc: car
+pair2 -down-> set_y1_proc: car
+pair7 -down-> dispatch_proc: car
+
+pair8 -down-> set_x2_proc: car
+pair9 -down-> set_y2_proc: car
+pair10 -down-> dispatch_proc2: car
+
+z -right-> pair10
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.20-second.png]]
+
+Alright, this is getting a little more complicated, but still understandable.
+
+** Set car
+
+We are now showing the environment model after the following line:
+
+#+begin_src racket :exports code
+(set-car! (cdr z) 17)
+#+end_src
+
+I don't really think I have to show the environment frame that appeared on the application of the ~set-car!~ procedure, and instead, I will just show the aftermath of this procedure application.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.20-third.png
+@startuml
+
+rectangle "pair" as pair1
+rectangle "pair" as pair2
+rectangle "pair" as pair3
+rectangle "pair" as pair4
+rectangle "pair" as pair5
+rectangle "pair" as pair6
+rectangle "pair" as pair7
+
+rectangle "pair" as pair8
+rectangle "pair" as pair9
+rectangle "pair" as pair10
+
+rectangle "'car" as car_symbol
+
+node global_env {
+        label x
+        label z
+        label car
+        label cdr
+        label "set-car!" as set_car
+        label "set-cdr!" as set_cdr
+}
+
+node e1_env {
+        label "x" as x1
+        label "y" as y1
+        label "set-x!" as set_x1
+        label "set-y!" as set_y1
+        label "dispatch" as dispatch1
+}
+
+node e2_env {
+        label "x" as x2
+        label "y" as y2
+        label "set-x!" as set_x2
+        label "set-y!" as set_y2
+        label "dispatch" as dispatch2
+}
+
+node e3_env {
+        label "z" as z3
+}
+
+node e4_env {
+        label "m" as m4
+}
+
+z3 -down-> pair10
+
+node e5_env {
+        label "z" as z5
+        label "new-value" as new_value5
+}
+
+z5 -down-> pair7
+
+note top of e3_env: call to cdr
+note top of e5_env: call to set-car!
+
+card set_x1_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y1_proc [
+parameter: v
+body: (set! y v)
+]
+card car_proc [
+parameter: z
+body: (z 'car)
+]
+card cdr_proc [
+parameter: z
+body: (z 'cdr)
+]
+card set_car_proc [
+parameter: z new-value
+body: ((z 'set-car!) new-value) z
+]
+card set_cdr_proc [
+parameter: z new-value
+body: ((z 'set-cdr!) new-value) z
+]
+card dispatch_proc [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+card set_x2_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y2_proc [
+parameter: v
+body: (set! y v)
+]
+card dispatch_proc2 [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+
+global_env <-down- e1_env
+global_env <-down- e2_env
+global_env <-down- e3_env
+global_env <-down- pair3: cdr
+global_env <-down- pair4: cdr
+global_env <-down- pair5: cdr
+global_env <-down- pair6: cdr
+
+e2_env <-down- e4_env
+e1_env <-down- e5_env
+
+x -down-> pair7
+car -down-> pair3
+cdr -down-> pair4
+set_car -down-> pair5
+set_cdr -down-> pair6
+
+pair3 -down-> car_proc: car
+pair4 -down-> cdr_proc: car
+pair5 -down-> set_car_proc: car
+pair6 -down-> set_cdr_proc: car
+
+label 17
+label 2
+
+e1_env <-down- pair1: cdr
+e1_env <-down- pair2: cdr
+e1_env <-down- pair7: cdr
+
+e2_env <-down- pair8: cdr
+e2_env <-down- pair9: cdr
+e2_env <-down- pair10: cdr
+
+x1 -left-> 17
+y1 -left-> 2
+x1 -[hidden]down- y1
+set_x1 -[hidden]down- set_y1
+set_x1 -[hidden]down- dispatch1
+set_x1 -down-> pair1
+set_y1 -down-> pair2
+dispatch1 -down-> pair7
+
+x2 -down-> pair7
+y2 -down-> pair7
+x2 -[hidden]down- y2
+set_x2 -[hidden]down- set_y2
+set_x2 -[hidden]down- dispatch2
+set_x2 -down-> pair8
+set_y2 -down-> pair9
+dispatch2 -down-> pair10
+
+pair1 -down-> set_x1_proc: car
+pair2 -down-> set_y1_proc: car
+pair7 -down-> dispatch_proc: car
+
+pair8 -down-> set_x2_proc: car
+pair9 -down-> set_y2_proc: car
+pair10 -down-> dispatch_proc2: car
+
+new_value5 -down-> 17
+z -down-> pair10
+
+m4 -down-> car_symbol
+
+global_env -[#red]-> e3_env: Call to car
+e3_env -[#red]-> e4_env: Application of the z object dispatch procedure
+e4_env -[#red]-> e5_env: Application of target procedure
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.20-third.png]]
+
+
+This is now a complicated diagram, but it shows how applications of procedures creates different environment frames in order to access certain variables.
+** Car access
+We are now showing the environment model after the following line:
+
+#+begin_src racket :exports code
+(car x)
+#+end_src
+
+Yep, we will show the environment frames that are allocated to grab the ~car~ of x.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.20-fourth.png
+@startuml
+
+rectangle "pair" as pair1
+rectangle "pair" as pair2
+rectangle "pair" as pair3
+rectangle "pair" as pair4
+rectangle "pair" as pair5
+rectangle "pair" as pair6
+rectangle "pair" as pair7
+
+rectangle "pair" as pair8
+rectangle "pair" as pair9
+rectangle "pair" as pair10
+
+rectangle "'car" as car_symbol
+
+node global_env {
+        label x
+        label z
+        label car
+        label cdr
+        label "set-car!" as set_car
+        label "set-cdr!" as set_cdr
+}
+
+node e1_env {
+        label "x" as x1
+        label "y" as y1
+        label "set-x!" as set_x1
+        label "set-y!" as set_y1
+        label "dispatch" as dispatch1
+}
+
+node e2_env {
+        label "x" as x2
+        label "y" as y2
+        label "set-x!" as set_x2
+        label "set-y!" as set_y2
+        label "dispatch" as dispatch2
+}
+
+node e3_env {
+        label "z" as z3
+}
+
+node e4_env {
+        label "m" as m4
+}
+
+z3 -down-> pair7
+
+note top of e3_env: call to car
+
+card set_x1_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y1_proc [
+parameter: v
+body: (set! y v)
+]
+card car_proc [
+parameter: z
+body: (z 'car)
+]
+card cdr_proc [
+parameter: z
+body: (z 'cdr)
+]
+card set_car_proc [
+parameter: z new-value
+body: ((z 'set-car!) new-value) z
+]
+card set_cdr_proc [
+parameter: z new-value
+body: ((z 'set-cdr!) new-value) z
+]
+card dispatch_proc [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+card set_x2_proc [
+parameter: v
+body: (set! x v)
+]
+card set_y2_proc [
+parameter: v
+body: (set! y v)
+]
+card dispatch_proc2 [
+parameter: m
+body: (cond ((eq? m 'car) x)
+((eq? m 'cdr) y)
+((eq? m 'set-car!) set-x!)
+((eq? m 'set-cdr!) set-y!)
+(else
+(error "undefined operation: CONS" m)))
+]
+
+global_env <-down- e1_env
+global_env <-down- e2_env
+global_env <-down- e3_env
+global_env <-down- pair3: cdr
+global_env <-down- pair4: cdr
+global_env <-down- pair5: cdr
+global_env <-down- pair6: cdr
+
+e1_env <-down- e4_env
+
+x -down-> pair7
+car -down-> pair3
+cdr -down-> pair4
+set_car -down-> pair5
+set_cdr -down-> pair6
+
+pair3 -down-> car_proc: car
+pair4 -down-> cdr_proc: car
+pair5 -down-> set_car_proc: car
+pair6 -down-> set_cdr_proc: car
+
+label 17
+label 2
+
+e1_env <-down- pair1: cdr
+e1_env <-down- pair2: cdr
+e1_env <-down- pair7: cdr
+
+e2_env <-down- pair8: cdr
+e2_env <-down- pair9: cdr
+e2_env <-down- pair10: cdr
+
+x1 -left-> 17
+y1 -left-> 2
+x1 -[hidden]down- y1
+set_x1 -[hidden]down- set_y1
+set_x1 -[hidden]down- dispatch1
+set_x1 -down-> pair1
+set_y1 -down-> pair2
+dispatch1 -down-> pair7
+
+x2 -down-> pair7
+y2 -down-> pair7
+x2 -[hidden]down- y2
+set_x2 -[hidden]down- set_y2
+set_x2 -[hidden]down- dispatch2
+set_x2 -down-> pair8
+set_y2 -down-> pair9
+dispatch2 -down-> pair10
+
+pair1 -down-> set_x1_proc: car
+pair2 -down-> set_y1_proc: car
+pair7 -down-> dispatch_proc: car
+
+pair8 -down-> set_x2_proc: car
+pair9 -down-> set_y2_proc: car
+pair10 -down-> dispatch_proc2: car
+
+z -down-> pair10
+
+m4 -down-> car_symbol
+
+global_env -[#red]-> e3_env: Call to car
+e3_env -[#red]-> e4_env: Application of the x object dispatch procedure
+
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.20-fourth.png]]
+
+
+Well, here we are.
