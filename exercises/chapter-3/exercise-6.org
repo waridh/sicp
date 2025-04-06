@@ -57,14 +57,14 @@ Since we are lacking a proper ~rand-update~ procedure that satisfies the stated 
 
 
 ** Result
-#+begin_src sh :exports both
+#+begin_src sh :exports both :results output replace
 racket ./src/exercise-6.rkt
 #+end_src
 
 #+RESULTS:
-|       rand-update | sees: |                 0 |
-| 11.49488470771723 |       |                   |
-|       rand-update | sees: | 11.49488470771723 |
-| 67.24897925457631 |       |                   |
-|       rand-update | sees: |                 8 |
-| 68.96004612643496 |       |                   |
+: rand-update sees: 0
+: 41.25353514233961
+: rand-update sees: 41.25353514233961
+: 2.0708099311982435
+: rand-update sees: 8
+: 81.69939888023656

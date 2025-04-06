@@ -71,12 +71,12 @@ Now, we are going to test against all the values from [[file:exercise-16.org][ex
 
 Running our result, we get the following answers.
 
-#+begin_src bash :exports both :results drawer replace
+#+begin_src bash :exports both :results output replace
 racket ./src/exercise-17.rkt
 #+end_src
 
 #+RESULTS:
-:results:
+#+begin_example
 testing against name: three-pairs-count-three
 which has the following shape: (a b c)
 number of pairs: 3
@@ -93,6 +93,6 @@ testing against name: infinte-loops
 which has the following shape: #0=(a c b . #0#)
 number of pairs: 3
 
-:end:
+#+end_example
 
 Well, that is an interesting printout for the infinite data structure. We see that we are able to accurately find the number of pairs in an input data structure. Nice!

@@ -252,7 +252,7 @@ Now, testing this against the testcase from the previous exercise, we see the sa
 #+end_src
 
 
-#+begin_src bash :exports both :results output
+#+begin_src bash :exports both :results output replace
 racket ./src/exercise-23.rkt
 #+end_src
 
