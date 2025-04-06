@@ -1,78 +1,5 @@
-#+title: Exercise 23
-* Prompt
-A /deque/ ("double-ended queue") is a sequence in which items can be inserted and deleted at either the front or the rear. Operations on deques are the constructor ~make-deque~, the predicate ~empty-deque?~, selectors ~front-deque~ and ~rear-deque~, mutators ~front-insert-deque!~, ~rear-insert-deque!~, ~front-delete-deque!~, and ~rear-delete-deque!~. Show how to represent deques using pairs, and give implementations of the operations. All operations should be accomplished in \Theta(1) steps.
-
-* Solution
-:PROPERTIES:
-:header-args:racket: :tangle ./src/exercise-23.rkt
-:END:
-
-#+begin_src racket :exports none
 #lang sicp
-#+end_src
 
-We'll be implementing using pairs, and immediately, the problem we are going to run into is the singly linked list representation, which is the default list representation in Lisp. If our rear pointer is pointing to the actual last pair in the list that represents the queue, we would not be able to delete the rear in \Theta(1) time, since we would have to traverse from the front pointer to find the last pair again.
-
-Well, I think that I have read about different ways to implement a double ended queue using just singly linked list. Since now, both ends have to be able to pop, maybe we should have both ends point to the middle. Every time that one end is empty, we internally reorganize half from the other end. Now there is reorganization overhead, but for most of the case, we should be able to do queue operations in \Theta(1) steps.
-
-Now we need to have a procedure that will shuffle half of one side of the queue to the other side.
-
-#+begin_src plantuml :exports results :results file :file ./images/3.23-dequeue-idea.png
-@startuml
-rectangle "front-side" as front_side {
-        rectangle "pair" as pair1
-        rectangle "pair" as pair2
-        rectangle "pair" as pair3
-        rectangle "nil" as nil1
-}
-rectangle "rear-side" as rear_side {
-        rectangle "pair" as pair4
-        rectangle "pair" as pair5
-        rectangle "pair" as pair6
-        rectangle "pair" as pair7
-        rectangle "nil" as nil2
-}
-rectangle "pair" as pair8
-note top of pair8 : deque representation
-
-label a
-label b
-label c
-label d
-label e
-label f
-label g
-
-nil1 -[hidden]right- nil2
-front_side -[hidden]right- rear_side
-pair1 -right-> pair2: cdr
-pair2 -right-> pair3: cdr
-pair3 -right-> nil1: cdr
-pair4 -left-> nil2: cdr
-pair5 -left-> pair4: cdr
-pair6 -left-> pair5: cdr
-pair7 -left-> pair6: cdr
-
-pair1 -down-> a: car
-pair2 -down-> b: car
-pair3 -down-> c: car
-pair4 -down-> d: car
-pair5 -down-> e: car
-pair6 -down-> f: car
-pair7 -down-> g: car
-
-pair8 -down-> pair1: car
-pair8 -down-> pair7: cdr
-
-@enduml
-#+end_src
-
-#+RESULTS:
-[[file:./images/3.23-dequeue-idea.png]]
-
-Every time that we run out of a singly linked list, we will find the length of the other singly linked list, and using this value, use iteration to build a reversed list up to the halfway point.
-
-#+begin_src racket :exports code
 ;; This procedure will split the donor in half, and return a pair where the
 ;; first element is a pointer to the donor, and the second element of the pair
 ;; is the pointer to the reversed tail list.
@@ -201,11 +128,7 @@ Every time that we run out of a singly linked list, we will find the length of t
                  (set-front-ptr! deque new-front)
                  (set-rear-ptr! deque (cdr new-rear))
                  deque))))])))
-#+end_src
 
-Now, testing this against the testcase from the previous exercise, we see the same values, and therefore we were successful in implementing the closure representation of the queue.
-
-#+begin_src racket :exports code
 (define deque1 (make-deque))
 (empty-deque? deque1)
 (front-insert-deque! deque1 'd)
@@ -249,48 +172,3 @@ Now, testing this against the testcase from the previous exercise, we see the sa
 (assert-eq "rear of (d)" (rear-deque deque2) 'd)
 (rear-delete-deque! deque2)
 (assert-eq "should be empty deque after this line" (empty-deque? deque2) true)
-#+end_src
-
-
-#+begin_src bash :exports both :results output
-racket ./src/exercise-23.rkt
-#+end_src
-
-#+RESULTS:
-#+begin_example
-#t
-((d))
-((c d))
-((b c d))
-((a b c d))
-(() d)
-(() c d)
-(() b c d)
-(() a b c d)
-pass: front of (a b c d)
-pass: front of (d c b a)
-pass: rear of (a b c d)
-pass: rear of (d c b a)
-((b) d c)
-pass: front of (b c d)
-(() d c)
-pass: front of (c d)
-(() d)
-pass: front of (d)
-new-rear and new-front: ((d) ())
-(())
-pass: should be empty deque after this line
-new-rear and new-front: ((a) ())
-pass: Testing (nil (a))
-((d c) b)
-pass: rear of (d c b)
-((d c))
-pass: rear of (d c)
-((d))
-pass: rear of (d)
-(())
-pass: should be empty deque after this line
-#+end_example
-
-With this test result, we are relatively confident that we have written our ~deque~ library to properly support it's specification. The usage of two linked list should ensure that for most of the usecase, our operations are \Theta(1) time, with the exception of reblancing, which would cost \Theta(n) steps.
-
