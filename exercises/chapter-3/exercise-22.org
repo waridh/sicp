@@ -105,3 +105,7 @@ racket ./src/exercise-22.rkt
 :end:
 
 And now, we are correctly displaying the queue.
+
+As an additional note, I suspect that although the modularity of message passing could be great, there might be more overhead than defining procedures that directly act on data structure, mutation or no mutation. Every environment frames must hold on to more data, as compared to having procedures that act on both the data and the value.
+
+I suppose that we should just be conscious of the location of the most important parameter in an operation.

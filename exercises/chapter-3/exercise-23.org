@@ -1,0 +1,46 @@
+#+title: Exercise 23
+* Prompt
+A /deque/ ("double-ended queue") is a sequence in which items can be inserted and deleted at either the front or the rear. Operations on deques are the constructor ~make-deque~, the predicate ~empty-deque?~, selectors ~front-deque!~ and ~rear-deque~, mutators ~front-insert-deque!~, ~rear-insert-deque!~, ~front-delete-deque!~, and ~rear-delete-deque!~. Show how to represent deques using pairs, and give implementations of the operations. All operations should be accomplished in \Theta(1) steps.
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-23.rkt
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+We'll be implementing using pairs, and immediately, the problem we are going to run into is the singly linked list representation, which is the default list representation in Lisp. If our rear pointer is pointing to the actual last pair in the list that represents the queue, we would not be able to delete the rear in \Theta(1) time, since we would have to traverse from the front pointer to find the last pair again. Solution to this might not be so complex, as we just have to make sure to have a pointer to the second last element of the list. In fact, by adding more checking logic (which increases complexity), we just have to use this as the rear pointer, and the front pointer.
+
+
+#+begin_src racket :exports code
+#+end_src
+
+Now, testing this against the testcase from the previous exercise, we see the same values, and therefore we were successful in implementing the closure representation of the queue.
+
+#+begin_src racket :exports code
+(define q1 (make-queue))
+(print-queue (insert-queue! q1 'a))
+(print-queue (insert-queue! q1 'b))
+(print-queue (delete-queue! q1))
+(print-queue (delete-queue! q1))
+#+end_src
+
+#+begin_src bash :exports results :results drawer
+racket ./src/exercise-22.rkt
+#+end_src
+
+#+RESULTS:
+:results:
+(a)
+(a b)
+(b)
+()
+:end:
+
+And now, we are correctly displaying the queue.
+
+As an additional note, I suspect that although the modularity of message passing could be great, there might be more overhead than defining procedures that directly act on data structure, mutation or no mutation. Every environment frames must hold on to more data, as compared to having procedures that act on both the data and the value.
+
+I suppose that we should just be conscious of the location of the most important parameter in an operation.
