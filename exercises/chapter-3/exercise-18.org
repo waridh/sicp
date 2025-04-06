@@ -81,12 +81,12 @@ Now we will have a look at some simple tests.
 
 Running our result, we get the following answers.
 
-#+begin_src bash :exports both :results drawer replace
+#+begin_src bash :exports both :results output replace
 racket ./src/exercise-18.rkt
 #+end_src
 
 #+RESULTS:
-:results:
+#+begin_example
 testing against name: basic-list
 which has the following shape: (a b c)
 is a cycle?: #f
@@ -99,6 +99,6 @@ testing against name: cycle-2
 which has the following shape: (x y z . #0=(a b c . #0#))
 is a cycle?: #t
 
-:end:
+#+end_example
 
 These results are accurate, but the testing is not exhaustive. Functionally, this looks correct, but the issue is that our implementation is linear. Imagine having to build another list with 1,000,000 elements when trying to see if a list of 1,000,000 elements contains a cycle.

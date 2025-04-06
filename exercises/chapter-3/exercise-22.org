@@ -92,17 +92,16 @@ Now, testing this against the testcase from the previous exercise, we see the sa
 (print-queue (delete-queue! q1))
 #+end_src
 
-#+begin_src bash :exports results :results drawer
+#+begin_src bash :exports results :results output
 racket ./src/exercise-22.rkt
 #+end_src
 
 #+RESULTS:
-:results:
-(a)
-(a b)
-(b)
-()
-:end:
+: (a)
+: (a b)
+: (b)
+: ()
+
 
 And now, we are correctly displaying the queue.
 

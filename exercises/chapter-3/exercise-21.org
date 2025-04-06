@@ -72,16 +72,15 @@ On deletion of the last pair of the queue, the front pointer will correctly show
 (print-queue (delete-queue! q1))
 #+end_src
 
-#+begin_src bash :exports results :results drawer
+#+begin_src bash :exports results :results output
 racket ./src/exercise-21.rkt
 #+end_src
 
 #+RESULTS:
-:results:
-(a)
-(a b)
-(b)
-()
-:end:
+: (a)
+: (a b)
+: (b)
+: ()
+
 
 And now, we are correctly displaying the queue.

@@ -99,12 +99,12 @@ Now we will have a look at some simple tests.
 
 Running our result, we get the following answers.
 
-#+begin_src bash :exports both :results drawer replace
+#+begin_src bash :exports both :results output replace
 racket ./src/exercise-19.rkt
 #+end_src
 
 #+RESULTS:
-:results:
+#+begin_example
 testing against name: basic-list
 is a cycle?: #f
 
@@ -120,6 +120,6 @@ is a cycle?: #f
 testing against name: very large cycle
 is a cycle?: #t
 
-:end:
+#+end_example
 
 Well, we are now able to find if the list is a cycle or not, using constant memory for the algorithm. This is lovely, now we can move forward.
