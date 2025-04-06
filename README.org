@@ -5,4 +5,4 @@ Repository for structure and interpretation of computer programs exercises. Exer
 * Links
 - [[./exercises/chapter-1.org][Chapter 1]]
 - [[./exercises/chapter-2.org][Chapter 2]]
-- [[org:../proj/sicp/exercises/chapter-3/index.org][Chapter 3]]
+- [[file:exercises/chapter-3/index.org][Chapter 3]]
