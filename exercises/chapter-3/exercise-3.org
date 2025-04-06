@@ -50,12 +50,12 @@ The resulting account object should process a request only if it is accompanies 
 #+end_src
 
 
-#+begin_src sh :exports both
+#+begin_src sh :exports both :results output replace
 racket ./src/exercise-3.rkt
 #+end_src
 
 #+RESULTS:
-|         60 |           |
-| "Incorrect | password" |
+: 60
+: "Incorrect password"
 
 Yep, this is what we expected.

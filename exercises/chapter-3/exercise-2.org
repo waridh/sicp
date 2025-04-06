@@ -33,14 +33,14 @@ Yay, I love higher order functions. We will make three branches, one for showing
 #+end_src
 
 
-#+begin_src sh :exports both
+#+begin_src sh :exports both :results replace output
 racket ./src/exercise-2.rkt
 #+end_src
 
 #+RESULTS:
-| 10 |
-|  1 |
-|  0 |
-|  0 |
+: 10
+: 1
+: 0
+: 0
 
 Yep, this is what we expected.
