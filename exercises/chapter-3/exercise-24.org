@@ -1,0 +1,88 @@
+#+title: Exercise 24
+* Prompt
+In the table implementations above, the keys are tested for equality using ~equal?~ (called by ~assoc~). This is not always the appropriate test. For instance, we might have a table with numeric keys in which we don't need an exact match to the number we're looking up, but only a number within some tolerance of it. Design a table constructor ~make-table~ that takes as an argument a ~same-key?~ procedure that will be used to test "equality" of keys. ~make-table~ should return a dispatch procedure that can be used to access appropriate ~lookup~ and ~insert!~ procedures for a local table.
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-24.rkt
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+We are applying some higher order procedures in a mutating architecture, I like it. Firstly, we should port over the ~make-table~ procedure from sicp and begin to update it.
+
+Mainly, we are going to make another procedure in the table environment that replaces the call to ~assoc~, which will use the key matching procedure inputted as the parameter.
+
+#+begin_src racket :exports code
+(define (make-table same-key?)
+  ;; Main addition to this exercise is the following closure. We are now
+  ;; creating custom assoc procedure for the different table instances.
+  (define (assoc key records)
+    (cond
+      [(null? records) false]
+      [(same-key? key (caar records)) (car records)]
+      [else (assoc key (cdr records))]))
+  (let ([local-table (list '*table*)])
+    (define (lookup key-1 key-2)
+      (let ([subtable (assoc key-1 (cdr local-table))])
+        (if subtable
+            (let ([record (assoc key-2 (cdr subtable))])
+              (if record
+                  (cdr record)
+                  false))
+            false)))
+    (define (insert! key-1 key-2 value)
+      (let ([subtable (assoc key-1 (cdr local-table))])
+        (if subtable
+            (let ([record (assoc key-2 (cdr subtable))])
+              (if record
+                  (set-cdr! record value)
+                  (set-cdr! subtable (cons (cons key-2 value) (cdr subtable)))))
+            (set-cdr! local-table (cons (list key-1 (cons key-2 value)) (cdr local-table)))))
+      'ok)
+    (define (dispatch m)
+      (cond
+        [(eq? m 'lookup-proc) lookup]
+        [(eq? m 'insert-proc!) insert!]
+        [else (error "Unknown operation: TABLE" m)]))
+    dispatch))
+
+(define (lookup key-1 key-2 table )
+  ((table 'lookup-proc) key-1 key-2))
+(define (insert! key-1 key-2 value table)
+  ((table 'insert-proc!) key-1 key-2 value))
+#+end_src
+
+** Testing
+We would not know if this is working without some assertions, so we are going to make that happen here.
+
+#+begin_src racket :exports code
+(define basic-table (make-table equal?))
+(define number-table (make-table =))
+
+(define (assert-eq? msg value expected)
+  (display (if (eq? value expected) "pass: " "fail: "))
+  (display msg)
+  (newline))
+
+(insert! 'key-a 'key-b 'a basic-table)
+(assert-eq? "testing original table insertion and lookup" (lookup 'key-a 'key-b basic-table) 'a)
+(insert! 42.0 138/2 'b number-table)
+(assert-eq? "exact value lookup for number table" (lookup 42.0 138/2 number-table) 'b)
+(assert-eq? "equivalent lookup for number table" (lookup 42 69 number-table) 'b)
+#+end_src
+
+** Result
+
+#+begin_src bash :exports results :results output
+racket ./src/exercise-24.rkt
+#+end_src
+
+#+RESULTS:
+: ok
+: pass: testing original table insertion and lookup
+: ok
+: pass: exact value lookup for number table
+: pass: equivalent lookup for number table
