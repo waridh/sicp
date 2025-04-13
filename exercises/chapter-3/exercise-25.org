@@ -1,0 +1,107 @@
+#+title: Exercise 25
+* Prompt
+Generalizing one- and two-dimensional tables, show how to implement a table in which values are stored under an arbitrary number of keys and different values may be stored under different numbers of keys. The ~lookup~ and ~insert!~ procedures should take as input a list of keys used to access the table.
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-25.rkt
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+Interesting exercise. We are going to try and make the key system scale better, as all systems will eventually need. Firstly, we need to be able to construct nested tables recursively, and conversely, we need to be able to lookup records recursively. We will use an iterative approach to this, for the sake of improved performance.
+
+#+begin_src racket :exports code
+(define (make-table same-key?)
+  ;; Main addition to this exercise is the following closure. We are now
+  ;; creating custom assoc procedure for the different table instances.
+  (define (assoc key records)
+    (cond
+      [(null? records) false]
+      [(same-key? key (caar records)) (car records)]
+      [else (assoc key (cdr records))]))
+  (let ([local-table (list '*table*)])
+    (define (lookup keys)
+      (define (iter record keys)
+        (if (null? keys)
+            (cdr record)
+            (let ([head-key (car keys)]
+                  [tail-keys (cdr keys)])
+              (let ([next-record (assoc head-key (cdr record))])
+                (if (not next-record)
+                    false
+                    (iter next-record tail-keys))))))
+      (iter local-table keys))
+    (define (insert! keys value)
+      (define (iter! record keys value)
+        (if (null? keys)
+            (set-cdr! record value)
+            (let ([head-key (car keys)]
+                  [tail-key (cdr keys)]
+                  [record-backbone (cdr record)])
+              (let ([next-record (assoc head-key record-backbone)])
+                (if (not next-record)
+                    ;; Need to create the next nested table
+                    (let ([new-record (list head-key)])
+                      (begin
+                        (set-cdr! record (cons new-record record-backbone))
+                        (iter! new-record tail-key value)))
+                    (iter! next-record tail-key value))))))
+      (iter! local-table keys value)
+      'ok)
+    (define (dispatch m)
+      (cond
+        [(eq? m 'lookup-proc) lookup]
+        [(eq? m 'insert-proc!) insert!]
+        [else (error "Unknown operation: TABLE" m)]))
+    dispatch))
+
+(define (lookup keys table)
+  ((table 'lookup-proc) keys))
+(define (insert! keys value table)
+  ((table 'insert-proc!) keys value))
+#+end_src
+
+** Testing
+We would not know if this is working without some assertions, so we are going to make that happen here.
+
+#+begin_src racket :exports code
+(define basic-table (make-table equal?))
+(define number-table (make-table =))
+
+(define (assert-eq? msg value expected)
+  (display (if (eq? value expected) "pass: " "fail: "))
+  (display msg)
+  (newline))
+
+(insert! (list 'key-a 'key-b) 'a basic-table)
+(assert-eq? "testing original table insertion and lookup"
+            (lookup (list 'key-a 'key-b) basic-table)
+            'a)
+(insert! (list 42.0 138/2) 'b number-table)
+(assert-eq? "exact value lookup for number table" (lookup (list 42.0 138/2) number-table) 'b)
+(assert-eq? "equivalent lookup for number table" (lookup (list 42 69) number-table) 'b)
+(insert! (list 'key-1 'key-2 'key-3) 'x basic-table)
+(assert-eq? "arbitrary key insertion and lookup testing"
+            (lookup (list 'key-1 'key-2 'key-3) basic-table)
+            'x)
+#+end_src
+
+** Result
+
+#+begin_src bash :exports results :results output
+racket ./src/exercise-25.rkt
+#+end_src
+
+#+RESULTS:
+: ok
+: pass: testing original table insertion and lookup
+: ok
+: pass: exact value lookup for number table
+: pass: equivalent lookup for number table
+: ok
+: pass: arbitrary key insertion and lookup testing
+
+This is working as we expect, as now, we have a third level nesting for a table insertion and lookup, which through our edge to edge testing, has passed.
