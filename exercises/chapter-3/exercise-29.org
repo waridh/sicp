@@ -1,0 +1,209 @@
+#+title: Exercise 29
+* Prompt
+Another way to construct an or-gate is as a compound digital logic device, built from and-gates and inverters. Define a procedure ~or-gate~ that accomplishes this. What is the delay time of the ~or-gate~ in terms of ~and-gate-delay~ and ~inverter-delay~?
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-29.rkt
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+As with before, we are going to bring over the setup implementation of the simulation system, and then implementing what is asked of us. Here, we will be reusing the tests from [[file:exercise-28.org][exercise 3.28]].
+
+** Wire implementation
+
+#+begin_src racket :exports code
+(define (make-wire)
+  (let ([action-map '()]
+        [local-value 0])
+    ;; This local procedure will apply all the stored callbacks
+    (define (apply-callbacks callback-tail)
+      (if (null? callback-tail)
+          'ok
+          (begin
+            ((car callback-tail))
+            (apply-callbacks (cdr callback-tail)))))
+    (define (set-value! value)
+      (cond
+        [(or (= value 1) (= value 0))
+         (begin
+           (set! local-value value)
+           (apply-callbacks action-map))]
+        [else (error "unsupported value for a wire" value)]))
+    (define (add-callback callback-procedure)
+      (set! action-map (cons callback-procedure action-map)))
+    (define (dispatch m)
+      (cond
+        [(eq? m 'get-signal) local-value]
+        [(eq? m 'set-signal!) set-value!]
+        [(eq? m 'add-action!) add-callback]))
+    dispatch))
+
+;; implementation of get-signal
+(define (get-signal wire)
+  (wire 'get-signal))
+
+;; implementation of set-signal!
+(define (set-signal! wire new-value)
+  ((wire 'set-signal!) new-value))
+
+;; implementation of add-action! Implemented for adding callbacks to
+;; changes in the value of the wire objects.
+(define (add-action! wire action-proc)
+  ((wire 'add-action!) action-proc))
+#+end_src
+
+** Delay
+Currently, we don't have to immediately implement a delay system, since we would have to architect some sort of clock, and an accurate way to propagate that information. I don't think that I need this yet, but soon, this type of system will be required. For now, we are going to add some dummy procedures that does not do anything yet.
+
+#+begin_src racket :exports code
+;; procedure that implements delay, which is a part of the clocking
+;; component of the circuit simulator. Current implementation does not
+;; have any real delay
+(define (after-delay delay-value callback)
+  (callback))
+#+end_src
+
+** Primitive gate implementation
+
+Here, we are going to implement the other required primitive gate implementations, namely, the ~and-gate~ and the ~inverter~.
+
+#+begin_src racket :exports code
+(define (and-gate a1 a2 output)
+  (define (and-action-propagation)
+    (let ([new-value (logical-and (get-signal a1) (get-signal a2))])
+      (after-delay and-gate-delay (lambda () (set-signal! output new-value)))))
+  (add-action! a1 and-action-propagation)
+  (add-action! a2 and-action-propagation)
+  'ok)
+
+(define and-gate-delay 0)
+
+(define (logical-and in1 in2)
+  (cond
+    [(= in1 0) 0]
+    [(= in2 0) 0]
+    [(and (= in1 1) (= in2 1)) 1]
+    [else (error "found invalid input value for and-gate" (list in1 in2))]))
+
+(define (inverter input output)
+  (define (invert-input)
+    (let ([new-value (logical-not (get-signal input))])
+      (after-delay inverter-delay (lambda () (set-signal! output new-value)))))
+  (add-action! input invert-input)
+  'ok)
+(define (logical-not s)
+  (cond
+    [(= s 0) 1]
+    [(= s 1) 0]
+    [else (error "Invalid signal" s)]))
+(define inverter-delay 0)
+#+end_src
+
+
+** Or gate implementation
+
+Here, we are now implementing the ~or-gate~ as a compound function block. We had to first write up a schema for how to make this gate. For us, we noticed that the ~or-gate~ has an output profile that looks like an inverted ~and-gate~ with the inputs inverted as well. Well, we could do this using three inverters surrounding an ~and-gate~. We will then implement this.
+
+#+begin_src racket :exports code
+(define (or-gate a1 a2 output)
+  (let ([b1 (make-wire)]
+        [b2 (make-wire)]
+        [c1 (make-wire)])
+    (inverter a1 b1)
+    (inverter a2 b2)
+    (and-gate b1 b2 c1)
+    (inverter c1 output))
+  'ok)
+#+end_src
+
+
+** Testing
+
+All good systems must be well tested. Here, we are going to just test the truth table.
+
+#+begin_src racket :exports code
+;; we should write a quick assertion function for this
+
+(define (assert-or-gate in-val1 in-val2 expected-output)
+  (let ([in-wire1 (make-wire)]
+        [in-wire2 (make-wire)]
+        [output-wire (make-wire)])
+    (let ([or-gate-ut (or-gate in-wire1 in-wire2 output-wire)])
+      (set-signal! in-wire1 in-val1)
+      (set-signal! in-wire2 in-val2)
+      (let ([result-value (get-signal output-wire)])
+        (display (if (= expected-output result-value) "pass: " "fail: "))
+        (display in-val2)
+        (display " | ")
+        (display in-val2)
+        (display " => ")
+        (display expected-output)
+        (display " got: ")
+        (display result-value)
+        (newline)))))
+
+(define or-gate-tests (list (list 0 0 0) (list 0 1 1) (list 1 0 1) (list 1 1 1)))
+
+(define (apply-or-gate-tests tail-tests)
+  (if (null? tail-tests)
+      'ok
+      (let ([curr-test (car tail-tests)])
+        (let ([i1 (car curr-test)]
+              [i2 (cadr curr-test)]
+              [expected (caddr curr-test)])
+          (assert-or-gate i1 i2 expected)
+          (apply-or-gate-tests (cdr tail-tests))))))
+(apply-or-gate-tests or-gate-tests)
+#+end_src
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-29.rkt
+#+end_src
+
+#+RESULTS:
+: pass: 0 | 0 => 0 got: 0
+: pass: 1 | 1 => 1 got: 1
+: pass: 0 | 0 => 1 got: 1
+: pass: 1 | 1 => 1 got: 1
+: ok
+
+
+Using this compound implementation of the ~or-gate~, we were able to verify the correctness of the gate.
+
+So now, we should probably discuss the delay time of the ~or-gate~ in terms of the other delay. I will draw out our implementation, which would make the clocking very obvious.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.28-or-gate.png
+@startuml
+rectangle inv1
+rectangle inv2
+rectangle inv3
+rectangle andgate
+
+label a
+label b
+
+label output
+
+a -> inv1
+b -> inv2
+inv3 -> output
+
+inv1 -down-> andgate
+inv2 -up-> andgate
+andgate -> inv3
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.28-or-gate.png]]
+
+So what we see here is that although there are three inverters, two of them are reached at the same time, therefore, we could describe the delay of this implementation of the gate to be expressed by the following equation.
+
+$\text{or-gate-delay} = \text{and-gate-delay} + \left( 2 \times \text{inverter-delay} \right)$
+
+And with this, we are complete.

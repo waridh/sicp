@@ -1,0 +1,150 @@
+#+title: Exercise 28
+* Prompt
+Define an or-gate as a primitive function box. Your ~or-gate~ constructor should be similar to ~and-gate~.
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-28.rkt
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+Fundamentally, we have to do a little extra work here, since we do not have an implementation of the wire object which would allow us to build and test the rest of the implementation. We are going to build the wire system such that it could be reused in future exercises that are related to the digital circuit simulation.
+
+** Wire implementation
+
+We now must do what the book as been telling us, and creating a mutable object with local states. We are going to use the message passing architecture that is being used more prominently in chapter 3 to do this.
+
+First, we must think about the specification of this object. Here are the requirements:
+- Constructor procedure in the form of ~make-wire~
+- Selector procedure in the form of ~get-signal~
+- Mutator for the signal in the form of ~set-signal!~
+- A callback map must be created for the wire object, where all the procedure in this callback map are applied when the value of the signal changes.
+
+#+begin_src racket :exports code
+(define (make-wire)
+  (let ([action-map '()]
+        [local-value 0])
+    ;; This local procedure will apply all the stored callbacks
+    (define (apply-callbacks callback-tail)
+      (if (null? callback-tail)
+          'ok
+          (begin
+            ((car callback-tail))
+            (apply-callbacks (cdr callback-tail)))))
+    (define (set-value! value)
+      (cond
+        [(or (= value 1) (= value 0))
+         (begin
+           (set! local-value value)
+           (apply-callbacks action-map))]
+        [else (error "unsupported value for a wire" value)]))
+    (define (add-callback callback-procedure)
+      (set! action-map (cons callback-procedure action-map)))
+    (define (dispatch m)
+      (cond
+        [(eq? m 'get-signal) local-value]
+        [(eq? m 'set-signal!) set-value!]
+        [(eq? m 'add-action!) add-callback]))
+    dispatch))
+
+;; implementation of get-signal
+(define (get-signal wire)
+  (wire 'get-signal))
+
+;; implementation of set-signal!
+(define (set-signal! wire new-value)
+  ((wire 'set-signal!) new-value))
+
+;; implementation of add-action! Implemented for adding callbacks to
+;; changes in the value of the wire objects.
+(define (add-action! wire action-proc)
+  ((wire 'add-action!) action-proc))
+#+end_src
+
+** Delay
+Currently, we don't have to immediately implement a delay system, since we would have to architect some sort of clock, and an accurate way to propagate that information. I don't think that I need this yet, but soon, this type of system will be required. For now, we are going to add some dummy procedures that does not do anything yet.
+
+#+begin_src racket :exports code
+;; procedure that implements delay, which is a part of the clocking
+;; component of the circuit simulator. Current implementation does not
+;; have any real delay
+(define (after-delay delay-value callback)
+  (callback))
+#+end_src
+** Or gate implementation
+
+#+begin_src racket :exports code
+(define (or-gate a1 a2 output)
+  (define (or-action-propagation)
+    (let ([new-value (logical-or (get-signal a1) (get-signal a2))])
+      (after-delay or-gate-delay (lambda () (set-signal! output new-value)))))
+  (add-action! a1 or-action-propagation)
+  (add-action! a2 or-action-propagation)
+  'ok)
+
+(define or-gate-delay 0)
+
+(define (logical-or in1 in2)
+  (cond
+    [(= in1 1) 1]
+    [(= in2 1) 1]
+    [(and (= in1 0) (= in2 0)) 0]
+    [else (error "found invalid input value" (list in1 in2))]))
+#+end_src
+
+** Testing
+
+All good systems must be well tested. Here, we are going to just test the truth table.
+
+#+begin_src racket :exports code
+;; we should write a quick assertion function for this
+
+(define (assert-or-gate in-val1 in-val2 expected-output)
+  (let ([in-wire1 (make-wire)]
+        [in-wire2 (make-wire)]
+        [output-wire (make-wire)])
+    (let ([or-gate-ut (or-gate in-wire1 in-wire2 output-wire)])
+      (set-signal! in-wire1 in-val1)
+      (set-signal! in-wire2 in-val2)
+      (let ([result-value (get-signal output-wire)])
+        (display (if (= expected-output result-value) "pass: " "fail: "))
+        (display in-val2)
+        (display " | ")
+        (display in-val2)
+        (display " => ")
+        (display expected-output)
+        (display " got: ")
+        (display result-value)
+        (newline)))))
+
+(define or-gate-tests (list (list 0 0 0) (list 0 1 1) (list 1 0 1) (list 1 1 1)))
+
+(define (apply-or-gate-tests tail-tests)
+  (if (null? tail-tests)
+      'ok
+      (let ([curr-test (car tail-tests)])
+        (let ([i1 (car curr-test)]
+              [i2 (cadr curr-test)]
+              [expected (caddr curr-test)])
+          (assert-or-gate i1 i2 expected)
+          (apply-or-gate-tests (cdr tail-tests))))))
+(apply-or-gate-tests or-gate-tests)
+#+end_src
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-28.rkt
+#+end_src
+
+#+RESULTS:
+: pass: 0 | 0 => 0 got: 0
+: pass: 1 | 1 => 1 got: 1
+: pass: 0 | 0 => 1 got: 1
+: pass: 1 | 1 => 1 got: 1
+: ok
+
+
+Alright, we were able to show that we can create an or gate, and along with this, we built the required infrastructure to run the digital circuit simulator. The only missing feature here is that timing and clocks are not being simulated sufficiently. If there is anything that I know, it is that clocking matters a lot.
