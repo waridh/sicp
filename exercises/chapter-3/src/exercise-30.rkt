@@ -21,7 +21,8 @@
            (apply-callbacks action-map))]
         [else (error "unsupported value for a wire" value)]))
     (define (add-callback callback-procedure)
-      (set! action-map (cons callback-procedure action-map)))
+      (set! action-map (cons callback-procedure action-map))
+      (callback-procedure))
     (define (dispatch m)
       (cond
         [(eq? m 'get-signal) local-value]
