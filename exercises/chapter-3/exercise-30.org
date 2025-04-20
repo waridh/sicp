@@ -1,0 +1,333 @@
+#+title: Exercise 30
+* Prompt
+We are shown a /ripple-carry adder/ in the sicp textbook. It is formed by stringing together /n/ full-adders. This is the simplest form of parallel adder for adding two /n-bit/ binary numbers. The inputs A_1, A_2, A_3, ..., A_n and B_1, B_2, B_3, ..., B_n are the two binary numbers to be added (each A_k, and B_k is a 0 or a 1). The circuit generates S_1, S_2, S_3, ..., S_n, the /n/ bits of the sum, and C, the carry from the addition. Write a procedure ~ripple-carry-adder~ that generates this circuit. The procedure should take as arguments three lists of /n/ wires each - the A_k, the B_k, and the S_k - and also another wire C. The major drawback of the ripple-carry adder is the need to wait for the carry signals to propagate. What is the delay needed to obtain the complete output from an /n/-bit ripple-carry adder, expressed in terms of the delays for ~and-gates~, ~or-gates~, and ~inverters~?
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-30.rkt :comments yes
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+Again, for this exercise, we are going to have to port over the system setup work we had done prior. Here, we are suddenly placed into a digital logic class.
+
+** Wire implementation
+
+#+begin_src racket :exports code
+(define (make-wire)
+  (let ([action-map '()]
+        [local-value 0])
+    ;; This local procedure will apply all the stored callbacks
+    (define (apply-callbacks callback-tail)
+      (if (null? callback-tail)
+          'ok
+          (begin
+            ((car callback-tail))
+            (apply-callbacks (cdr callback-tail)))))
+    (define (set-value! value)
+      (cond
+        [(or (= value 1) (= value 0))
+         (begin
+           (set! local-value value)
+           (apply-callbacks action-map))]
+        [else (error "unsupported value for a wire" value)]))
+    (define (add-callback callback-procedure)
+      (set! action-map (cons callback-procedure action-map)))
+    (define (dispatch m)
+      (cond
+        [(eq? m 'get-signal) local-value]
+        [(eq? m 'set-signal!) set-value!]
+        [(eq? m 'add-action!) add-callback]))
+    dispatch))
+
+;; implementation of get-signal
+(define (get-signal wire)
+  (wire 'get-signal))
+
+;; implementation of set-signal!
+(define (set-signal! wire new-value)
+  ((wire 'set-signal!) new-value))
+
+;; implementation of add-action! Implemented for adding callbacks to
+;; changes in the value of the wire objects.
+(define (add-action! wire action-proc)
+  ((wire 'add-action!) action-proc))
+#+end_src
+
+** Delay
+Currently, we don't have to immediately implement a delay system, since we would have to architect some sort of clock, and an accurate way to propagate that information. I don't think that I need this yet, but soon, this type of system will be required. For now, we are going to add some dummy procedures that does not do anything yet.
+
+#+begin_src racket :exports code
+;; procedure that implements delay, which is a part of the clocking
+;; component of the circuit simulator. Current implementation does not
+;; have any real delay
+(define (after-delay delay-value callback)
+  (callback))
+#+end_src
+
+** Primitive gate implementation
+
+Here, we are going to implement the other required primitive gate implementations, namely, the ~and-gate~ and the ~inverter~.
+
+#+begin_src racket :exports code
+(define (and-gate a1 a2 output)
+  (define (and-action-propagation)
+    (let ([new-value (logical-and (get-signal a1) (get-signal a2))])
+      (after-delay and-gate-delay (lambda () (set-signal! output new-value)))))
+  (add-action! a1 and-action-propagation)
+  (add-action! a2 and-action-propagation)
+  'ok)
+
+(define and-gate-delay 0)
+
+(define (logical-and in1 in2)
+  (cond
+    [(= in1 0) 0]
+    [(= in2 0) 0]
+    [(and (= in1 1) (= in2 1)) 1]
+    [else (error "found invalid input value for and-gate" (list in1 in2))]))
+
+(define (inverter input output)
+  (define (invert-input)
+    (let ([new-value (logical-not (get-signal input))])
+      (after-delay inverter-delay (lambda () (set-signal! output new-value)))))
+  (add-action! input invert-input)
+  'ok)
+(define (logical-not s)
+  (cond
+    [(= s 0) 1]
+    [(= s 1) 0]
+    [else (error "Invalid signal" s)]))
+(define inverter-delay 0)
+
+(define (or-gate a1 a2 output)
+  (define (or-action-propagation)
+    (let ([new-value (logical-or (get-signal a1) (get-signal a2))])
+      (after-delay or-gate-delay (lambda () (set-signal! output new-value)))))
+  (add-action! a1 or-action-propagation)
+  (add-action! a2 or-action-propagation)
+  'ok)
+
+(define or-gate-delay 0)
+
+(define (logical-or in1 in2)
+  (cond
+    [(= in1 1) 1]
+    [(= in2 1) 1]
+    [(and (= in1 0) (= in2 0)) 0]
+    [else (error "found invalid input value" (list in1 in2))]))
+#+end_src
+** Pre-requisite adders
+
+Before getting into the carry-lookahead adder, we are going to have to implement the primitive adders first. We are going to start with the half adder, and then combine it into a full-adder.
+
+#+begin_src racket :exports code
+(define (half-adder a b s c)
+  (let ([d (make-wire)]
+        [e (make-wire)])
+    (or-gate a b d)
+    (and-gate a b c)
+    (inverter c e)
+    (and-gate d e s)
+    'ok))
+
+(define (full-adder a b c-in sum c-out)
+  (let ([s (make-wire)]
+        [c1 (make-wire)]
+        [c2 (make-wire)])
+    (half-adder b c-in s c1)
+    (half-adder a s sum c2)
+    (or-gate c1 c2 c-out)
+    'ok))
+#+end_src
+
+Now we have all the required parts to implement the carry lookahead adder.
+** Carry Lookahead Adder implementation
+
+Here, we are now able to implement the carry-lookahead adder. We see that we are trying to implement a dynamic function box that operates on sequences of signals.
+
+Let's talk about what would be tricky here. Firstly, the input is dynamic, so there is a need to iterate through three lists at the same time. Secondly, private wires must be constructed to bind the different full adders together. Those are the limitations of this system, otherwise, we should be able to build this system using an iterator.
+
+We also want to error check the length of the input wires, since we do not want the user to put in lists of different sizes to the system.
+
+#+begin_src racket :exports code
+;; This is the ripple carry adder implementation for this exerciser.
+(define (ripple-carry-adder a-wires b-wires s-wires c)
+  (define (ripple-carry-iter a-tail b-tail s-tail c-prev)
+    (cond
+      [(or (null? a-tail) (null? b-tail) (null? s-tail))
+       (error "input lists have a length mismatch" (list a-wires b-wires s-wires))]
+      [(and (null? (cdr a-tail)) (null? (cdr b-tail)) (null? (cdr s-tail)))
+       (let ([new-c (make-wire)])
+         (begin
+           (full-adder (car a-tail) (car b-tail) new-c (car s-tail) c-prev)
+           'ok))]
+      [else
+       (let ([new-c (make-wire)])
+         (begin
+           (full-adder (car a-tail) (car b-tail) new-c (car s-tail) c-prev)
+           (ripple-carry-iter (cdr a-tail) (cdr b-tail) (cdr s-tail) new-c)))]))
+  (ripple-carry-iter a-wires b-wires s-wires c))
+#+end_src
+
+Looks like this is it. We just need to ensure correctness by running this through a robust testing suite.
+
+
+** Testing
+
+All good systems must be well tested. Here, we are going to have to try to cover the different cases that the adder must handle.
+
+#+begin_src racket :exports code
+;; we should write a quick assertion function for this
+;; in-val1 will be the value that will be assigned to the wires in
+;; a-list, in-val2 is the values that will be assigned to the wires in b-list,
+;; and expected-output is the value we expect to retrieved from the s-list.
+;; Finally, the expected-carry is the carry value that we expect to retrieve
+;; from the system.
+(define (assert-ripple-adder in-val1 in-val2 expected-output expected-carry)
+  (define (make-corresponding-wires reference-values)
+    (if (null? reference-values)
+        '()
+        (cons (make-wire) (make-corresponding-wires (cdr reference-values)))))
+  ;; procedure that will set the values in the wire to match the value list.
+  (define (set-wire-values! wires the-values)
+    (if (null? wires)
+        'ok
+        (begin
+          (set-signal! (car wires) (car the-values))
+          (set-wire-values! (cdr wires) (cdr the-values)))))
+  (define (get-wire-values wires)
+    (if (null? wires)
+        '()
+        (cons (get-signal (car wires)) (get-wire-values (cdr wires)))))
+  (define (list-=? list-1 list-2)
+    (cond
+      [(and (null? list-1) (null? list-2)) true]
+      [(or (null? list-1) (null? list-2)) false]
+      [(not (= (car list-1) (car list-2))) false]
+      [else (list-=? (cdr list-1) (cdr list-2))]))
+  (define (test-pass?-with-reason result-sum result-carry expected-sum expected-carry)
+    (let ([sum-match (list-=? result-sum expected-sum)]
+          [carry-match (= result-carry expected-carry)])
+      (cond
+        [(and sum-match carry-match) (cons true "sum and carry match expected")]
+        [(not (or sum-match carry-match)) (cons false "both sum and carry do not match")]
+        [(not sum-match) (cons false "sum do not match")]
+        [(not carry-match) (cons false "carry does not match")]
+        [else (error "unhandled case")])))
+  (let ([in-wires1 (make-corresponding-wires in-val1)]
+        [in-wires2 (make-corresponding-wires in-val2)]
+        [output-wires (make-corresponding-wires in-val1)]
+        [carry-out (make-wire)])
+    (ripple-carry-adder in-wires1 in-wires2 output-wires carry-out)
+    (set-wire-values! in-wires1 in-val1)
+    (set-wire-values! in-wires2 in-val2)
+    (let ([result-values (get-wire-values output-wires)]
+          [result-carry (get-signal carry-out)])
+      (let ([test-result
+             (test-pass?-with-reason result-values result-carry expected-output expected-carry)])
+        (let ([test-bool (car test-result)]
+              [test-msg (cdr test-result)])
+          (display (if test-bool "pass: " "fail: "))
+          (display in-val1)
+          (display " + ")
+          (display in-val2)
+          (display " => ")
+          (display expected-output)
+          (display " with ")
+          (display expected-carry)
+          (display " got: ")
+          (display result-values)
+          (display " with ")
+          (display result-carry)
+          (newline))))))
+
+(define ripple-carry-tests
+  (list (list (list 0) (list 1) (list 1) 0)
+        (list (list 1 0) (list 0 1) (list 1 1) 0)
+        (list (list 0 1 1 0 0 0 1) (list 0 0 0 0 1 0 0) (list 0 1 1 0 1 0 1) 0)
+        (list (list 0 1 1 0 0 0 1) (list 0 0 1 0 1 0 0) (list 1 0 0 0 1 0 1) 0)
+        (list (list 1 1) (list 1 0) (list 0 1) 1)
+        (list (list 1 1 1 0 0 1) (list 0 0 1 0 0 0) (list 0 0 0 0 0 1) 1)))
+
+(define (apply-ripple-carry-tests tail-tests)
+  (if (null? tail-tests)
+      'ok
+      (let ([curr-test (car tail-tests)])
+        (let ([i1 (car curr-test)]
+              [i2 (cadr curr-test)]
+              [expected-sum (caddr curr-test)]
+              [expected-carry (cadddr curr-test)])
+          (assert-ripple-adder i1 i2 expected-sum expected-carry)
+          (apply-ripple-carry-tests (cdr tail-tests))))))
+(apply-ripple-carry-tests ripple-carry-tests)
+#+end_src
+
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-30.rkt
+#+end_src
+
+#+RESULTS:
+: pass: (0) + (1) => (1) with 0 got: (1) with 0
+: pass: (1 0) + (0 1) => (1 1) with 0 got: (1 1) with 0
+: pass: (0 1 1 0 0 0 1) + (0 0 0 0 1 0 0) => (0 1 1 0 1 0 1) with 0 got: (0 1 1 0 1 0 1) with 0
+: pass: (0 1 1 0 0 0 1) + (0 0 1 0 1 0 0) => (1 0 0 0 1 0 1) with 0 got: (1 0 0 0 1 0 1) with 0
+: pass: (1 1) + (1 0) => (0 1) with 1 got: (0 1) with 1
+: pass: (1 1 1 0 0 1) + (0 0 1 0 0 0) => (0 0 0 0 0 1) with 1 got: (0 0 0 0 0 1) with 1
+: ok
+
+
+From this test suite, we can see that our /ripple-carry/ adder implementation is correct, and working as to our specification.
+** Function Block Delay
+Now, we are going to analyzer the function block delay present in this system in terms of /and-gate-delay/, /or-gate-delay/, and /inverter-delay/. We are going to choose to find the delay of the building blocks of the smaller function blocks that are present in the system.
+*** Half Adder Delay
+
+The delay of the ~half-adder~ is represented by the following expression for the sum output:
+
+$\text{s-half-adder-delay} = \text{max} \left( \text{or-gate-delay}, \left( \text{and-gate-delay} + \text{inverter-delay} \right) \right) + \text{and-gate-delay}$
+
+And it is the following for the carry output:
+
+$\text{c-half-adder-delay} = \text{and-gate-delay}$
+
+We modeled the delay of the carry output because this seemingly quick pathway will become our bottleneck.
+
+*** Full adder delay
+
+The full adder sum delay can be modeled with the following expression:
+
+$\text{s-full-adder-delay} = 2 \times \text{s-half-adder-delay}$
+
+Which will expand to the following expression in terms of the primitive gate delays.
+
+$\text{s-full-adder-delay} = 2 \times \left( \text{max} \left( \text{or-gate-delay}, \text{and-gate-delay} + \text{inverter-delay} \right) + \text{and-gate-delay} \right)$
+
+The delay of the carry out will be modeled as follows.
+
+$\text{c-full-adder-delay} = \left( \text{s-half-adder-delay} + \text{c-half-adder-delay} + \text{or-gate-delay} \right)$
+
+Which when expanded, will result in the following delay.
+
+$\text{c-full-adder-delay} = \left( \text{max} \left( \text{or-gate-delay}, \text{and-gate-delay} + \text{inverter-delay} \right) + \text{and-gate-delay} \right) + \text{and-gate-delay} + \text{or-gate-delay}$
+
+And now, just reducing the expression:
+
+$\text{c-full-adder-delay} = \left( \text{max} \left( \text{or-gate-delay}, \text{and-gate-delay} + \text{inverter-delay} \right) + 2 \times \text{and-gate-delay} + \text{or-gate-delay} \right)$
+
+We needed to model the delay of both outputs, as it will affect the speed in which the ripple carry adder delay.
+*** Ripple-carry adder delay
+The function blocks that makes up the ripple-carry adder depends on the carry output of the previous full-adder block. This means that the critical path of the ripple-carry adder will always be the time it takes for the MSB to evaluate its sum. We are going to use that as the function block delay. The expression that represents the function block delay of the ripple-carry adder is given below:
+
+$\text{ripple-carry-adder-delay} = \text{s-full-adder-delay} + \left( n - 1 \right) \text{c-full-adder-delay}$
+
+Where /n/ is the number of bits supported by the ripple-carry adder. The ~c-full-adder-delay~ term represents the delay for the carry in dependency required to produce the correct sum for the most significant bit of the ripple-carry adder. The ~s-full-adder-delay~ term is the critical path for the most significant full adder block.
+
+Expanding this, we will have the answer to the question asked by this exercise.
+
+$\text{ripple-carry-adder-delay} = 2 \left( \text{max} \left( \text{or-gate-delay}, \text{and-gate-delay} + \text{inverter-delay} \right) + \text{and-gate-delay} \right) + \left( n - 1 \right) \left( \text{max} \left( \text{or-gate-delay}, \text{and-gate-delay} + \text{inverter-delay} \right) + 2 \times \text{and-gate-delay} + \text{or-gate-delay} \right)$
+
+Here, we can see that the delay scales linearly with the number of bits that the ripple-carry adder must operate on.
