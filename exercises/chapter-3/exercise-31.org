@@ -1,0 +1,16 @@
+#+title: Exercise 31
+* Prompt
+
+The internal procedure ~accept-action-procedure!~ defined in ~make-wire~ specified that when a new action procedure is added to a wire, the procedure is immediately run. Explain why this initialization is necessary. In particular, trace through the half-adder example in the paragraphs above and say how the system's response would differ if we had defined ~accept-actioh-procedure!~ as
+
+#+begin_src racket :exports code
+(define (accept-action-procedure! proc)
+  (set! action-procedures
+        (cons proc action-procedure)))
+#+end_src
+
+* Solution
+
+The initialization is necessary because different input wire states should begin to influence the state of the output wires once a function block has been instantiated. This is also due to how by default, our events are registered through change in the value of the different signals in the wires. For an example, not requested by the exercise, if we had an input and an output wire for an inverter that are both instantiated to 0, if we do not apply the action procedure on the registration immediately, the output value may become stuck at 0, instead of moving to the expected value of 1 because the input signal might not change. This sort of error could cause subtle bugs that are hard to detect.
+
+Now using half adders as an example, suppose we have the two input wires set to 1, and the sum and carry out wires set to 0. Now, we are registering the ~half-adder~ function block. In the correct sicp provided implementation, after the delay that is associated with the ~half-adder~ has passed, the carry output wire will change its state to 1. The implementation given in this exercise without the application of the action procedure will have its carry out signal stuck at 0 until one of the input to the ~half-adder~ has changed. If there are values downstream of this function block that depends on this value, it will have an incorrect state, invalidating the simulation.
