@@ -16,9 +16,11 @@
     (define (set-value! value)
       (cond
         [(or (= value 1) (= value 0))
-         (begin
-           (set! local-value value)
-           (apply-callbacks action-map))]
+         (if (not (= value local-value))
+             (begin
+               (set! local-value value)
+               (apply-callbacks action-map))
+             'ok)]
         [else (error "unsupported value for a wire" value)]))
     (define (add-callback callback-procedure)
       (set! action-map (cons callback-procedure action-map))
