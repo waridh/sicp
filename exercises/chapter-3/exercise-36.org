@@ -1,0 +1,27 @@
+#+title: Exercise 36
+* Prompt
+
+Suppose we evaluate the following sequence of expressions in the global environment:
+
+#+begin_src racket :exports code
+(define a (make-connector))
+(define b (make-connector))
+(set-value! a 10 'user)
+#+end_src
+
+
+At some time, during evaluation of the ~set-value!~, the following expression fro the connector's local procedure is evaluated:
+
+#+begin_src racket :exports code
+(for-each-except
+ setter inform-about-value constraints)
+#+end_src
+
+Draw an environment diagram showing the environment in which the above expression is evaluated.
+* Solution
+
+Right, so basically, we are trying to resolve what is happening in line 3.
+
+The following image shows the environment diagram for the evaluation of the specified line.
+
+[[file:images/exercise-3.36.png]]
