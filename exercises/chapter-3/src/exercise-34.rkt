@@ -1,20 +1,8 @@
-#+title: Exercise 33
-* Prompt
-
-Using the primitive multiplier, adder, and constant constraints, define a procedure ~averager~ that takes three connectors ~a~, ~b~, and ~c~ as inputs and establishes the constraint that the value of ~c~ is the average of the values of ~a~ and ~b~.
-* Solution
-:PROPERTIES:
-:header-args:racket: :tangle ./src/exercise-33.rkt :comments yes
-:END:
-
-#+begin_src racket :exports none
+;; [[file:../exercise-34.org::*Solution][Solution:1]]
 #lang sicp
-#+end_src
+;; Solution:1 ends here
 
-** Provided Primitive Implementation
-*** Connectors
-
-#+begin_src racket :exports none
+;; [[file:../exercise-34.org::*Connectors][Connectors:1]]
 (define (make-connector)
   ;; The internal states
   (let ([value false]
@@ -54,9 +42,9 @@ Using the primitive multiplier, adder, and constant constraints, define a proced
         [(eq? request 'connect) connect]
         [else (error "unknown operation: CONNECTOR" request)]))
     me))
-#+end_src
+;; Connectors:1 ends here
 
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Connectors][Connectors:2]]
 (define (for-each-except exception procedure list)
   (define (loop items)
     (cond [(null? items) 'done]
@@ -64,10 +52,9 @@ Using the primitive multiplier, adder, and constant constraints, define a proced
           [else (procedure (car items))
                 (loop (cdr items))]))
   (loop list))
+;; Connectors:2 ends here
 
-#+end_src
-
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Connectors][Connectors:3]]
 (define (has-value? connector)
   (connector 'has-value?))
 
@@ -79,26 +66,16 @@ Using the primitive multiplier, adder, and constant constraints, define a proced
   ((connector 'forget) retractor))
 (define (connect connector new-constraint)
   ((connector 'connect) new-constraint))
-#+end_src
-*** Constraints
+;; Connectors:3 ends here
 
-The interface for the constraint system is the following. The classes that implement the constraint interface must accept the following symbols.
-
-- ~'I-have-a-value~
-- ~'I-lost-my-value~
-
-With this in mind, the following is the implementation given to us by the book.
-
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Constraints][Constraints:1]]
 (define (inform-about-value constraint)
   (constraint 'I-have-a-value))
 (define (inform-about-no-value constraint)
   (constraint 'I-lost-my-value))
-#+end_src
+;; Constraints:1 ends here
 
-Now, we can implement the different constraint primitives.
-
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Constraints][Constraints:2]]
 (define (adder a1 a2 sum)
   (define (process-new-value)
     (cond
@@ -119,9 +96,9 @@ Now, we can implement the different constraint primitives.
   (connect a2 me)
   (connect sum me)
   me)
-#+end_src
+;; Constraints:2 ends here
 
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Constraints][Constraints:3]]
 (define (multiplier m1 m2 product)
   (define (process-new-value)
     (cond
@@ -147,20 +124,18 @@ Now, we can implement the different constraint primitives.
   (connect m2 me)
   (connect product me)
   me)
-#+end_src
+;; Constraints:3 ends here
 
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Constraints][Constraints:4]]
 (define (constant value connector)
   (define (me request)
     (error "unknown request: CONSTANT" request))
   (connect connector me)
   (set-value! connector value me)
   me)
-#+end_src
+;; Constraints:4 ends here
 
-We are also going to add the probe connector for better debugging.
-
-#+begin_src racket :exports code
+;; [[file:../exercise-34.org::*Constraints][Constraints:5]]
 (define (probe name connector)
   (define (print-probe value)
     (newline)
@@ -178,60 +153,31 @@ We are also going to add the probe connector for better debugging.
           [else (error "unknown request: PROBE" request)]))
   (connect connector me)
   me)
-#+end_src
-** Average Constraint
+;; Constraints:5 ends here
 
-Here, we are now implementing the average constraint, which will be built entirely out of the primitive constraints. It's not complicated yet, we really just have to satisfy the following expression.
+;; [[file:../exercise-34.org::*Test Bench][Test Bench:1]]
+(define (squarer a b)
+  (multiplier a a b))
+;; Test Bench:1 ends here
 
-~c = (* (+ a b) 0.5)~
-
-#+begin_src racket :exports code
-(define (averager a b c)
-  (let ([w (make-connector)]
-        [x (make-connector)])
-    (adder a b w)
-    (constant 0.5 x)
-    (multiplier w x c)
-    'ok))
-#+end_src
-
-** Testing
-
-I think one of the thing that SICP is really lacking is good testing, unlike CS3110, my beloved. Here, I will just make some basic prints.
-
-#+begin_src racket :exports code
-(define (test-a)
+;; [[file:../exercise-34.org::*Test Bench][Test Bench:2]]
+(define (test-1)
   (let ([a (make-connector)]
-        [b (make-connector)]
-        [c (make-connector)])
-    (probe "input 1" a)
-    (probe "input 2" b)
-    (probe "average value" c)
-    (averager a b c)
-    (constant 90.4 a)
-    (constant 33.13 b)))
-#+end_src
+        [b (make-connector)])
+    (probe "result" b)
+    (probe "input" a)
+    (squarer a b)
+    (constant 2 a)))
+(define (test-2)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+    (probe "result" b)
+    (probe "input" a)
+    (squarer a b)
+    (constant 4 b)))
+;; Test Bench:2 ends here
 
-#+begin_src racket :export code
-(define (test-b)
-(let ([a (make-connector)]
-        [b (make-connector)]
-        [c (make-connector)])
-    (probe "input 1" a)
-    (probe "input 2" b)
-    (probe "average value" c)
-    (averager a b c)
-    (constant 90.4 a)
-    (constant 33.13 c)))
-#+end_src
-
-#+begin_src racket :export code
-(test-a)
-(test-b)
-#+end_src
-
-
-Very nice, for this self teaching, this has convinced me that our system is working. We shall now move on.
-** Additional Discussions
-
-We would be able to make the ~averager~ more generic if we correctly defined division, and then do a little constraint definitions to dynamically define the value to divide the sum by. Alas, I won't be doing that.
+;; [[file:../exercise-34.org::*Test Bench][Test Bench:3]]
+(test-1)
+(test-2)
+;; Test Bench:3 ends here
