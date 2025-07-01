@@ -1,0 +1,373 @@
+#+title: Exercise 37
+* Prompt
+
+The ~celsius-fahrenheit-converter~ procedure is cumbersome when compared with a more expression-oriented style of definition, such as
+
+#+begin_src racket :exports code
+(define (celsius-fahrenheit-converter x)
+  (c+ (c* (c/ (cv 9) (cv 5)) x) (cv 32)))
+(define C (make-connector))
+(define F (celsius-fahrenheit-converter))
+#+end_src
+
+Here ~c+~, ~c*~, etc. are the "constraint" versions of the arithmetic operations. For example, ~c+~ takes two connectors as arguments and returns a connector that is related to these by an adder constraint:
+
+#+begin_src racket :exports code
+(define (c+ x y)
+  (let ([z (make-connector)])
+    (adder x y z)
+    z))
+#+end_src
+
+Define analogous procedures ~c-~, ~c*~, ~c/~, and ~cv~ (constant value) that enables us to define compound constraints as in the converter example above.
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-37.rkt :comments yes
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+** Provided Primitive Implementation
+*** Connectors
+
+#+begin_src racket :exports none
+(define (make-connector)
+  ;; The internal states
+  (let ([value false]
+        [informant false]
+        [constraints '()])
+    ;; Setter for the value being held
+    (define (set-my-value newval setter)
+      (cond
+        [(not (has-value? me))
+         (set! value newval)
+         (set! informant setter)
+         (for-each-except setter inform-about-value constraints)]
+        [(not (= value newval)) (error "Contradiction" (list value newval))]
+        [else 'ignored]))
+    ;; Mutator that clears the current value held
+    (define (forget-my-value retractor)
+      (if (eq? retractor informant)
+          (begin
+            (set! informant false)
+            (for-each-except retractor inform-about-no-value constraints))
+          'ignored))
+    ;; Adding a new constraint if not already registered
+    (define (connect new-constraint)
+      (if (not (memq new-constraint constraints))
+          (set! constraints (cons new-constraint constraints)))
+      ;; This will tell the new constraint about the new value
+      (if (has-value? me)
+          (inform-about-value new-constraint))
+      'done)
+    ;; Manually setting up self
+    (define (me request)
+      (cond
+        [(eq? request 'has-value?) (if informant true false)]
+        [(eq? request 'value) value]
+        [(eq? request 'set-value!) set-my-value]
+        [(eq? request 'forget) forget-my-value]
+        [(eq? request 'connect) connect]
+        [else (error "unknown operation: CONNECTOR" request)]))
+    me))
+#+end_src
+
+#+begin_src racket :exports code
+(define (for-each-except exception procedure list)
+  (define (loop items)
+    (cond [(null? items) 'done]
+          [(eq? (car items) exception) (loop (cdr items))]
+          [else (procedure (car items))
+                (loop (cdr items))]))
+  (loop list))
+
+#+end_src
+
+#+begin_src racket :exports code
+(define (has-value? connector)
+  (connector 'has-value?))
+
+(define (get-value connector)
+  (connector 'value))
+(define (set-value! connector new-value informant)
+  ((connector 'set-value!) new-value informant))
+(define (forget-value! connector retractor)
+  ((connector 'forget) retractor))
+(define (connect connector new-constraint)
+  ((connector 'connect) new-constraint))
+#+end_src
+*** Constraints
+
+The interface for the constraint system is the following. The classes that implement the constraint interface must accept the following symbols.
+
+- ~'I-have-a-value~
+- ~'I-lost-my-value~
+
+With this in mind, the following is the implementation given to us by the book.
+
+#+begin_src racket :exports code
+(define (inform-about-value constraint)
+  (constraint 'I-have-a-value))
+(define (inform-about-no-value constraint)
+  (constraint 'I-lost-my-value))
+#+end_src
+
+Now, we can implement the different constraint primitives.
+
+#+begin_src racket :exports code
+(define (adder a1 a2 sum)
+  (define (process-new-value)
+    (cond
+      [(and (has-value? a1) (has-value? a2)) (set-value! sum (+ (get-value a1) (get-value a2)) me)]
+      [(and (has-value? a1) (has-value? sum)) (set-value! a2 (- (get-value sum) (get-value a1)) me)]
+      [(and (has-value? a2) (has-value? sum)) (set-value! a1 (- (get-value sum) (get-value a2)) me)]))
+  (define (process-forget-value)
+    (forget-value! sum me)
+    (forget-value! a1 me)
+    (forget-value! a2 me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      [(eq? request 'I-have-a-value) (process-new-value)]
+      [(eq? request 'I-lost-my-value) (process-forget-value)]
+      [else (error "Unknown request: ADDER" request)]))
+  (connect a1 me)
+  (connect a2 me)
+  (connect sum me)
+  me)
+#+end_src
+
+#+begin_src racket :exports code
+(define (multiplier m1 m2 product)
+  (define (process-new-value)
+    (cond
+      [(or (and (has-value? m1) (= (get-value m1) 0)) (and (has-value? m2) (= (get-value m2) 0)))
+       (set-value! product 0 me)]
+      [(and (has-value? m1) (has-value? m2))
+       (set-value! product (* (get-value m1) (get-value m2)) me)]
+      [(and (has-value? product) (has-value? m1))
+       (set-value! m2 (/ (get-value product) (get-value m1)) me)]
+      [(and (has-value? product) (has-value? m2))
+       (set-value! m1 (/ (get-value product) (get-value m2)) me)]))
+  (define (process-forget-value)
+    (forget-value! product me)
+    (forget-value! m1 me)
+    (forget-value! m2 me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      [(eq? request 'I-have-a-value) (process-new-value)]
+      [(eq? request 'I-lost-my-value) (process-forget-value)]
+      [else (error "Unknown request: MULTIPLIER" request)]))
+  (connect m1 me)
+  (connect m2 me)
+  (connect product me)
+  me)
+#+end_src
+
+#+begin_src racket :exports code
+(define (constant value connector)
+  (define (me request)
+    (error "unknown request: CONSTANT" request))
+  (connect connector me)
+  (set-value! connector value me)
+  me)
+#+end_src
+
+We are also going to add the probe connector for better debugging.
+
+#+begin_src racket :exports code
+(define (probe name connector)
+  (define (print-probe value)
+    (newline)
+    (display "Probe: ")
+    (display name)
+    (display " = ")
+    (display value))
+  (define (process-new-value)
+    (print-probe (get-value connector)))
+  (define (process-forget-value)
+    (print-probe "?"))
+  (define (me request)
+    (cond [(eq? request 'I-have-a-value) (process-new-value)]
+          [(eq? request 'I-lost-my-value) (process-forget-value)]
+          [else (error "unknown request: PROBE" request)]))
+  (connect connector me)
+  me)
+#+end_src
+
+So, since I am an engineer that does debug, obviously, I won't be wasting time doing a raw code analysis when I have the ability to run the code. I will now setup a test environment where we will see what happens when you use such a constraint object.
+** Connector combinators
+
+Here, we are building additional ways to combine connectors together, with the constraints as the combination logic.
+*** Given implementations
+
+#+begin_src racket :exports code
+(define (c+ x y)
+  (let ([z (make-connector)])
+    (adder x y z)
+    z))
+#+end_src
+*** Our solutions
+#+begin_src racket :exports code
+(define (c- x y)
+  (let ([z (make-connector)])
+    (adder z y x)
+    z))
+#+end_src
+
+#+begin_src racket :exports code
+(define (c* x y)
+  (let ([z (make-connector)])
+    (multiplier x y z)
+    z))
+#+end_src
+
+#+begin_src racket :exports code
+(define (c/ x y)
+  (let ([z (make-connector)])
+    (multiplier z y x)
+    z))
+#+end_src
+
+#+begin_src racket :exports code
+(define (cv value)
+  (let ([x (make-connector)])
+    (constant value x)
+    x))
+#+end_src
+
+
+
+** Test Bench
+
+The following is the expression based implementation of the C-to-F constraint.
+
+#+begin_src racket :exports code
+(define (celsius-fahrenheit-converter x)
+  (c+ (c* (c/ (cv 9) (cv 5)) x) (cv 32)))
+#+end_src
+
+
+This might be not so rigorous, but we are just going to test against this constraint.
+
+#+begin_src racket :exports code
+
+(define (test-c+-forward)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+        (let ([c (c+ a b)])
+          (probe "a" a)
+          (probe "b" b)
+          (probe "a + b" c)
+          (constant 1 a)
+          (constant 1.3 b))))
+(define (test-c--forward)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+        (let ([c (c- a b)])
+          (probe "a" a)
+          (probe "b" b)
+          (probe "a - b" c)
+          (constant 1 a)
+          (constant 1.3 b))))
+(define (test-c*-forward)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+        (let ([c (c* a b)])
+          (probe "a" a)
+          (probe "b" b)
+          (probe "a * b" c)
+          (constant 1 a)
+          (constant 1.3 b))))
+(define (test-c/-forward)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+        (let ([c (c/ a b)])
+          (probe "a" a)
+          (probe "b" b)
+          (probe "a / b" c)
+          (constant 1 a)
+          (constant 1.3 b))))
+(define (test-cv-forward)
+  (let ([a (cv 1)]
+        [b (make-connector)])
+        (let ([c (c+ a b)])
+          (probe "a = 1" a)
+          (probe "b" b)
+          (probe "a + b" c)
+          (constant 1.3 b))))
+
+(define (test-1)
+  (let ([a (make-connector)])
+    (let ([b (celsius-fahrenheit-converter a)])
+      (probe "fahrenheit" b)
+      (probe "celsius" a)
+      (constant -40.0 a))))
+(define (test-2)
+  (let ([a (make-connector)])
+    (let ([b (celsius-fahrenheit-converter a)])
+      (probe "fahrenheit" b)
+      (probe "celsius" a)
+      (constant 8.0 b))))
+
+#+end_src
+
+#+begin_src racket :exports code
+(test-c+-forward)
+(test-c--forward)
+(test-c*-forward)
+(test-c/-forward)
+(test-cv-forward)
+(test-1)
+(test-2)
+#+end_src
+
+*** Result
+
+#+begin_src elisp :exports code
+(org-babel-tangle)
+#+end_src
+
+#+RESULTS:
+| /home/bwongwandanee/proj/sicp/exercises/chapter-3/src/exercise-37.rkt |
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-37.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+Probe: a = 1
+Probe: b = 1.3
+Probe: a + b = 2.3#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: a = 1
+Probe: b = 1.3
+Probe: a - b = -0.30000000000000004#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: a = 1
+Probe: b = 1.3
+Probe: a * b = 1.3#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: a = 1
+Probe: b = 1.3
+Probe: a / b = 0.7692307692307692#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: a = 1 = 1
+Probe: b = 1.3
+Probe: a + b = 2.3#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: celsius = -40.0
+Probe: fahrenheit = -40.0#<procedure:...src/exercise-37.rkt:131:2>
+
+Probe: fahrenheit = 8.0
+Probe: celsius = -13.333333333333332#<procedure:...src/exercise-37.rkt:131:2>
+#+end_example
+** Discussion
+
+We were able to correctly implement the new closure property combination procedure. Obviously, this is a very powerful implementation of the system, as we are now able to concisely build more complex constraints.
