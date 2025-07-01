@@ -1,0 +1,275 @@
+#+title: Exercise 35
+* Prompt
+Bit Bitdiddle tells Louis that one way to avoid the trouble in the previous excercise is to define a squarer as a new primitive constraint. Fill in the missing portions in Ben's outline for a procedure to implement such a constraint:
+
+#+begin_src racket :exports code
+(define (squarer a b)
+  (define (process-new-value)
+    (if (has-value? b)
+        (if (< (get-value b) 0)
+            (error "square less than 0: SQUARER" (get-value b))
+            ⟨alternative1⟩)
+        ⟨alternative2⟩))
+  (define (process-forget-value)
+    ⟨body1⟩)
+  (define (me request)
+    ⟨body2⟩)
+  ⟨rest
+  of
+  definition⟩
+  me)
+#+end_src
+
+* Solution
+:PROPERTIES:
+:header-args:racket: :tangle ./src/exercise-35.rkt :comments yes
+:END:
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+** Provided Primitive Implementation
+*** Connectors
+
+#+begin_src racket :exports none
+(define (make-connector)
+  ;; The internal states
+  (let ([value false]
+        [informant false]
+        [constraints '()])
+    ;; Setter for the value being held
+    (define (set-my-value newval setter)
+      (cond
+        [(not (has-value? me))
+         (set! value newval)
+         (set! informant setter)
+         (for-each-except setter inform-about-value constraints)]
+        [(not (= value newval)) (error "Contradiction" (list value newval))]
+        [else 'ignored]))
+    ;; Mutator that clears the current value held
+    (define (forget-my-value retractor)
+      (if (eq? retractor informant)
+          (begin
+            (set! informant false)
+            (for-each-except retractor inform-about-no-value constraints))
+          'ignored))
+    ;; Adding a new constraint if not already registered
+    (define (connect new-constraint)
+      (if (not (memq new-constraint constraints))
+          (set! constraints (cons new-constraint constraints)))
+      ;; This will tell the new constraint about the new value
+      (if (has-value? me)
+          (inform-about-value new-constraint))
+      'done)
+    ;; Manually setting up self
+    (define (me request)
+      (cond
+        [(eq? request 'has-value?) (if informant true false)]
+        [(eq? request 'value) value]
+        [(eq? request 'set-value!) set-my-value]
+        [(eq? request 'forget) forget-my-value]
+        [(eq? request 'connect) connect]
+        [else (error "unknown operation: CONNECTOR" request)]))
+    me))
+#+end_src
+
+#+begin_src racket :exports code
+(define (for-each-except exception procedure list)
+  (define (loop items)
+    (cond [(null? items) 'done]
+          [(eq? (car items) exception) (loop (cdr items))]
+          [else (procedure (car items))
+                (loop (cdr items))]))
+  (loop list))
+
+#+end_src
+
+#+begin_src racket :exports code
+(define (has-value? connector)
+  (connector 'has-value?))
+
+(define (get-value connector)
+  (connector 'value))
+(define (set-value! connector new-value informant)
+  ((connector 'set-value!) new-value informant))
+(define (forget-value! connector retractor)
+  ((connector 'forget) retractor))
+(define (connect connector new-constraint)
+  ((connector 'connect) new-constraint))
+#+end_src
+*** Constraints
+
+The interface for the constraint system is the following. The classes that implement the constraint interface must accept the following symbols.
+
+- ~'I-have-a-value~
+- ~'I-lost-my-value~
+
+With this in mind, the following is the implementation given to us by the book.
+
+#+begin_src racket :exports code
+(define (inform-about-value constraint)
+  (constraint 'I-have-a-value))
+(define (inform-about-no-value constraint)
+  (constraint 'I-lost-my-value))
+#+end_src
+
+Now, we can implement the different constraint primitives.
+
+#+begin_src racket :exports code
+(define (adder a1 a2 sum)
+  (define (process-new-value)
+    (cond
+      [(and (has-value? a1) (has-value? a2)) (set-value! sum (+ (get-value a1) (get-value a2)) me)]
+      [(and (has-value? a1) (has-value? sum)) (set-value! a2 (- (get-value sum) (get-value a1)) me)]
+      [(and (has-value? a2) (has-value? sum)) (set-value! a1 (- (get-value sum) (get-value a2)) me)]))
+  (define (process-forget-value)
+    (forget-value! sum me)
+    (forget-value! a1 me)
+    (forget-value! a2 me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      [(eq? request 'I-have-a-value) (process-new-value)]
+      [(eq? request 'I-lost-my-value) (process-forget-value)]
+      [else (error "Unknown request: ADDER" request)]))
+  (connect a1 me)
+  (connect a2 me)
+  (connect sum me)
+  me)
+#+end_src
+
+#+begin_src racket :exports code
+(define (multiplier m1 m2 product)
+  (define (process-new-value)
+    (cond
+      [(or (and (has-value? m1) (= (get-value m1) 0)) (and (has-value? m2) (= (get-value m2) 0)))
+       (set-value! product 0 me)]
+      [(and (has-value? m1) (has-value? m2))
+       (set-value! product (* (get-value m1) (get-value m2)) me)]
+      [(and (has-value? product) (has-value? m1))
+       (set-value! m2 (/ (get-value product) (get-value m1)) me)]
+      [(and (has-value? product) (has-value? m2))
+       (set-value! m1 (/ (get-value product) (get-value m2)) me)]))
+  (define (process-forget-value)
+    (forget-value! product me)
+    (forget-value! m1 me)
+    (forget-value! m2 me)
+    (process-new-value))
+  (define (me request)
+    (cond
+      [(eq? request 'I-have-a-value) (process-new-value)]
+      [(eq? request 'I-lost-my-value) (process-forget-value)]
+      [else (error "Unknown request: MULTIPLIER" request)]))
+  (connect m1 me)
+  (connect m2 me)
+  (connect product me)
+  me)
+#+end_src
+
+#+begin_src racket :exports code
+(define (constant value connector)
+  (define (me request)
+    (error "unknown request: CONSTANT" request))
+  (connect connector me)
+  (set-value! connector value me)
+  me)
+#+end_src
+
+We are also going to add the probe connector for better debugging.
+
+#+begin_src racket :exports code
+(define (probe name connector)
+  (define (print-probe value)
+    (newline)
+    (display "Probe: ")
+    (display name)
+    (display " = ")
+    (display value))
+  (define (process-new-value)
+    (print-probe (get-value connector)))
+  (define (process-forget-value)
+    (print-probe "?"))
+  (define (me request)
+    (cond [(eq? request 'I-have-a-value) (process-new-value)]
+          [(eq? request 'I-lost-my-value) (process-forget-value)]
+          [else (error "unknown request: PROBE" request)]))
+  (connect connector me)
+  me)
+#+end_src
+
+So, since I am an engineer that does debug, obviously, I won't be wasting time doing a raw code analysis when I have the ability to run the code. I will now setup a test environment where we will see what happens when you use such a constraint object.
+
+
+** Test Bench
+
+The following is the potentially flawed constraint.
+
+#+begin_src racket :exports code
+(define (squarer a b)
+  (define (process-new-value)
+    (if (has-value? b)
+        (if (< (get-value b) 0)
+            (error "square less than 0: SQUARER" (get-value b))
+            (set-value! a (sqrt (get-value b)) me))
+        (if (has-value? a)
+            (let ([a-value (get-value a)])
+              (set-value! b (* a-value a-value) me)))))
+  (define (process-forget-value)
+    (forget-value! a me)
+    (forget-value! b me))
+  (define (me request)
+    (cond [(eq? request 'I-have-a-value) (process-new-value)]
+          [(eq? request 'I-lost-my-value) (process-forget-value)]))
+  (connect a me)
+  (connect b me)
+  me)
+#+end_src
+
+Now, we are going to make multiple runs where we try to different contraint systems, and view the internals using the probes.
+
+#+begin_src racket :exports code
+(define (test-1)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+    (probe "result" b)
+    (probe "input" a)
+    (squarer a b)
+    (constant 2 a)))
+(define (test-2)
+  (let ([a (make-connector)]
+        [b (make-connector)])
+    (probe "result" b)
+    (probe "input" a)
+    (squarer a b)
+    (constant 4 b)))
+#+end_src
+
+#+begin_src racket :exports code
+(test-1)
+(test-2)
+#+end_src
+
+*** Result
+
+#+begin_src elisp :exports code
+(org-babel-tangle)
+#+end_src
+
+#+RESULTS:
+| /home/bwongwandanee/proj/sicp/exercises/chapter-3/src/exercise-35.rkt |
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-35.rkt
+#+end_src
+
+#+RESULTS:
+:
+: Probe: result = 4
+: Probe: input = 2#<procedure:...src/exercise-35.rkt:131:2>
+:
+: Probe: input = 2
+: Probe: result = 4#<procedure:...src/exercise-35.rkt:131:2>
+** Discussion
+
+Yep, this was a simple implementation of a primitive constraint. There actually is not that much to discuss.
