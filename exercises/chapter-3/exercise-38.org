@@ -1,0 +1,247 @@
+#+title: Exercise 38
+* Prompt
+Suppose that Peter, Paul, and Mary share a joint bank account that initially contains $100. Concurrently, Peter deposits $10, Paul withdraws $20, and Mary withdraws half the money in the  account, by executing the following commands:
+
+#+begin_src racket :exports code
+(set! balance (+ balance 10))
+(set! balance (- balance 20))
+(set! balance (- balance (/ balance 2)))
+#+end_src
+
+a. List all the different possible values for ~balance~ after these three transactions have been completed, assuming that the banking system forces the three processes to run sequentially in some order.
+b. What are some other values that could be produced if the system allows the processes to be interleaved? Draw timing diagrams like the one in the chapter to explain how these values can occur.
+* Solution
+** Part A
+In the sequential case, the different values are entirely dependent on when the half the money withdraw happens. Since it is dependent on this, we are going to see 4 solutions.
+
+- (+ 10) -> (/ 2) -> (- 20) = 35
+- (- 20) -> (/ 2) -> (+ 10) = 50
+- (/ 2) -> (+ 10) -> (- 20) = 40
+- (+ 10) -> (- 20) -> (/ 2) = 45
+
+** Part B
+
+The problem that is occurring here is that the different processes could have done the read operation on the balance at the same time. In this situation, we basically see that some of the transactions will just not be registered.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-first.png
+@startuml
+peter <- bank : read 100
+paul <- bank : read 100
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+paul -> bank : write 100 - 20 = 80
+peter -> bank : write 100 + 10 = 110
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-first.png]]
+
+In this first case, all the transactions are re-written by Peter's transaction. This would be disasterous for the bank.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-second.png
+@startuml
+peter <- bank : read 100
+paul <- bank : read 100
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+peter -> bank : write 100 + 10 = 110
+paul -> bank : write 100 - 20 = 80
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-second.png]]
+
+In this case, we are seeing that Paul's write overwrote the other cases.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-third.png
+@startuml
+peter <- bank : read 100
+paul <- bank : read 100
+mary <- bank : read 100
+peter -> bank : write 100 + 10 = 110
+paul -> bank : write 100 - 20 = 80
+mary -> bank : write 100 / 2 = 50
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-third.png]]
+
+Finally, in this permutation of the read first, we see that Mary's case overwrote the other cases.
+
+Now we are done the cases in which the reads are done at the same time, now we are to describe the cases where just two of the processes read the value at the same time. Suddenly, the combinations have become much more complex, We now need to keep track of which of the two processes that read at the same time shall write last, which affects the value that the last process will read. There are three combinations of values that could be read at the same time, and each of those have two possible values that could be the final overwrite, giving us an expected 6 possible sequence where two of the processes read at the same time first, and the third process reading the value last.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-1-1.png
+@startuml
+peter <- bank : read 100
+paul <- bank : read 100
+paul -> bank : write 100 - 20 = 80
+peter -> bank : write 100 + 10 = 110
+mary <- bank : read 110
+mary -> bank : write 110 / 2 = 55
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-1-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-1-2.png
+@startuml
+peter <- bank : read 100
+paul <- bank : read 100
+peter -> bank : write 100 + 10 = 110
+paul -> bank : write 100 - 20 = 80
+mary <- bank : read 80
+mary -> bank : write 80 / 2 = 40
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-1-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-2-1.png
+@startuml
+peter <- bank : read 100
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+peter -> bank : write 100 + 10 = 110
+paul <- bank : read 110
+paul -> bank : write 110 - 20 = 90
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-2-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-2-2.png
+@startuml
+peter <- bank : read 100
+mary <- bank : read 100
+peter -> bank : write 100 + 10 = 110
+mary -> bank : write 100 / 2 = 50
+paul <- bank : read 50
+paul -> bank : write 50 - 20 = 30
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-2-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-3-1.png
+@startuml
+paul <- bank : read 100
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+paul -> bank : write 100 - 20 = 80
+peter <- bank : read 80
+peter -> bank : write 80 + 10 = 90
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-3-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-2-3-2.png
+@startuml
+paul <- bank : read 100
+mary <- bank : read 100
+paul -> bank : write 100 - 20 = 80
+mary -> bank : write 100 / 2 = 50
+peter <- bank : read 50
+peter -> bank : write 50 + 10 = 60
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-2-3-2.png]]
+
+Now we have the final combination to look through. Here, one of the processes will complete before the others, and the other two will read the completed values, and one of the two will complete correctly. This will also result in another 6 sequence of operations.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-1-1.png
+@startuml
+paul <- bank : read 100
+paul -> bank : write 100 - 20 = 80
+mary <- bank : read 80
+peter <- bank : read 80
+mary -> bank : write 80 / 2 = 40
+peter -> bank : write 80 + 10 = 90
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-1-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-1-2.png
+@startuml
+paul <- bank : read 100
+paul -> bank : write 100 - 20 = 80
+mary <- bank : read 80
+peter <- bank : read 80
+peter -> bank : write 80 + 10 = 90
+mary -> bank : write 80 / 2 = 40
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-1-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-2-1.png
+@startuml
+peter <- bank : read 100
+peter -> bank : write 100 + 10 = 110
+paul <- bank : read 110
+mary <- bank : read 110
+paul -> bank : write 110 - 20 = 90
+mary -> bank : write 110 / 2 = 55
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-2-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-2-2.png
+@startuml
+peter <- bank : read 100
+peter -> bank : write 100 + 10 = 110
+paul <- bank : read 110
+mary <- bank : read 110
+mary -> bank : write 110 / 2 = 55
+paul -> bank : write 110 - 20 = 90
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-2-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-3-1.png
+@startuml
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+paul <- bank : read 50
+peter <- bank : read 50
+paul -> bank : write 50 - 20 = 30
+peter -> bank : write 50 + 10 = 60
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-3-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-3-3-2.png
+@startuml
+mary <- bank : read 100
+mary -> bank : write 100 / 2 = 50
+paul <- bank : read 50
+peter <- bank : read 50
+peter -> bank : write 50 + 10 = 60
+paul -> bank : write 50 - 20 = 30
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-3-3-2.png]]
+
+
+This concludes all the cases in which the processes have overlapping computation, causing an error in the result.
