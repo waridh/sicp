@@ -23,4 +23,26 @@ In the unserialized case, we see there are three classes of results.
    1. There are two permutation of this, either P_1 executes first or P_2 executes first
 2. Both processes completely finishes reading from the variable without mutation, but doing so at the same time.
    1. There would be two possible write values for this, either P_1 writes first, or P_2 writes first, and the one that writes first will have their values overwritten
-3. A process read changes because the other process writes to the variable while the current process still needs to read from the variable, causing
+3. A process read changes because the other process writes to the variable while the current process still needs to read from the variable, causing the following cases:
+   1. P_1 completes first:
+      1. P_1 writes after the first P_2 read
+      2. P_1 writes after the second P_2 read
+   2. P_2 completes first:
+      1. P_2 writes after the first P_1 read
+
+This should cover all the cases, let's evaluate this.
+
+- P_1 -> P_2 = 100^3
+- P_2 -> P_1 = 1000^2
+- For P_1 interleave
+  - 10 * 1000 = 10000
+- For P_2 interleave
+  - 10 * 100 * 100 = 100000
+  - 10 * 10 * 100 = 10000
+
+This concludes the permutation of evaluation for the un-serialized version
+** Serialized
+After using the serialized set, the interleaving cases disappears, and we are left with the following two cases.
+
+- P_1 -> P_2 = 100^3
+- P_2 -> P_1 = 1000^2
