@@ -1,0 +1,70 @@
+#+title: Exercise 43
+#+filetags: :sicp:
+* Prompt
+Suppose that the balances in three accounts start out as $10, $20, and $30, and that multiple processes run, exchanging the balances in the accounts. Argue that if the processes are run sequentially, after any number of concurrent exchanges, the account balances should be $10, $20, and $30 in some order. Draw a timing diagram like the one previously to show how this condition can be violated if the exchanges are implemented using the first version of the account-exchange program in this section. On the other hand, argue that even with this ~exchange~ program, the sum of the balances in the accounts will be preserved. Draw a timing diagram to show how even this condition would be violated if we did not serialize the transactions on individual accounts.
+* Solution
+
+** Showing that the balance in the accounts would just be swapped if ran sequentially
+
+If ran sequentially, each time the process is invoked, we just see that the balance will correctly swap before the next invocation of the exchange procedure. What this does is cause every exchange to be a true swap of value, and the sequential execution prevents interleaving. My math is not strong enough to create a proof for this, but the idea is there.
+
+The swapping will always look something like the following:
+
+#+begin_src plantuml :exports results :results file :file ./images/3.43-swap-generic.png
+@startuml
+a1 <-> a2: a1 10 -> 20, a2 20 -> 10
+a2 <-> a3: a2 10 -> 30, a3 30 -> 10
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.43-swap-generic.png]]
+
+Since the transactions are atomic, we actually could never get an account to not have a value that is $10, $20, and $30.
+** Atomic violation on the exchange
+
+If the exchange does not correctly lock the accounts for the transaction, the type of failure that could happen is illustrated by the following sequence diagram.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.43-swap-interleave.png
+@startuml
+exchange1 <- a1 : read 30
+exchange2 <- a1 : read 30
+exchange1 <- a2 : read 20
+exchange1 -> a1 : withdraw 30 - 20 = 10 -> a1: 20
+exchange1 -> a2 : deposit 30 - 20 = 10 -> a2: 30
+exchange2 <- a3 : read 10
+exchange2 -> a1 : withdraw 30 - 10 = 20 -> a1: 0
+exchange2 -> a3 : deposit 30 - 10 = 20 -> a3: 30
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.43-swap-interleave.png]]
+
+Here, we see that the concurrent computation were put in a race condition, and that the swap that comes a little later will be incorrect, due to a change in the state during transaction.
+
+** Sum of balance preservation
+
+Again though, as long as the accounts deposit and withdraw are serialized, we are not going to see money lost or gained in the system, and the sum of all the accounts will stay the same. As seen in SICP, where money could be lost and gained in the system if withdraw and deposit are interleaved, since there is a case where both the withdraw in deposit reads the same initial states, and then write their designated values back to the account. When withdraw and deposit are serialized, such interleaving is not possible, therefore, there shall be no addition or removal of money from the system.
+
+** Balance sum preservation violation without serialization
+
+Here, we are going to show a case where preservation of total balance sum is violated when there is no serialization on the withdraw and deposit methods.
+
+
+#+begin_src plantuml :exports results :results file :file ./images/3.43-no-serialization.png
+@startuml
+exchange1 <- a1 : read 30
+exchange2 <- a1 : read 30
+exchange1 <- a2 : read 20
+exchange2 <- a3 : read 10
+exchange1 <- a1 : read balance: 30
+exchange2 <- a1 : read balance: 30
+exchange1 -> a1 : write balance 30 - 10 = 20 -> a1: 20
+exchange2 -> a1 : write balance 30 - 20 = 10 -> a1: 10
+exchange1 -> a2 : deposit 30 - 20 = 10 -> a2: 30
+exchange2 -> a3 : deposit 30 - 10 = 20 -> a3: 30
+@enduml
+#+end_src
+
+And with this sequence, we effectively dropped a withdraw from a1, causing a gain in the total amount of money in the system.
