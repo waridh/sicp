@@ -1,0 +1,35 @@
+#+title: Exercise 41
+* Prompt
+
+Ben Bitdiddle worries that it would be better to implement the bank account as follows (where the commented line has been changed):
+
+#+begin_src racket :exports code
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance
+                     (- balance amount))
+               balance)
+        "insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((protected (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) (protected withdraw))
+            ((eq? m 'deposit) (protected deposit))
+            ((eq? m 'balance)
+             ((protected
+               (lambda () balance))))
+            (else
+             (error "unknown request: MAKE-ACCOUNT"
+                    m))))
+    dispatch))
+#+end_src
+
+because allowing unserialized access to the bank balance can result in anomalous behavior. Do you agree? Is there any scenario that demonstrates Ben's concern?
+* Solution
+
+Actually, I think we should answer the question in reverse, since for us to agree or not, we should really consider what could happen. The case that validates Ben's concern is the case where there are extraneous systems that will act on the account after reading that the balance is at a certain value. Specifically if that system is using a polling architecture instead of a an event driven one, which could likely be the case on older systems. Say a system that polls the account for the balance for a value below a certain threshold, and then starts a transaction to deposit some money back into the account. In this polling architecture, if there isn't a lock on the balance read, there is a chance that even though the deposit has been registered by the polling system, the polling system could read the pre-deposited balance again and send a second deposit.
+
+Of course, modern systems should be using event subscription for systems that does some action on events, but without this, putting some lock on the reader is a sensible idea. I agree that there are cases where it might be a good idea to put locks on the selector function as well. (Maybe not on our modern systems).
