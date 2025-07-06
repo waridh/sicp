@@ -1,0 +1,31 @@
+#+title: Exercise 42
+#+filetags: :sicp:
+* Prompt
+Ben Bitdiddle suggests that it's a waste of time to create a new serialized procedure in response to every ~withdraw~ and ~deposit~ message. He says that ~make-account~ could be changed so that the calls to ~protected~ are done outside the ~dispatch~ procedure. That is, an account would return the same serialized procedure (which) was created at the same time as the account) each time it is asked for a withdrawal procedure.
+
+#+begin_src racket :exports code
+(define (make-account balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin
+          (set! balance (- balance amount))
+          balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ([protected (make-serializer)])
+    (let ([protected-withdraw (protected withdraw)]
+          [protected-deposit (protected deposit)])
+      (define (dispatch m)
+        (cond
+          [(eq? m 'withdraw) protected-withdraw]
+          [(eq? m 'deposit) protected-deposit]
+          [(eq? m 'balance) balance]
+          [else (error "Unknown request: MAKE-ACCOUNT" m)]))
+      dispatch)))
+#+end_src
+
+Is this a safe change to make? In particular, is there any difference in what concurrency is allowed by these two versions of ~make-account~?
+* Solution
+I think Ben is right, if we follow the definition of a serializer, it states that a serializer maintains a set of procedures, and then one of the procedure in that set is executing, and another process is attempting to run any procedure in this serialized set, it would be forced to wait until the currently executing procedure is completed. So, Ben's new implementation should work, and there should not be a difference in what concurrency is allowed by this version of ~make-account~.
