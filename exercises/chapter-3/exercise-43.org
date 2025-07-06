@@ -67,4 +67,7 @@ exchange2 -> a3 : deposit 30 - 10 = 20 -> a3: 30
 @enduml
 #+end_src
 
+#+RESULTS:
+[[file:./images/3.43-no-serialization.png]]
+
 And with this sequence, we effectively dropped a withdraw from a1, causing a gain in the total amount of money in the system.
