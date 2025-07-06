@@ -1,0 +1,26 @@
+#+title: Exercise 40
+* Prompt
+Give all possible values of x that can result from executing:
+
+#+begin_src racket
+(define x 10)
+(parallel-execute (lambda () (set! x (* x x)))
+                  (lambda () (set! x (* x x x))))
+#+end_src
+
+Which of these possibilities remain if we instead use serialized procedures:
+
+#+begin_src racket
+(define x 10)
+(define s (make-serializer))
+(parallel-execute (s (lambda () (set! x (* x x))))
+                  (s (lambda () (set! x (* x x x)))))
+#+end_src
+* Solution
+** Un-serialized
+In the unserialized case, we see there are three classes of results.
+1. The processes executes in sequence, as if they are already serial
+   1. There are two permutation of this, either P_1 executes first or P_2 executes first
+2. Both processes completely finishes reading from the variable without mutation, but doing so at the same time.
+   1. There would be two possible write values for this, either P_1 writes first, or P_2 writes first, and the one that writes first will have their values overwritten
+3. A process read changes because the other process writes to the variable while the current process still needs to read from the variable, causing

@@ -245,3 +245,160 @@ paul -> bank : write 50 - 20 = 30
 
 
 This concludes all the cases in which the processes have overlapping computation, causing an error in the result.
+
+Actually, correction: there are additional special cases where the Mary case could be interrupted midway through, since there are actually two reads in this case, meaning that the other processes could interleave writes in this middle read, giving us another group of new values. This is a quirk of how the program was written to calculate the value written by Mary's process.
+
+Here are the cases.
+- The first Mary read is of the initial state, and then some write happens, and the second Mary read happens, which would mean that the Mary computation will now produce a different value than the atomic assumption done before.
+  - Mary's second read could either be:
+    - Paul only
+    - Peter only
+    - sequentially both Paul and Peter
+  - Now Mary must write, which may or may not interleave with one more process.
+    - Paul already wrote, so Peter reads from Mary
+    - Peter already wrote, so Paul reads from Mary
+    - Paul and Peter already interleaved, so Mary is the last operation
+- Some process write a result first, and Mary will read that value as the first read, and the other process write as the second read
+  - Here, the second process write could have either read from the initial state, or the newly written state
+  - Paul wrote first
+    - Peter read from initial
+    - Peter read from Paul
+  - Peter wrote first
+    - Paul read from initial
+    - Paul read from Peter
+
+Now we will illustrate the different cases.
+#+begin_src plantuml :exports results :results file :file ./images/3.38-4-1-1.png
+@startuml
+bank -> mary : read 100
+bank -> peter : read 100
+peter -> bank : write 100 + 10 = 110
+bank -> mary : read 110
+mary -> bank : write 100 - (110 / 2) = 45
+bank -> paul : read 45
+paul -> bank : write 45 - 20 = 25
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-4-1-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-4-1-2.png
+@startuml
+bank -> mary : read 100
+bank -> peter : read 100
+bank -> paul : read 100
+paul -> bank : write 100 - 20 = 80
+peter -> bank : write 100 + 10 = 110
+bank -> mary : read 110
+mary -> bank : write 100 - (110 / 2) = 45
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-4-1-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-4-2-1.png
+@startuml
+bank -> mary : read 100
+bank -> paul : read 100
+paul -> bank : write 100 - 20 = 80
+bank -> mary : read 80
+mary -> bank : write 100 - (80 / 2) = 60
+bank -> peter : read 60
+peter -> bank : write 60 + 10 = 70
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-4-2-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-4-2-2.png
+@startuml
+bank -> mary : read 100
+bank -> peter : read 100
+bank -> paul : read 100
+peter -> bank : write 100 + 10 = 110
+paul -> bank : write 100 - 20 = 80
+bank -> mary : read 80
+mary -> bank : write 100 - (80 / 2) = 60
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-4-2-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-4-3-1.png
+@startuml
+bank -> mary : read 100
+bank -> peter : read 100
+peter -> bank : write 100 + 10 = 110
+bank -> paul : read 110
+paul -> bank : write 110 - 20 = 90
+bank -> mary : read 90
+mary -> bank : write 100 - (90 / 2) = 55
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-4-3-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-5-1-1.png
+@startuml
+bank -> peter : read 100
+peter -> bank : write 100 + 10 = 110
+bank -> mary : read 110
+bank -> paul : read 110
+paul -> bank : write 110 - 20 = 90
+bank -> mary : read 90
+mary -> bank : write 110 - (90 / 2) = 65
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-5-1-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-5-1-2.png
+@startuml
+bank -> peter : read 100
+bank -> paul : read 100
+peter -> bank : write 100 + 10 = 110
+bank -> mary : read 110
+paul -> bank : write 100 - 20 = 80
+bank -> mary : read 80
+mary -> bank : write 110 - (80 / 2) = 70
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-5-1-2.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-5-2-1.png
+@startuml
+bank -> paul : read 100
+paul -> bank : write 100 - 20 = 80
+bank -> mary : read 80
+bank -> peter : read 80
+peter -> bank : write 80 + 10 = 90
+bank -> mary : read 90
+mary -> bank : write 80 - (90 / 2) = 35
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-5-2-1.png]]
+
+#+begin_src plantuml :exports results :results file :file ./images/3.38-5-2-2.png
+@startuml
+bank -> paul : read 100
+bank -> peter : read 100
+paul -> bank : write 100 - 20 = 80
+bank -> mary : read 80
+peter -> bank : write 100 + 10 = 110
+bank -> mary : read 110
+mary -> bank : write 80 - (110 / 2) = 25
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.38-5-2-2.png]]
