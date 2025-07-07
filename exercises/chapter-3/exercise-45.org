@@ -1,0 +1,34 @@
+#+title: Exercise 45
+* Prompt
+
+Louis Reasoner thinks our bank-account system is unnecessarily complex  and error-prone now that deposits and withdrawls aren't automatically serialized. He suggests that ~make-account-and-serializer~ should have exported the serializer (for use by such procedures as ~serialized-exchange~) in addition to (rather than instead of) using it to serialize accounts and deposits as ~make-account~ did. He proposes to redefine accounts as follows:
+
+#+begin_src racket
+(define (make-account-and-serializer balance)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance (- balance amount)) balance)
+        "insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount)) balance)
+  (let ((balance-serializer (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) (balance-serializer withdraw))
+            ((eq? m 'deposit) (balance-serializer deposit))
+            ((eq? m 'balance) balance)
+            ((eq? m 'serializer) balance-serializer)
+            (else (error "unknown request: MAKE-ACCOUNT" m))))
+    dispatch))
+#+end_src
+
+Then deposits are handled as with the original ~make-account~:
+
+#+begin_src racket
+(define (deposit account amount)
+  ((account 'deposit) amount))
+#+end_src
+* Solution
+
+Louis Reasoner is wrong here because we cannot use ~serialized-exchange~ if we serialize ~withdraw~ and ~deposit~ during message passing. This is because ~serialized-exchange~ serializes ~exchange~, which already has calls to ~withdraw~ and ~deposit~, which means that the application of ~serialized-exchange~ would cause a program halt.
+
+Poor Louis, I don't think he has been right once yet.
