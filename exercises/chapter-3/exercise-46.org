@@ -1,0 +1,32 @@
+#+title: Exercise 46
+* Prompt
+
+Suppose that we implement ~test-and-set!~ using an ordinary procedure as shown in the text, without attempting to make the operation atomic. Draw a timing diagram like the ones previously to demonstrate how the mutex implementation can fail by allowing two processes to acquire the mutex at the same time.
+* Solution
+
+More timing diagrams, amazing!
+
+Let there be two processes, P1, and P2, along with a /mutex/ denoted with the name mutex. We see that there is busy waiting architecture, where we are testing a shared value. We are just going to show the failure of this shared value ~test-and-set!~.
+
+#+begin_src plantuml :exports results :results file :file ./images/3.46-non-atomic-mutex.png
+@startuml
+participant mutex
+participant p1
+mutex -> p1 : read cell -> false
+note over p1 : test-and-set!
+activate p1 #salmon
+mutex -> p2 : read cell -> false
+note over p2 : test-and-set!
+activate p2 #salmon
+p1 -> mutex : set! true
+deactivate p1
+p2 -> mutex : set! true
+deactivate p2
+note over p1, p2 : Thinks they have the mutex
+@enduml
+#+end_src
+
+#+RESULTS:
+[[file:./images/3.46-non-atomic-mutex.png]]
+
+Here, we have shown the sequence in which the mutext could have been taken by two concurrent processes.
