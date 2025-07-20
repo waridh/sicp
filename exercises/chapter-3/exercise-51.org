@@ -1,0 +1,72 @@
+#+title: Exercise 51
+* Prompt
+In order to take a closer look at the delayed evaluation, we will use the following procedure, which simply returns its argument after printing it:
+
+#+begin_src racket :exports code
+(define (show x)
+  (display-line x)
+  x)
+#+end_src
+
+What does the interpreter print in response to evaluating each expression in the following sequence?
+
+#+begin_src racket :exports code
+(define x
+  (stream-map show
+              (stream-enumerate-interval 0 10)))
+(stream-ref x 5)
+(stream-ref x 7)
+#+end_src
+* Solution
+** Pre-check interpretation
+~stream-ref~ is a zero index element look-up procedure. ~stream-enumerate-interval~ is a range creation procedure that creates a range that is inclusive of the two ends of the range. We also have to consider that we are using an implementation of ~delay~ that will memoize the result of the first evaluation of the value it promises, meaning that side-effects should only show up once. Hence, we are going to see the following interpreter output:
+
+#+begin_example
+
+0
+1
+2
+3
+4
+55
+
+6
+77
+#+end_example
+
+Newlines are there because of the semantics chosen by the SICP implementations. In the interpreter, the return values are printed when returned to the global environment, therefore, we are going to see the final value have duplicate printing.
+
+Now, we could just check our work with a real evaluation of the given code.
+** Read execution of code
+
+#+begin_src racket :tangle ./src/exercise-51.rkt :exports code :comments yes
+#lang sicp
+(#%require "modules/stream-base.rkt" "modules/stream-map.rkt")
+(define (show x)
+  (display-line x)
+  x)
+(define x
+  (stream-map show
+              (stream-enumerate-interval 0 10)))
+(stream-ref x 5)
+(stream-ref x 7)
+#+end_src
+
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-51.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+0
+1
+2
+3
+4
+55
+
+6
+77
+#+end_example

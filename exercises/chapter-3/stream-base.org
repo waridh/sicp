@@ -9,7 +9,13 @@ This org file contains the basic implementation of the stream interface, as the 
 #+end_src
 
 #+begin_src racket :tangle ./src/modules/stream-base.rkt :comments yes
-(#%provide stream-car stream-cdr display-stream)
+(#%provide stream-car
+           stream-cdr
+           stream-for-each
+           display-stream
+           stream-ref
+           display-line
+           stream-enumerate-interval)
 #+end_src
 * Stream basic selectors
 
@@ -40,4 +46,24 @@ This org file contains the basic implementation of the stream interface, as the 
 (define (display-ele x)
   (display " ")
   (display x))
+#+end_src
+
+#+begin_src racket :exports code :tangle ./src/modules/stream-base.rkt :comments yes
+;; procedure that does a 0-index based lookup of the stream
+(define (stream-ref s n)
+  (if (= n 0)
+      (stream-car s)
+      (stream-ref (stream-cdr s) (- n 1))))
+
+#+end_src
+
+#+begin_src racket :exports code :tangle ./src/modules/stream-base.rkt :comments yes
+;; procedure that will generate a stream of a range of value, with the range
+;; being [start, end]
+(define (stream-enumerate-interval start end)
+  (if (> start end)
+      the-empty-stream
+      (cons-stream
+       start
+       (stream-enumerate-interval (+ start 1) end))))
 #+end_src

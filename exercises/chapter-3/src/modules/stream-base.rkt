@@ -3,7 +3,13 @@
 ;; Module base:1 ends here
 
 ;; [[file:../../stream-base.org::*Module base][Module base:2]]
-(#%provide stream-car stream-cdr display-stream)
+(#%provide stream-car
+           stream-cdr
+           stream-for-each
+           display-stream
+           stream-ref
+           display-line
+           stream-enumerate-interval)
 ;; Module base:2 ends here
 
 ;; [[file:../../stream-base.org::*Stream basic selectors][Stream basic selectors:1]]
@@ -33,3 +39,22 @@
   (display " ")
   (display x))
 ;; Stream Utilities:1 ends here
+
+;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:2]]
+;; procedure that does a 0-index based lookup of the stream
+(define (stream-ref s n)
+  (if (= n 0)
+      (stream-car s)
+      (stream-ref (stream-cdr s) (- n 1))))
+;; Stream Utilities:2 ends here
+
+;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:3]]
+;; procedure that will generate a stream of a range of value, with the range
+;; being [start, end]
+(define (stream-enumerate-interval start end)
+  (if (> start end)
+      the-empty-stream
+      (cons-stream
+       start
+       (stream-enumerate-interval (+ start 1) end))))
+;; Stream Utilities:3 ends here
