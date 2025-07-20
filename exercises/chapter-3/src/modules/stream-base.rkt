@@ -9,7 +9,8 @@
            display-stream
            stream-ref
            display-line
-           stream-enumerate-interval)
+           stream-enumerate-interval
+           stream-filter)
 ;; Module base:2 ends here
 
 ;; [[file:../../stream-base.org::*Stream basic selectors][Stream basic selectors:1]]
@@ -46,6 +47,15 @@
   (if (= n 0)
       (stream-car s)
       (stream-ref (stream-cdr s) (- n 1))))
+
+;; procedure that filters the stream sequence to only elements that matches the
+;; provided predicate.
+(define (stream-filter predicate s)
+  (cond
+    [(stream-null? s) the-empty-stream]
+    [(predicate (stream-car s))
+     (cons-stream (stream-car s) (stream-filter predicate (stream-cdr s)))]
+    [else (stream-filter predicate (stream-cdr s))]))
 ;; Stream Utilities:2 ends here
 
 ;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:3]]

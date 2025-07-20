@@ -1,0 +1,106 @@
+#+title: Exercise 52
+* Prompt
+Consider the sequence of expressions
+
+#+begin_src racket :exports code
+(define sum 0)
+(define (accum x) (set! sum (+ x sum)) sum)
+(define seq
+  (stream-map accum
+              (stream-enumerate-interval 1 20)))
+(define y (stream-filter even? seq))
+(define z
+  (stream-filter (lambda (x) (= (remainder x 5) 0))
+                 seq))
+(stream-ref y 7)
+(display-stream z)
+#+end_src
+
+What is the value of ~sum~ after each of the above expressions is evaluated? What is the printed response to evaluating the ~stream-ref~ and ~display-stream~ expressions? Would these responses differ if we had implemented ~(delay <exp>)~ simply as ~(lambda () <exp>)~ without using the optimization provided by ~memo-proc~? Explain.
+* Solution
+#+begin_src racket :exports code
+(define sum 0) ;; sum: 0
+(define (accum x) (set! sum (+ x sum)) sum) ;; sum: 0
+(define seq
+  (stream-map accum
+              (stream-enumerate-interval 1 20))) ;; sum: 1
+(define y (stream-filter even? seq)) ;; sum: 6
+(define z
+  (stream-filter (lambda (x) (= (remainder x 5) 0))
+                 seq)) ;; sum: 10
+(stream-ref y 7) ;; sum: 136
+(display-stream z) ;; sum: 210
+#+end_src
+
+The printed value of the ~(stream-ref y 7)~ line is:
+
+#+begin_example
+136
+#+end_example
+
+The printed value of ~(display-stream z)~ is:
+
+#+begin_example
+( 10 15 45 55 105 120 190 210)
+#+end_example
+
+
+Would the response be different if we were not memoizing the result of the ~delay~ object evaluation? The answer is yes, since in this case, we are mutating some shared state as a part of the accumulation algorithm, we are going to see that every time that we traverse through the stream, the sum value will increment, causing unexpected results.
+
+** Checking
+:properties:
+:header-args:racket: :tangle ./src/exercise-52.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt" "modules/stream-map.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+(define sum 0)
+(define (display-sum)
+  (newline)
+  (display "sum: ")
+  (display sum))
+(display-sum)
+(define (accum x) (set! sum (+ x sum)) sum)
+(display-sum)
+(define seq
+  (stream-map accum
+              (stream-enumerate-interval 1 20)))
+(display-sum)
+(define y (stream-filter even? seq))
+(display-sum)
+(define z
+  (stream-filter (lambda (x) (= (remainder x 5) 0))
+                 seq))
+(display-sum)
+(newline)
+(stream-ref y 7)
+(display-sum)
+(newline)
+(display-stream z)
+(display-sum)
+#+end_src
+
+#+RESULTS:
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-52.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+sum: 0
+sum: 0
+sum: 1
+sum: 6
+sum: 10
+136
+
+sum: 136
+( 10 15 45 55 105 120 190 210)
+sum: 210
+#+end_example
