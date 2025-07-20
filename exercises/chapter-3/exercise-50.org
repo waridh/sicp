@@ -1,0 +1,94 @@
+#+title: Exercise 50
+* Prompt
+Complete the following definition, which generalizes ~stream-map~ to allow procedures that take multiple arguments, analogous to ~map~ in the previous chapter.
+#+begin_src racket :exports code
+(define (stream-map proc . argstreams)
+  (if (<??> (car argstreams))
+      the-empty-stream
+      (<??>
+       (apply proc (map <??> argstreams))
+       (apply stream-map
+              (cons proc (map <??> argstreams))))))
+#+end_src
+* Solution
+The procedure interface that we are looking to use is one where the input procedure takes in ~n~ positional parameters, and we will provide ~n~ sequences that will be mapped element by element.
+
+We are most definitely setting up some test benches for this first.
+** Test Bench
+:properties:
+:header-args:racket: :tangle ./src/exercise-50.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt" "modules/stream-map.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+(define (assert-sequence left-list right-sequence)
+  (define (pass-print)
+    (newline)
+    (display "pass: ")
+    (display left-list)
+    (display " == ")
+    (display-stream right-sequence))
+  (define (fail-print msg)
+    (newline)
+    (display "fail: ")
+    (display msg)
+    (display "; ")
+    (display left-list)
+    (display " != ")
+    (display-stream right-sequence))
+  (define (recur-check l r)
+    (cond
+      [(and (null? l) (stream-null? r)) (pass-print)]
+      [(or (null? l) (stream-null? r)) (fail-print "unequal length")]
+      [(not (equal? (car l) (stream-car r))) (fail-print "found unequal value")]
+      [else (recur-check (cdr l) (stream-cdr r))]))
+  (recur-check left-list right-sequence))
+#+end_src
+
+#+begin_src racket :exports code
+;; produce a stream of the range [start, end]
+(define (generate-range start end)
+  (if (> start end)
+      the-empty-stream
+      (cons-stream start (generate-range (+ start 1) end))))
+
+;; produce a stream of a constant value with the specified size.
+(define (generate-const value size)
+  (define (maker curr)
+    (if (>= curr size)
+        the-empty-stream
+        (cons-stream value (maker (+ curr 1)))))
+  (maker 0))
+#+end_src
+
+The following is the test site.
+#+begin_src racket :exports code
+(assert-sequence (list 0 2 4 6 8 10) (stream-map * (generate-range 0 5) (generate-const 2 6)))
+#+end_src
+** Implementation
+
+#+begin_src racket :tangle ./src/modules/stream-map.rkt :comments yes
+#lang sicp
+(#%require "stream-base.rkt")
+(#%provide stream-map)
+
+(define (stream-map proc . argstreams)
+  (if (stream-null? (car argstreams))
+      the-empty-stream
+      (cons-stream (apply proc (map stream-car argstreams))
+                   (apply stream-map (cons proc (map stream-cdr argstreams))))))
+#+end_src
+
+** Test Execution
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-50.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (0 2 4 6 8 10) == ( 0 2 4 6 8 10)
