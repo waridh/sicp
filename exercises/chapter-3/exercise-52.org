@@ -20,16 +20,16 @@ What is the value of ~sum~ after each of the above expressions is evaluated? Wha
 * Solution
 #+begin_src racket :exports code
 (define sum 0) ;; sum: 0
-(define (accum x) (set! sum (+ x sum)) sum) ;; sum: 0
-(define seq
-  (stream-map accum
-              (stream-enumerate-interval 1 20))) ;; sum: 1
-(define y (stream-filter even? seq)) ;; sum: 6
+(define (accum x)
+  (set! sum (+ x sum))
+  sum) ;; sum: 0
+(define seq (stream-map accum (stream-enumerate-interval 1 20))) ;; sum: 1
+(define y (stream-filter even? seq)) ;; sum: 6, the third element of the stream
 (define z
-  (stream-filter (lambda (x) (= (remainder x 5) 0))
-                 seq)) ;; sum: 10
-(stream-ref y 7) ;; sum: 136
-(display-stream z) ;; sum: 210
+  (stream-filter (lambda (x) (= (remainder x 5) 0)) seq)) ;; sum: 10, the fourth element of the stream
+(stream-ref y 7) ;; sum: 136, the eighth even number
+(display-stream z) ;; sum: 210, sum is now equal to the final element of the
+;; stream
 #+end_src
 
 The printed value of the ~(stream-ref y 7)~ line is:
