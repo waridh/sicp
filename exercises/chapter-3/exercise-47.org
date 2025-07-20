@@ -1,0 +1,69 @@
+#+title: Exercise 47
+* Prompt
+
+A semaphore (of size n) is a generalization of a mutex. Like a mutex, a semaphore supports acquire and release operations, but it is more general in that up to /n/ processes can acquire it concurrently. Additional processes that attempt to acquire the semaphore must wait for release operations. Give implementations of semaphores
+
+a. in terms of mutexes
+b. in terms of atomic ~test-and-set!~ operations.
+* Solution
+** Part a: Using Mutexes
+
+The strategy that we are going to use here is to have a mutex guard an internal state that is a number. Here, the strategy is to lock the access to the number and use the number as the counter for how many processes have acquired the resource. As resources are able to pass through the mutex and detect that there is free resource by seeing that the ~count~ value is not 0, it will take the resource by decrementing the ~count~ resource. Like with the mutex implementation, if it is found that there are no resources available, the process asking for the resource will busy wait.
+
+#+begin_src racket :exports code
+(define (make-semaphore n)
+  (let ([mutex (make-mutex)]
+        [count n])
+    (define (acquire)
+      (mutex 'acquire)
+      (if (= count 0)
+          (begin
+            (mutex 'release)
+            (the-semaphore 'acquire))
+          (begin
+            (set! count (- count 1))
+            (mutex 'release))))
+    (define (release)
+      (mutex 'acquire)
+      (if (< count n)
+          (begin
+            (set! count (+ count 1))
+            (mutex 'release))
+          (mutex 'release)))
+    (define (the-semaphore s)
+      (cond
+        [(eq? s 'acquire) (acquire)]
+        [(eq? s 'release) (release)]))
+    the-semaphore))
+#+end_src
+
+** Part b: Using test-and-set!
+
+Here, we do the same thing as the previous section, but this time using the ~test-and-set!~ procedure.
+
+#+begin_src racket :exports code
+(define (make-semaphore n)
+  (let ((cell (list false n)))
+    (define (get-count) (cadr cell))
+    (define (set-count! value) (set-cadr! cell value))
+    (define (incr-count!) (set-count! (+ (get-count) 1)))
+    (define (decr-count!) (set-count! (- (get-count) 1)))
+    (define (acquire)
+      (if (test-and-set! cell)
+          (acquire)
+          (if (< (get-count) 1)
+              (begin (clear! cell)
+                     (acquire))
+              (begin (decr-count!)
+                     (clear! cell)))))
+    (define (release)
+      (if (test-and-set! cell)
+          (acquire)
+          (if (< (get-count) n)
+              (begin (incr-count!)
+                     (clear! cell))
+              (clear! cell))))
+    (define (the-semaphore s)
+      (cond [(eq? s 'acquire) (acquire)]
+            [(eq? s 'release) (release)]))))
+#+end_src

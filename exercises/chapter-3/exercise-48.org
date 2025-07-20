@@ -1,0 +1,61 @@
+#+title: Exercise 48
+* Prompt
+Explain in detail why the deadlock-avoidance method described above, (i.e., the accounts are numbered, and each process attempts to acquire the smaller-numbered account first) avoids deadlock in the exchange problem. Rewrite ~serialized-exchange~ to incorporate this idea. (You will also need to modify ~make-account~ so that each account is created with a number, which can be accessed by sending an appropriate message.)
+* Solution
+Main deadlock to try and avoid is case where two people are trying to exchange between the two same accounts in opposing directions, specifically when the sender account on both sides are locked, and the two transactions are both trying to access the other account, which we just established that they are locked.
+
+Proposed solution says that we should give all account a unique number, and that instead of having the ordering lock be done based on the position of the argument, the procedure should always attempt to lock the account with a lower number first.
+
+This works because a unit of a transaction only requires two resources, and if we always check the account with the lower value first, we will never form a dependency cycle.
+
+To use the previous example, if Peter tries to exchange from ~a1~ to ~a2~, and Paul tries to exchange from ~a2~ to ~a1~, assuming that ~a1~ is an account with a lower identification number, even if both processes start at the same time, and regardless of that, they would both try to lock ~a1~ first, which means that only one of the two process are able to continue and lock the other resources that it requires.
+** Exchange Rewrite
+We are to rewrite ~serialize-exchange~. We will also change ~make-account~ so that each account is created with a number, and we can retrieve that value from message passing.
+
+#+begin_src racket :exports code
+(define (make-account balance)
+  (let ([account-id (make-unique-account-id)])
+    (define (withdraw amount)
+      (if (>= balance amount)
+          (begin
+            (set! balance (- balance amount))
+            balance)
+          "Insufficient funds"))
+    (define (deposit amount)
+      (set! balance (+ balance amount))
+      balance)
+    (let ([protected (make-serializer)])
+      (let ([protected-withdraw (protected withdraw)]
+            [protected-deposit (protected deposit)])
+        (define (dispatch m)
+          (cond
+            [(eq? m 'withdraw) protected-withdraw]
+            [(eq? m 'deposit) protected-deposit]
+            [(eq? m 'balance) balance]
+            [(eq? m 'account-id) account-id]
+            [else (error "Unknown request: MAKE-ACCOUNT" m)]))
+        dispatch))))
+#+end_src
+
+#+begin_src racket
+;; Getter for the account id for an account
+(define (get-account-id account)
+  (account 'account-id))
+#+end_src
+
+Now that we have the modification to the ~make-account~ method, we can now move on to changing the ~exchange~ program.
+
+#+begin_src racket :exports code
+(define (serialized-exchange account1 account2)
+  (define (serialized-exchange-aux lower-account higher-account)
+    (let ([lower-serializer (lower-account 'serializer)]
+          [higher-serializer (higher-account 'serializer)])
+      ((higher-serializer (lower-account exchange)) lower-account higher-account)))
+  (define (sort-accounts first-account second-account)
+    (if (> (get-account-id second-account) (get-account-id first-account))
+        (list first-account second-account)
+        (list second-account first-account)))
+  (apply serialized-exchange-aux (sort-accounts account1 account2)))
+#+end_src
+
+The new implementation moved the previous implementation into an auxiliary procedure that asks for the account with the lower account id first, followed by the account with the higher account id. Attempt to lock the account with the lower account id will occur first. Ordering the account by the account with the lower id has it's own procedure, which is called before applying the returning list to the core exchange logic.
