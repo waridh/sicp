@@ -1,0 +1,19 @@
+#+title: Exercise 53
+* Prompt
+
+Without running the program, describe the elements of the stream defined by
+
+#+begin_src racket :exports code
+(define s (cons-stream 1 (add-stream s s)))
+#+end_src
+
+* Solution
+
+Our stream initial condition is 1. The ~stream-cdr~ is the merging of the same stream with itself. We are going to want to write out how the system behaves.
+
+#+begin_example
+1 (+ 1 1) (+ 2 2) (+ 4 4) ...
+1 2 4 8 ...
+#+end_example
+
+So we just have an exponential series with a base of 2. To think about this, we have our initial conditions, and from there, we reason about the recursive conditions using the previous states. This is very much the same type of thinking used in induction.

@@ -1,0 +1,18 @@
+#+title: Stream Combinator
+* Overview
+Literate programming for the stream combinators
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-combinator.rkt :comments yes
+:end:
+#+begin_src racket
+#lang sicp
+(#%require "stream-base.rkt")
+(#%provide add-stream)
+#+end_src
+** Add stream
+#+begin_src racket :exports code
+(define (add-stream stream-1 stream-2)
+  (cons-stream (+ (stream-car stream-1) (stream-car stream-2))
+               (add-stream (stream-cdr stream-1) (stream-cdr stream-2))))
+#+end_src
