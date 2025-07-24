@@ -1,0 +1,41 @@
+#+title: Exercise 55
+* Prompt
+Define a procedure ~partial-sums~ that takes as argument a stream /S/ and returns the stream whose elements are $S_{0}, S_{0} + S_{1}, S_{0} + S_{1} + S_{2}, \dots$. For example, ~(partial-sums integers)~ should be the stream 1, 3, 6, 10, 15, ....
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-55.rkt :comments yes
+:end:
+This should be definable with the frameworks that we have built so far.
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+** Implementation
+Here, we implement the solution. Now, we could be creating this stream using explicit stream declaration, but I thought that now with implicit streams unlocked, we might as well implement our solution that way. Anyways, here it is.
+
+#+begin_src racket :exports code
+(define (partial-sums s)
+  (define result
+    (cons-stream (stream-car s)
+                 (add-streams result (stream-cdr s))))
+  result)
+#+end_src
+** Test
+We shall start by testing the example given by the problem, followed by additional tests.
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 3 6 10 15 21) (partial-sums integers))
+(assert-list-infinite-stream (list 1 2 3 4 5 6 7 8 9 10 11 12) (partial-sums ones))
+#+end_src
+** Result
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-55.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 3 6 10 15 21) == ( 1 3 6 10 15 21)
+: pass: (1 2 3 4 5 6 7 8 9 10 11 12) == ( 1 2 3 4 5 6 7 8 9 10 11 12)
