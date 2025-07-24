@@ -1,0 +1,75 @@
+#+title: Test Tools
+* Overview
+This page contains literate programming of the different method that will help us test our programs.
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/assert-tool.rkt
+:end:
+
+#+begin_src racket :exports code
+#lang sicp
+(#%require "stream-base.rkt")
+(#%provide assert-list-stream assert-list-infinite-stream
+           assert)
+#+end_src
+
+
+
+** Asserting a sequence
+
+#+begin_src racket :exports code
+(define (assert-list-stream left-list right-sequence)
+  (define (pass-print)
+    (newline)
+    (display "pass: ")
+    (display left-list)
+    (display " == ")
+    (display-stream-range 0 (- (length left-list) 1) right-sequence))
+  (define (fail-print msg)
+    (newline)
+    (display "fail: ")
+    (display msg)
+    (display "; ")
+    (display left-list)
+    (display " != ")
+    (display-stream-range 0 (- (length left-list) 1) right-sequence))
+  (define (recur-check l r)
+    (cond
+      [(and (null? l) (stream-null? r)) (pass-print)]
+      [(or (null? l) (stream-null? r)) (fail-print "unequal length")]
+      [(not (equal? (car l) (stream-car r))) (fail-print "found unequal value")]
+      [else (recur-check (cdr l) (stream-cdr r))]))
+  (recur-check left-list right-sequence))
+#+end_src
+** Basic Assert
+#+begin_src racket :exports code
+(define (assert predicate message)
+  (newline)
+  (if (not predicate) (display "fail: ") (display "pass: "))
+  (display message))
+#+end_src
+** Asserting an infinite sequence
+#+begin_src racket
+(define (assert-list-infinite-stream left-list right-sequence)
+  (define (pass-print)
+    (newline)
+    (display "pass: ")
+    (display left-list)
+    (display " == ")
+    (display-stream-range 0 (- (length left-list) 1) right-sequence))
+  (define (fail-print msg)
+    (newline)
+    (display "fail: ")
+    (display msg)
+    (display "; ")
+    (display left-list)
+    (display " != ")
+    (display-stream-range 0 (- (length left-list) 1) right-sequence))
+  (define (recur-check l r)
+    (cond
+      [(null? l) (pass-print)]
+      [(stream-null? r) (fail-print "stream ended early")]
+      [(not (equal? (car l) (stream-car r))) (fail-print "found unequal value")]
+      [else (recur-check (cdr l) (stream-cdr r))]))
+  (recur-check left-list right-sequence))
+#+end_src

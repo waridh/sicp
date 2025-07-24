@@ -4,7 +4,7 @@
 Without running the program, describe the elements of the stream defined by
 
 #+begin_src racket :exports code
-(define s (cons-stream 1 (add-stream s s)))
+(define s (cons-stream 1 (add-streams s s)))
 #+end_src
 
 * Solution

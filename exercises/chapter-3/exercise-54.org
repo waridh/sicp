@@ -1,0 +1,45 @@
+#+title: Exercise 54
+* Prompt
+Define a procedure ~mul-streams~, analogous to ~add-streams~, that produces the elementwise product of its two input streams. Use this together with the stream of ~integers~ to complete the following definition of the stream whose $n^{th}$ element (counting from 0) is $n + 1$ factorial:
+
+#+begin_src racket :exports code
+(define factorials
+  (cons-stream 1 (mul-streams <??> <??>)))
+#+end_src
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-54.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+We are going to implement the ~mul-streams~ procedure in [[file:stream-combinator.org][stream-combinator]], and implement the rest of the factorials here.
+** Factorials
+#+begin_src racket :exports code
+(define factorial
+  (cons-stream 1 (mul-streams integers factorial)))
+#+end_src
+
+** Testing
+
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 1 2 6 24 120) factorial)
+(assert (= (stream-ref factorial 6) 720) "6! is 720")
+#+end_src
+
+
+** Result
+#+begin_src bash :results output :exports both
+racket ./src/exercise-54.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 1 2 6 24 120) == ( 1 1 2 6 24 120)
+: pass: 6! is 720

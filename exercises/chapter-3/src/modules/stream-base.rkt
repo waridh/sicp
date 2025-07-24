@@ -7,6 +7,7 @@
            stream-cdr
            stream-for-each
            display-stream
+           display-stream-range
            stream-ref
            display-line
            stream-enumerate-interval
@@ -42,6 +43,22 @@
 ;; Stream Utilities:1 ends here
 
 ;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:2]]
+(define (display-stream-range lower upper s)
+  (define (display-range-iter idx s-aux)
+    (cond
+      [(stream-null? s-aux) 'done]
+      [(and (>= idx lower) (<= idx upper))
+       (begin
+         (display-ele (stream-car s-aux))
+         (display-range-iter (+ idx 1) (stream-cdr s-aux)))]
+      [(> idx upper) 'done]
+      [else (display-range-iter (+ idx 1) (stream-cdr s-aux))]))
+  (display "(")
+  (display-range-iter 0 s)
+  (display ")"))
+;; Stream Utilities:2 ends here
+
+;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:3]]
 ;; procedure that does a 0-index based lookup of the stream
 (define (stream-ref s n)
   (if (= n 0)
@@ -56,9 +73,9 @@
     [(predicate (stream-car s))
      (cons-stream (stream-car s) (stream-filter predicate (stream-cdr s)))]
     [else (stream-filter predicate (stream-cdr s))]))
-;; Stream Utilities:2 ends here
+;; Stream Utilities:3 ends here
 
-;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:3]]
+;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:4]]
 ;; procedure that will generate a stream of a range of value, with the range
 ;; being [start, end]
 (define (stream-enumerate-interval start end)
@@ -67,4 +84,4 @@
       (cons-stream
        start
        (stream-enumerate-interval (+ start 1) end))))
-;; Stream Utilities:3 ends here
+;; Stream Utilities:4 ends here

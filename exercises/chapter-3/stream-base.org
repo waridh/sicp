@@ -2,34 +2,39 @@
 * Overview
 
 This org file contains the basic implementation of the stream interface, as the ~sicp~ language on Racket does not provide the higher level implementations.
-* Module base
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-base.rkt :comments yes
+:end:
+** Module base
 
-#+begin_src racket :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket :exports code
 #lang sicp
 #+end_src
 
-#+begin_src racket :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket
 (#%provide stream-car
            stream-cdr
            stream-for-each
            display-stream
+           display-stream-range
            stream-ref
            display-line
            stream-enumerate-interval
            stream-filter)
 #+end_src
-* Stream basic selectors
+** Stream basic selectors
 
-#+begin_src racket :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket
 (define (stream-car s)
   (car s))
 
 (define (stream-cdr s)
   (force (cdr s)))
 #+end_src
-* Stream Utilities
+** Stream Utilities
 
-#+begin_src racket :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket
 (define (stream-for-each proc s)
   (if (stream-null? s)
       'done
@@ -49,7 +54,23 @@ This org file contains the basic implementation of the stream interface, as the 
   (display x))
 #+end_src
 
-#+begin_src racket :exports code :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket :exports code
+(define (display-stream-range lower upper s)
+  (define (display-range-iter idx s-aux)
+    (cond
+      [(stream-null? s-aux) 'done]
+      [(and (>= idx lower) (<= idx upper))
+       (begin
+         (display-ele (stream-car s-aux))
+         (display-range-iter (+ idx 1) (stream-cdr s-aux)))]
+      [(> idx upper) 'done]
+      [else (display-range-iter (+ idx 1) (stream-cdr s-aux))]))
+  (display "(")
+  (display-range-iter 0 s)
+  (display ")"))
+#+end_src
+
+#+begin_src racket
 ;; procedure that does a 0-index based lookup of the stream
 (define (stream-ref s n)
   (if (= n 0)
@@ -66,7 +87,7 @@ This org file contains the basic implementation of the stream interface, as the 
     [else (stream-filter predicate (stream-cdr s))]))
 #+end_src
 
-#+begin_src racket :exports code :tangle ./src/modules/stream-base.rkt :comments yes
+#+begin_src racket
 ;; procedure that will generate a stream of a range of value, with the range
 ;; being [start, end]
 (define (stream-enumerate-interval start end)

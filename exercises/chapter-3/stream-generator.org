@@ -1,0 +1,27 @@
+#+title: Stream Generator
+* Overview
+This file contains the different implementation of stream generators in the literate programming style.
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-generator.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "stream-base.rkt"
+           "stream-combinator.rkt")
+(#%provide ones integers)
+#+end_src
+
+** Ones
+Streams that just generates infinite ones
+
+#+begin_src racket :exports code
+(define ones (cons-stream 1 ones))
+#+end_src
+** Integers
+Streams that generates incrementing integers.
+
+#+begin_src racket :exports code
+(define integers (cons-stream 1 (add-streams ones integers)))
+#+end_src
