@@ -21,7 +21,7 @@ We are most definitely setting up some test benches for this first.
 
 #+begin_src racket :exports none
 #lang sicp
-(#%require "modules/stream-base.rkt" "modules/stream-map.rkt"
+(#%require "modules/stream-base.rkt"
            "modules/assert-tool.rkt")
 #+end_src
 
@@ -47,17 +47,8 @@ The following is the test site.
 #+end_src
 ** Implementation
 
-#+begin_src racket :tangle ./src/modules/stream-map.rkt :comments yes
-#lang sicp
-(#%require "stream-base.rkt")
-(#%provide stream-map)
+Implementation has been moved to [[file:stream-base.org::*Stream Map][Stream Map]].
 
-(define (stream-map proc . argstreams)
-  (if (stream-null? (car argstreams))
-      the-empty-stream
-      (cons-stream (apply proc (map stream-car argstreams))
-                   (apply stream-map (cons proc (map stream-cdr argstreams))))))
-#+end_src
 
 ** Test Execution
 

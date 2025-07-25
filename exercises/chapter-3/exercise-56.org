@@ -1,0 +1,83 @@
+#+title: Exercise 56
+* Prompt
+A famous problem, first raised by R. Hamming, is to enumerate, in ascending order with no repetitions, all positive integers with no prime factors other than 2, 3, or 5. One obvious way to do this is to simply test each integer in turn to see whether it has any factors other than 2, 3, and 5. But this is very inefficient, since, as the integers get larger, fewer, and fewer of them fit the requirement. As an alternative, let us call the required stream of numbers ~S~ and notice the following facts about it.
+- ~S~ begins with 1.
+- The elements of ~(scale-stream S 2)~ are also elements of ~S~
+- The same is true for ~(scale-stream S 3)~ and ~(scale-stream 5 S)~
+- These are all the elements of ~S~
+
+Now all we have to do is combine elements from these sources. For this, we define a procedure ~merge~ that combines two ordered streams into one ordered result stream, eliminating repetitions:
+
+#+begin_src racket :exports code
+(define (merge s1 s2)
+  (cond
+    [(stream-null? s1) s2]
+    [(stream-null? s2) s1]
+    [else
+     (let ([s1car (stream-car s1)]
+           [s2car (stream-car s2)])
+       (cond
+         [(< s1car s2car) (cons-stream s1car (merge (stream-cdr s1) s2))]
+         [(> s1car s2car) (cons-stream s2car (merge s1 (stream-cdr s2)))]
+         [else (cons-stream s1car (merge (stream-cdr s1) (stream-cdr s2)))]))]))
+#+end_src
+
+Then the following stream may be constructed with ~merge~, as follows:
+
+#+begin_src racket :exports code
+(define S (cons-stream 1 (merge <??> <??>)))
+#+end_src
+
+Fill in the missing expressions in the places marked ~<??>~ above.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-56.rkt :comments yes
+:end:
+
+** Setup
+#+begin_src racket
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+We shall also pass in the implementation of ~merge~.
+
+#+begin_src racket :exports code
+(define (merge s1 s2)
+  (cond
+    [(stream-null? s1) s2]
+    [(stream-null? s2) s1]
+    [else
+     (let ([s1car (stream-car s1)]
+           [s2car (stream-car s2)])
+       (cond
+         [(< s1car s2car) (cons-stream s1car (merge (stream-cdr s1) s2))]
+         [(> s1car s2car) (cons-stream s2car (merge s1 (stream-cdr s2)))]
+         [else (cons-stream s1car (merge (stream-cdr s1) (stream-cdr s2)))]))]))
+#+end_src
+
+** Implementation
+
+Rules were given to us in the problem prompt. We know that we are looking for the merge between three streams that is constructed from the initial condition here. By making the three streams be generated from the final stream as a sort of implicit stream, we can ensure that all the streams will also include cases where there are more than one non-one factors. The merge, combining the elements in a sorted fashion is vital to this system working.
+
+#+begin_src racket :exports code
+(define S (cons-stream 1 (merge (scale-stream S 2) (merge (scale-stream S 3) (scale-stream S 5)))))
+#+end_src
+
+** Testing
+
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 2 3 4 5 6 8 9 10 12 15 16 18 20) S)
+#+end_src
+
+** Result
+#+begin_src bash :exports both :results output
+racket ./src/exercise-56.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 2 3 4 5 6 8 9 10 12 15 16 18 20) == ( 1 2 3 4 5 6 8 9 10 12 15 16 18 20)

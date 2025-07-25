@@ -8,13 +8,19 @@ Literate programming for the stream combinators
 #+begin_src racket
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams)
+(#%provide add-streams mul-streams combine-streams scale-stream)
 #+end_src
 ** Generic Combinator
 #+begin_src racket :exports code
 (define (combine-streams proc stream-1 stream-2)
   (cons-stream (proc (stream-car stream-1) (stream-car stream-2))
                (combine-streams proc (stream-cdr stream-1) (stream-cdr stream-2))))
+#+end_src
+** Scale stream
+#+begin_src racket :exports code
+(define (scale-stream stream factor)
+  (stream-map (lambda (x) (* x factor))
+              stream))
 #+end_src
 ** Add stream
 #+begin_src racket :exports code

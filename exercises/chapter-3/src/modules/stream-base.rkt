@@ -11,7 +11,8 @@
            stream-ref
            display-line
            stream-enumerate-interval
-           stream-filter)
+           stream-filter
+           stream-map)
 ;; Module base:2 ends here
 
 ;; [[file:../../stream-base.org::*Stream basic selectors][Stream basic selectors:1]]
@@ -85,3 +86,11 @@
        start
        (stream-enumerate-interval (+ start 1) end))))
 ;; Stream Utilities:4 ends here
+
+;; [[file:../../stream-base.org::*Stream Map][Stream Map:1]]
+(define (stream-map proc . argstreams)
+  (if (stream-null? (car argstreams))
+      the-empty-stream
+      (cons-stream (apply proc (map stream-car argstreams))
+                   (apply stream-map (cons proc (map stream-cdr argstreams))))))
+;; Stream Map:1 ends here

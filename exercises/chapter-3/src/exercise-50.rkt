@@ -1,6 +1,6 @@
 ;; [[file:../exercise-50.org::*Test Bench][Test Bench:1]]
 #lang sicp
-(#%require "modules/stream-base.rkt" "modules/stream-map.rkt"
+(#%require "modules/stream-base.rkt" 
            "modules/assert-tool.rkt")
 ;; Test Bench:1 ends here
 
