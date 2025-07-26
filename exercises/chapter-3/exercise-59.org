@@ -27,4 +27,96 @@ b. The function $x \rightarrow e^x$ is its own derivative. This implies that $e^
 * Solution
 Looks like a tough one.
 ** Part a
+:properties:
+:header-args:racket: :tangle ./src/exercise-59-a.rkt :comments yes
+:end:
+
+Here, we are just defining a stream transformer.
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+(define (integrate-series s)
+  (define (iter acc tail)
+    (cons-stream (* (/ 1 (+ acc 1)) (stream-car tail))
+                 (iter (+ acc 1) (stream-cdr tail))))
+  (iter 0 s))
+#+end_src
+
+*** Testing
+Of course, as engineers, we have to test our system
+
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 (/ 1 2) (/ 1 3) (/ 1 4) (/ 1 5)) (integrate-series ones))
+(assert-list-infinite-stream (list 1 1 1 1 1 1 1 1) (integrate-series integers))
+#+end_src
+*** Execution
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-59-a.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 1/2 1/3 1/4 1/5) == ( 1 1/2 1/3 1/4 1/5)
+: pass: (1 1 1 1 1 1 1 1) == ( 1 1 1 1 1 1 1 1)
+*** Discussion
+For now, we are able to a sort of an iterable process that generates the desired stream.
+
 ** Part b
+:properties:
+:header-args:racket: :tangle ./src/exercise-59-b.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+#+begin_src racket :exports none
+(define (integrate-series s)
+  (define (iter acc tail)
+    (cons-stream (* (/ 1 (+ acc 1)) (stream-car tail))
+                 (iter (+ acc 1) (stream-cdr tail))))
+  (iter 0 s))
+#+end_src
+
+Interesting, it looks like we are about to use some mathematical properties with co-operative recursion to create the power series for sine and cosine. I think we could just start.
+
+#+begin_src racket :exports code
+(define exp-series
+  (cons-stream 1 (integrate-series exp-series)))
+#+end_src
+
+#+begin_src racket :exports code
+(define cosine-series (cons-stream 1 (scale-stream (integrate-series sine-series) -1)))
+(define sine-series (cons-stream 0 (integrate-series cosine-series)))
+#+end_src
+
+*** Test
+
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 1 (/ 1 2) (/ 1 6) (/ 1 24)) exp-series)
+(assert-list-infinite-stream (list 1 0 (/ -1 2) 0 (/ 1 24)) cosine-series)
+(assert-list-infinite-stream (list 0 1 0 (/ -1 6) 0 (/ 1 120)) sine-series)
+#+end_src
+
+*** Result
+#+begin_src bash :exports both :results output
+racket ./src/exercise-59-b.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 1 1/2 1/6 1/24) == ( 1 1 1/2 1/6 1/24)
+: pass: (1 0 -1/2 0 1/24) == ( 1 0 -1/2 0 1/24)
+: pass: (0 1 0 -1/6 0 1/120) == ( 0 1 0 -1/6 0 1/120)
