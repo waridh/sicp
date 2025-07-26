@@ -1,0 +1,119 @@
+#+title: Exercise 58
+* Prompt
+Give an interpretation of the stream computed by the following procedure:
+
+#+begin_src racket :exports code
+(define (expand num den radix)
+  (cons-stream
+   (quotient (* num radix) den)
+   (expand (remainder (* num radix) den) den radix)))
+#+end_src
+
+(~quotient~ is a primitive that returns the integer quotient of two integers.) What are the successive elements produced by ~(expand 1 7 10)~? What is produced by ~(expand 3 8 10)~?
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-58.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt")
+#+end_src
+
+#+begin_src racket :exports none
+(define (expand num den radix)
+  (cons-stream
+   (quotient (* num radix) den)
+   (expand (remainder (* num radix) den) den radix)))
+#+end_src
+
+I think, I should just run the program as well. Since this is not a course that I will be tested in person on, I should just use the tools at my disposal to determine what is going on.
+
+** First evaluation
+
+#+begin_src racket :exports code
+(define x (expand 1 7 10))
+(display "looking at (expand 1 7 10)")
+(newline)
+(display-stream-range 0 20 x)
+#+end_src
+
+Well, looking at the value output from this output, it looks very similar to the decimal values obtained from dividing 1 by 7.
+
+#+begin_src racket :exports code
+(newline)
+(display "(/ 1 7)")
+(newline)
+(/ 1.0 7.0)
+#+End_src
+
+Just to confirm that this is what we expect, we are going to see if it is only the decimal value being shown by evaluating ~(expand 8 7 10)~, which should result in the same value.
+
+#+begin_src racket :exports code
+(define x-prime (expand 8 7 10))
+(display "looking at (expand 8 7 10)")
+(newline)
+(display-stream-range 0 20 x-prime)
+#+end_src
+
+Oh, interesting, so the first term will be larger than the radix to denote that there are values that is not a decimal.
+
+** Second evaluation
+
+#+begin_src racket :exports code
+(define y (expand 3 8 10))
+(newline)
+(display "looking at (expand 3 8 10)")
+(newline)
+(display-stream-range 0 20 y)
+#+end_src
+
+And again, the resulting stream is the decimal point value of $3\div8$, which result in $0.325$.
+
+#+begin_src racket :exports code
+(newline)
+(display "(/ 3 8)")
+(newline)
+(/ 3.0 8.0)
+#+End_src
+** Radix changes the base
+
+So, finally, to confirm our description of what the procedure does, we should change the ~radix~ value to confirm that it does what we think it does, which is displaying the base of the resulting stream.
+
+#+begin_src racket :exports code
+(define y-2 (expand 3 8 2))
+(newline)
+(display "looking at (expand 3 8 2)")
+(newline)
+(display-stream-range 0 20 y-2)
+#+end_src
+
+Review of the result shows that this is the case. $(0.375)_{10} = (0.011)_{2}$
+
+** Result
+
+#+begin_src bash :results output :exports both
+racket ./src/exercise-58.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+looking at (expand 1 7 10)
+( 1 4 2 8 5 7 1 4 2 8 5 7 1 4 2 8 5 7 1 4 2)
+(/ 1 7)
+0.14285714285714285
+looking at (expand 8 7 10)
+( 11 4 2 8 5 7 1 4 2 8 5 7 1 4 2 8 5 7 1 4 2)
+looking at (expand 3 8 10)
+( 3 7 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+(/ 3 8)
+0.375
+
+looking at (expand 3 8 2)
+( 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+(/ 3 8)
+0.375
+#+end_example
+** Discussion
+We have determined that the ~(expand num den radix)~ will create a stream of the decimal values of the division between ~num~ and ~den~ in the base provided by the ~radix~ parameter.
