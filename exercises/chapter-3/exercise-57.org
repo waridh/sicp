@@ -1,0 +1,137 @@
+#+title: Exercise 57
+* Prompt
+How many additions are performed when we compute the $n^{th}$ Fibonacci number using the definition of ~fibs~ based on the ~add-streams~ procedure? Show that the number of additions would be exponentially greater if we had implemented ~(delay <exp>)~ simply as ~(lambda () <exp>)~, without using the optimization provided by the ~memo-proc~ procedure described in the previous section.
+* Solution
+So the goal here is to determine the number of additions are done for the $n^{th}$ Fibonacci number. Okay, let's do that.
+
+Here is the implementation for reference.
+#+begin_src racket :exports code
+(define fibs
+  (cons-stream
+   0
+   (cons-stream 1 (add-streams (stream-cdr fibs) fibs))))
+#+end_src
+
+** Memoized implementation
+For every value past the first and second Fibonacci number from the ~fibs~ stream, there will be one addition per element of the stream, therefore, to get the $n^{th}$ Fibonacci number, $n - 2$ addition operations will occur.
+** Unoptimized implementation
+Okay, in the non-optimized version, every time that we compute the next element of the stream, we must recompute each of the elements. Our base cases have no additions. We should really be trying to use induction to show this.
+
+The first value of the sequence is 0, and the second value is 1. These are the initial value, and therefore the base case. They do not have any additions. The next bit of reasoning that we need to do, is to denote the number of additions to go from one element to the next. The next element can be reached with the previous two values are recomputed. But here is the tricky part. To actually get to the values that would make up the next element in the stream, you would actually have to compute all prior elements. This implementation is actually less efficient than the naive Fibonacci implementation, since we have to compute all the previous terms to get to the $n^{th}$ Fibonacci number.
+
+Let $T(n)$ denote the number of additions it takes to compute the $n^{th}$ Fibonacci number using this implementation.
+
+$T(1), T(2) = 0$
+
+$T(3) = 1$
+
+$T(n) = T(n - 1) + T(n - 1) + T(n - 2) + 1$
+
+There is an extra term here because the system is forced to compute the previous element, as well is the target value in this implementation. Unfortunately, my maths is weak, so I will just say that the number of additions will grow at the rate of $\Theta(3^{n})$.
+
+So now, I will awkwardly try to prove my conjecture (hope I am larping correctly).
+
+$T(n - 1) = \Theta(3^{n - 1})$
+
+
+$T(n) = \Theta(3^{n - 1}) + \Theta(3^{n - 1}) + \Theta(3^{n - 2}) + \Theta(1)$
+
+$T(n) = \frac{2}{3} \Theta(3^n) + \frac{1}{9} \Theta(3^n) + \Theta(1)$
+
+And since we take the largest term, and discard the coefficients, we say that the number of additions grows at a rate of $\Theta(3^{n})$.
+
+
+** Testing
+:properties:
+:header-args:racket: :tangle ./src/exercise-57.rkt :comments yes
+:end:
+
+As an engineer, I have an obligation to test my analysis when I can. Obviously, we are able to do that by setting up a side-effect.
+
+
+#+begin_src racket :exports code
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+(define target-fib 15)
+(define (display-result identifier-string num-additions)
+  (newline)
+  (display "number of additions to get ")
+  (display identifier-string)
+  (display " number ")
+  (display (+ target-fib 1))
+  (display " is ")
+  (display num-additions))
+#+end_src
+
+*** Memoized testing
+
+Here, we are going to just do some testing
+
+#+begin_src racket :exports code
+(define memoized-value 0)
+(define (show-add-streams stream-1 stream-2)
+  (cons-stream (begin
+                 (set! memoized-value (+ memoized-value 1))
+                 (+ (stream-car stream-1) (stream-car stream-2)))
+               (show-add-streams (stream-cdr stream-1) (stream-cdr stream-2))))
+#+end_src
+
+#+begin_src racket :exports code
+(define fibs (cons-stream 0 (cons-stream 1 (show-add-streams (stream-cdr fibs) fibs))))
+
+(stream-ref fibs target-fib)
+(display-result "memoized Fibonacci" memoized-value)
+#+end_src
+
+*** Unoptimized testing
+
+#+begin_src racket :exports code
+(define unmemo-value 0)
+;; Where tail is actually just a lambda that force could be applied on
+(define (cons-stream-unop head tail)
+  (cons head tail))
+(define (stream-cdr-unop stream)
+  ((cdr stream)))
+(define (stream-ref-unop stream value)
+  (define (iter acc tail)
+    (if (>= acc value)
+        (stream-car tail)
+        (iter (+ acc 1) (stream-cdr-unop tail))))
+  (iter 0 stream))
+(define (show-add-streams-unop stream-1 stream-2)
+  (cons-stream-unop (begin
+                      (set! unmemo-value (+ unmemo-value 1))
+                      (+ (stream-car stream-1) (stream-car stream-2)))
+                    (lambda ()
+                      (show-add-streams-unop (stream-cdr-unop stream-1) (stream-cdr-unop stream-2)))))
+(define fibs-unop
+  (cons-stream-unop
+   0
+   (lambda ()
+     (cons-stream-unop 1 (lambda () (show-add-streams-unop (stream-cdr-unop fibs-unop) fibs-unop))))))
+
+(newline)
+(stream-ref-unop fibs-unop target-fib)
+(display-result "unmemoized Fibonacci" unmemo-value)
+#+end_src
+
+*** Results
+
+#+begin_src bash :results output :exports both
+racket ./src/exercise-57.rkt
+#+end_src
+
+#+RESULTS:
+: 610
+:
+: number of additions to get memoized Fibonacci number 16 is 14
+: 610
+:
+: number of additions to get unmemoized Fibonacci number 16 is 2567
+
+
+From looking at this result, we are able to see that the memoized solution does occur in linear number of additions. If I were a good computer scientist, I would probably start to leverage my computer to compute what the number of additions for the $n^{th}$ Fibonacci would be, but you know, Engineers consider $\pi = 3 = e$, so I will leave this dragon here.
