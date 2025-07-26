@@ -13,3 +13,17 @@ $$
 represented as infinite streams. We will represent the series $a_0 + a_1 x + a_2 x^2 + a_3 x^3 + \dots$ as the stream whose elements are the coefficients $a_0, a_1, a_2, a_3, \dots$.
 
 a. The integral of the series $a_0 + a_1 x + a_2 x^2 + a_3 x^3 + \dots$ is the series $$c+a_0x + \frac{1}{2} a_1 x^2 + \frac{1}{3} a_2 x^3 + \frac{1}{4} a_3 x^4 + \dots,$$ where $c$ is any constant. Define a procedure ~integrate-series~ that takes as input a stream $a_0, a_1, a_2, \dots$ representing a power series and returns the stream $a_0, \frac{1}{2}a_1, \frac{1}{3} a_2, \dots$ of coefficients of the non-constant terms of the integral of the series. (Since the result has no constant term, it doesn't represent a power series; when we use ~integrate-series~, we will ~cons~ on the appropriate constant.)
+b. The function $x \rightarrow e^x$ is its own derivative. This implies that $e^x$ and the integral of $e^x$ are the same series, except for the constant term, which is $e^0 = 1$. Accordingly, we can generate the series for $e^x$ as
+   #+begin_src racket :exports code
+(define exp-series
+  (cons-stream 1 (integrate-series exp-series)))
+   #+end_src
+   Show how to generate the series for sine and cosine, starting from the fact that the derivative of sine is cosine and the derivative of cosine is the negative of sine:
+   #+begin_src racket :exports code
+(define cosine-series (cons-stream 1 <??>))
+(define sine-series (cons-stream 0 <??>))
+   #+end_src
+* Solution
+Looks like a tough one.
+** Part a
+** Part b
