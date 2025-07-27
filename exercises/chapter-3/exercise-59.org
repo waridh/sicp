@@ -98,7 +98,7 @@ Interesting, it looks like we are about to use some mathematical properties with
 #+end_src
 
 #+begin_src racket :exports code
-(define cosine-series (cons-stream 1 (stream-map - (integrate-series sine-series))))
+(define cosine-series (cons-stream 1 (scale-stream (integrate-series sine-series) -1)))
 (define sine-series (cons-stream 0 (integrate-series cosine-series)))
 #+end_src
 

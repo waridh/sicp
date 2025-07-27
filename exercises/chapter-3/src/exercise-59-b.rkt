@@ -20,7 +20,7 @@
 ;; Part b:3 ends here
 
 ;; [[file:../exercise-59.org::*Part b][Part b:4]]
-(define cosine-series (cons-stream 1 (stream-map - (integrate-series sine-series))))
+(define cosine-series (cons-stream 1 (scale-stream (integrate-series sine-series) -1)))
 (define sine-series (cons-stream 0 (integrate-series cosine-series)))
 ;; Part b:4 ends here
 
