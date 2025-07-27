@@ -17,6 +17,8 @@ In other words, $X$ is the power series whose constant term is 1 an whose higher
 :header-args:racket: :tangle ./src/exercise-61.rkt :comments yes
 :end:
 
+Like with the previous, for improved modularity, we have moved the implementation of the ~invert-unit-series~ to over [[file:stream-series.org][here]].
+
 #+begin_src racket :exports none
 #lang sicp
 (#%require "modules/stream-base.rkt"
@@ -25,11 +27,15 @@ In other words, $X$ is the power series whose constant term is 1 an whose higher
            "modules/assert-tool.rkt")
 #+end_src
 ** Test
+For testing strategy, we are going to invert a series, and then multiply it with its uninverted counter-part to see if we get the value of 1.
+
 #+begin_src racket :exports code
 (assert-list-infinite-stream (list 1 0 0 0 0 0 0 0)
                              (mul-series (invert-unit-series cosine-series) cosine-series))
 #+end_src
 ** Result
+For the result, we shall evaluate the racket script to see if our test passes.
+
 #+begin_src bash :exports both :results output
 racket ./src/exercise-61.rkt
 #+end_src
@@ -37,3 +43,5 @@ racket ./src/exercise-61.rkt
 #+RESULTS:
 :
 : pass: (1 0 0 0 0 0 0 0) == ( 1 0 0 0 0 0 0 0)
+
+Nice, looks like we were able to implement the procedure to produces the inverted stream.
