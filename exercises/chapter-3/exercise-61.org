@@ -10,3 +10,30 @@ $$
   X &= 1 - S_R \cdot X
 \end{align}
 $$
+
+In other words, $X$ is the power series whose constant term is 1 an whose higher-order terms are given by the negative of $S_{R}$ times $X$. fuse this idea to write a procedure ~invert-unit-series~ that computes $1/S$ for a power series $S$ with constant term 1. You will need to use ~mul-series~ from the previous exercise.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-61.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-series.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+** Test
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 0 0 0 0 0 0 0)
+                             (mul-series (invert-unit-series cosine-series) cosine-series))
+#+end_src
+** Result
+#+begin_src bash :exports both :results output
+racket ./src/exercise-61.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 0 0 0 0 0 0 0) == ( 1 0 0 0 0 0 0 0)

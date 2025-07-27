@@ -9,7 +9,7 @@ This file contains the implementation of series operations.
 #+begin_src racket :export code
 #lang sicp
 (#%require "stream-base.rkt" "stream-combinator.rkt" "stream-generator.rkt")
-(#%provide integrate-series exp-series sine-series cosine-series mul-series)
+(#%provide integrate-series exp-series sine-series cosine-series mul-series invert-unit-series)
 #+end_src
 ** Integrate series
 
@@ -47,8 +47,17 @@ We have a split path of computation, where the next element of the stream shall 
 
 
 #+begin_src racket :exports code
+;; This procedure multiplies two series together, and return another series.
 (define (mul-series s1 s2)
   (cons-stream (* (stream-car s1) (stream-car s2))
                (add-streams (scale-stream (stream-cdr s2) (stream-car s1))
                             (mul-series (stream-cdr s1) s2))))
+#+end_src
+** Invert unit series
+This procedure shall compute $1/S$ for a power series $S$ with constant term 1.
+
+#+begin_src racket :exports code
+(define (invert-unit-series s)
+  (define x (cons-stream 1 (scale-stream (mul-series (stream-cdr s) x) -1)))
+  x)
 #+end_src

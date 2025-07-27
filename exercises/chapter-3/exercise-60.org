@@ -21,7 +21,7 @@ You can test your procedure by verifying that $\sin^2 \left( 2 \right) + \cos^2 
            "modules/assert-tool.rkt")
 #+end_src
 
-So that we could reuse the implementation of the multiply series, I have implemented it in a reusible module, which could be found [[file:stream-series.org::*Multiply Series][here]].
+So that we could reuse the implementation of the multiply series, I have implemented it in a reusable module, which could be found [[file:stream-series.org][here]].
 
 ** Test
 
