@@ -1,0 +1,54 @@
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-series.rkt :comments yes
+:end:
+#+title: Stream Series
+* Overview
+
+This file contains the implementation of series operations.
+* Source
+#+begin_src racket :export code
+#lang sicp
+(#%require "stream-base.rkt" "stream-combinator.rkt" "stream-generator.rkt")
+(#%provide integrate-series exp-series sine-series cosine-series mul-series)
+#+end_src
+** Integrate series
+
+#+begin_src racket :exports none
+(define (integrate-series s)
+  (define (iter acc tail)
+    (cons-stream (* (/ 1 (+ acc 1)) (stream-car tail))
+                 (iter (+ acc 1) (stream-cdr tail))))
+  (iter 0 s))
+#+end_src
+** Exponential Series
+
+
+#+begin_src racket :exports code
+(define exp-series
+  (cons-stream 1 (integrate-series exp-series)))
+#+end_src
+
+** Sine and Cosine
+
+#+begin_src racket :exports code
+(define cosine-series (cons-stream 1 (scale-stream (integrate-series sine-series) -1)))
+(define sine-series (cons-stream 0 (integrate-series cosine-series)))
+#+end_src
+
+** Multiply Series
+
+The implementation here is using the same logic you would use to compute the multiplication of two streams. Here is the base of the idea that was used.
+
+$$
+  \left( a_0 + a_1 x + a_2 x^2 + \dots \right) \times \left( b_0 + b_1 x + b_2 x^2 + \dots \right) = (a_0 b_0) + (a_0 b_1 + a_1 b_0) x + (a_0 b_2 + a_1 b_1 + a_2 b_0) x^2 + \dots
+$$
+
+We have a split path of computation, where the next element of the stream shall be the current coefficient multiplied by the cdr of the other stream added to the cdr of the current stream series multiplied with the other stream in the current environment.
+
+
+#+begin_src racket :exports code
+(define (mul-series s1 s2)
+  (cons-stream (* (stream-car s1) (stream-car s2))
+               (add-streams (scale-stream (stream-cdr s2) (stream-car s1))
+                            (mul-series (stream-cdr s1) s2))))
+#+end_src

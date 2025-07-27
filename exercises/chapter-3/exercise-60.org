@@ -1,0 +1,43 @@
+#+title: Exercise 60
+* Prompt
+With power series represented as streams of coefficients as in the previous exercise, adding series is implemented by ~add-streams~. Complete the definition of the following procedure for multiplying series:
+
+#+begin_src racket :exports code
+(define (mul-series s1 s2)
+  (cons-stream <??> (add-stream <??> <??>)))
+#+end_src
+
+You can test your procedure by verifying that $\sin^2 \left( 2 \right) + \cos^2 \left( x \right) = 1$
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-60.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-series.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+So that we could reuse the implementation of the multiply series, I have implemented it in a reusible module, which could be found [[file:stream-series.org::*Multiply Series][here]].
+
+** Test
+
+#+begin_src racket :exports code
+(assert-list-infinite-stream (list 1 0 -1) (mul-series cosine-series cosine-series))
+(assert-list-infinite-stream (list 1 0 0 0 0 0 0)
+                             (add-streams (mul-series sine-series sine-series)
+                                          (mul-series cosine-series cosine-series)))
+#+end_src
+** Result
+
+#+begin_src bash :exports results :results output
+racket ./src/exercise-60.rkt
+#+end_src
+
+#+RESULTS:
+:
+: pass: (1 0 -1) == ( 1 0 -1)
+: pass: (1 0 0 0 0 0 0) == ( 1 0 0 0 0 0 0)
