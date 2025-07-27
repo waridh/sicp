@@ -1,0 +1,12 @@
+#+title: Exercise 61
+* Prompt
+Let $S$ be a power series whose constant term is 1. Suppose we want to find the power series $1/S$, that is, the series $X$ such that $SX=1$. Write $S=1+S_R$ where $S_R$ is the part of $S$ after the constant term. Then we can solve for $X$ as follows:
+
+$$
+\begin{align}
+  S \cdot X &= 1,\\
+  \left( 1 + S_R \right) \cdot X &= 1,\\
+  X + S_R \cdot X &= 1,\\
+  X &= 1 - S_R \cdot X
+\end{align}
+$$
