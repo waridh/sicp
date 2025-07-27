@@ -1,7 +1,13 @@
 ;; [[file:../../stream-series.org::*Source][Source:1]]
 #lang sicp
 (#%require "stream-base.rkt" "stream-combinator.rkt" "stream-generator.rkt")
-(#%provide integrate-series exp-series sine-series cosine-series mul-series invert-unit-series)
+(#%provide integrate-series
+           exp-series
+           sine-series
+           cosine-series
+           mul-series
+           invert-unit-series
+           div-series)
 ;; Source:1 ends here
 
 ;; [[file:../../stream-series.org::*Integrate series][Integrate series:1]]
@@ -35,3 +41,20 @@
   (define x (cons-stream 1 (scale-stream (mul-series (stream-cdr s) x) -1)))
   x)
 ;; Invert unit series:1 ends here
+
+;; [[file:../../stream-series.org::*Div Series][Div Series:1]]
+(define (div-series num den)
+  (define (normalize-stream s val)
+    (scale-stream s (/ 1 val)))
+  (if (= 0 (stream-car den))
+      (error "DEN series cannot start with 0: DIV-SERIES" den)
+      (let ([car-den (stream-car den)]
+            [must-norm (not (= (stream-car den) 1))])
+        (let ([norm-den (if must-norm
+                            (normalize-stream den car-den)
+                            den)]
+              [norm-num (if must-norm
+                            (normalize-stream den car-den)
+                            num)])
+          (mul-series norm-num (invert-unit-series norm-den))))))
+;; Div Series:1 ends here
