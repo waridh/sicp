@@ -4,7 +4,7 @@ Let $S$ be a power series whose constant term is 1. Suppose we want to find the 
 
 $$
 \begin{align}
-  S \cdot X &= 1,&&\\
+  S \cdot X &= 1,\\
   \left( 1 + S_R \right) \cdot X &= 1,\\
   X + S_R \cdot X &= 1,\\
   X &= 1 - S_R \cdot X
