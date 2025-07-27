@@ -1,0 +1,30 @@
+#+title: Exercise 63
+* Prompt
+Louis Reasoner asks why the ~sqrt-stream~ procedure was not written in the following more straight-forward way, without the local variable ~guesses~:
+
+#+begin_src racket :exports code
+(define (sqrt-stream x)
+  (cons-stream 1.0 (stream-map
+                    (lambda (guess)
+                      (sqrt-improve guess x))
+                    (sqrt-stream x))))
+#+end_src
+
+Alyssa P. Hacker replies that this version of the procedure is considerably less efficient because it performs redundant computation. Explain Alyssa's answer. Would the two versions still differ in efficiency if our implementation of ~delay~ used only ~(lambda () <exp>)~ without using the optimization provided by ~memo-proc~?
+* Solution
+
+For reference, here is the implementation being contrasted against.
+
+#+begin_src racket :exports code
+(define (sqrt-stream x)
+  (define guesses
+    (cons-stream
+     1.0
+     (stream-map (lambda (guess) (sqrt-improve guess x))
+                 guesses)))
+  guesses)
+#+end_src
+
+Yes Alyssa P. Hacker is correct, if we do what Louis was suggesting, the n^{th} element of the stream would have the ~sqrt-improve~ procedure applied $n-1$ times. This is like the iterative process vs recursive process talk, but streams. The implicit stream is more efficient if we refer to the value through a local variable. Creating a new environment for every element of the stream will result in less efficiency.
+
+If ~delay~ was defined as ~(lambda () <exp>)~, then we would not have a difference in number of computation between Louis' implementation, and the one that SICP gave us. This is because we would be recomputing all the previous values of ~guesses~ again when trying to compute the next element.
