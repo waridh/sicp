@@ -1,0 +1,10 @@
+#+title: Exercise 64
+* Prompt
+Write a procedure ~stream-limit~ that takes as arguments a stream and a number (the tolerance). It should examine the stream until it find two successive elements that differ in absolute value by less than the  tolerance, and return the second of the two elements. fusing this, we could compute square roots up to a given tolerance by
+
+#+begin_src racket :exports code
+(define (sqrt x tolerance)
+  (stream-limit (sqrt-stream x) tolerance))
+#+end_src
+* Solution
+We are writing a sort of a selector for the stream.
