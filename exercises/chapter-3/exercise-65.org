@@ -66,3 +66,7 @@ racket ./src/exercise-65.rkt
 : ( 1.0 0.7 0.6932773109243697 0.6931488693329254 0.6931471960735491 0.6931471806635636 0.6931471805604039 0.6931471805599445)
 
 Yes, we can see that the speed of convergence is very much the same as those of the ~pi-stream~.
+
+- Original definition was slow to converge.
+- The Euler transform implementation was faster, but even 5th digit precise by the 8th term
+- The accelerated sequence implementation was hitting 10th digit precision by the 8th term
