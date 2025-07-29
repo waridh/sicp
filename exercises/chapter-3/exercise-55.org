@@ -14,15 +14,8 @@ This should be definable with the frameworks that we have built so far.
            "modules/assert-tool.rkt")
 #+end_src
 ** Implementation
-Here, we implement the solution. Now, we could be creating this stream using explicit stream declaration, but I thought that now with implicit streams unlocked, we might as well implement our solution that way. Anyways, here it is.
+Here, we implement the solution. Now, we could be creating this stream using explicit stream declaration, but I thought that now with implicit streams unlocked, we might as well implement our solution that way. Anyways, you can find that implementation in the [[file:stream-combinator.org][following file.]]
 
-#+begin_src racket :exports code
-(define (partial-sums s)
-  (define result
-    (cons-stream (stream-car s)
-                 (add-streams result (stream-cdr s))))
-  result)
-#+end_src
 ** Test
 We shall start by testing the example given by the problem, followed by additional tests.
 #+begin_src racket :exports code

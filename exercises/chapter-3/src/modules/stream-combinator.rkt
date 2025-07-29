@@ -1,7 +1,7 @@
 ;; [[file:../../stream-combinator.org::*Source][Source:1]]
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream)
+(#%provide add-streams mul-streams combine-streams scale-stream partial-sums)
 ;; Source:1 ends here
 
 ;; [[file:../../stream-combinator.org::*Generic Combinator][Generic Combinator:1]]
@@ -25,3 +25,11 @@
 (define (mul-streams stream-1 stream-2)
   (combine-streams * stream-1 stream-2))
 ;; Multiply streams:1 ends here
+
+;; [[file:../../stream-combinator.org::*Partial Sums][Partial Sums:1]]
+(define (partial-sums s)
+  (define result
+    (cons-stream (stream-car s)
+                 (add-streams result (stream-cdr s))))
+  result)
+;; Partial Sums:1 ends here

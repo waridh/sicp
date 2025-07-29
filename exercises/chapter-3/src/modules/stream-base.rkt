@@ -12,7 +12,9 @@
            display-line
            stream-enumerate-interval
            stream-filter
-           stream-map)
+           stream-map
+           make-tableau
+           accelerated-sequence)
 ;; Module base:2 ends here
 
 ;; [[file:../../stream-base.org::*Stream basic selectors][Stream basic selectors:1]]
@@ -94,3 +96,13 @@
       (cons-stream (apply proc (map stream-car argstreams))
                    (apply stream-map (cons proc (map stream-cdr argstreams))))))
 ;; Stream Map:1 ends here
+
+;; [[file:../../stream-base.org::*Make Tableau][Make Tableau:1]]
+(define (make-tableau transform s)
+  (cons-stream s (make-tableau transform (transform s))))
+;; Make Tableau:1 ends here
+
+;; [[file:../../stream-base.org::*Accelerated Sequence][Accelerated Sequence:1]]
+(define (accelerated-sequence transform s)
+  (stream-map stream-car (make-tableau transform s)))
+;; Accelerated Sequence:1 ends here

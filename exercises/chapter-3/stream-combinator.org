@@ -8,7 +8,7 @@ Literate programming for the stream combinators
 #+begin_src racket
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream)
+(#%provide add-streams mul-streams combine-streams scale-stream partial-sums)
 #+end_src
 ** Generic Combinator
 #+begin_src racket :exports code
@@ -32,4 +32,13 @@ Literate programming for the stream combinators
 #+begin_src racket :exports code
 (define (mul-streams stream-1 stream-2)
   (combine-streams * stream-1 stream-2))
+#+end_src
+** Partial Sums
+
+#+begin_src racket :exports code
+(define (partial-sums s)
+  (define result
+    (cons-stream (stream-car s)
+                 (add-streams result (stream-cdr s))))
+  result)
 #+end_src

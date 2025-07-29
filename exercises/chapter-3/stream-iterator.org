@@ -1,0 +1,51 @@
+#+title: Stream Iterator
+* Overview
+
+Contains the definition for the code used to perform iteration.
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-iterator.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "stream-base.rkt"
+           "stream-combinator.rkt")
+(#%provide pi-stream euler-transform stream-limit)
+#+end_src
+
+** Pi
+
+#+begin_src racket :exports code
+(define (pi-summands n)
+  (cons-stream (/ 1.0 n)
+               (stream-map - (pi-summands (+ n 2)))))
+
+(define pi-stream
+  (scale-stream (partial-sums (pi-summands 1)) 4))
+#+end_src
+** Euler Transform
+This procedure increases the rate at which some infinite series will converge.
+
+#+begin_src racket :exports code
+(define (square x)
+  (* x x))
+(define (euler-transform s)
+  (let ([s0 (stream-ref s 0)]
+        [s1 (stream-ref s 1)]
+                             [s2 (stream-ref s 2)])
+    (cons-stream (- s2 (/ (square (- s2 s1))
+                          (+ s0 (* -2 s1) s2)))
+                 (euler-transform (stream-cdr s)))))
+#+end_src
+** Stream Limit
+The following procedure will iterate through a stream until it finds a value that is different by less than the limit.
+
+#+begin_src racket :exports code
+(define (stream-limit s limit)
+  (define (iter prev tail)
+    (if (< (abs (- (stream-car tail) prev)) limit)
+        (stream-car tail)
+        (iter (stream-car tail) (stream-cdr tail))))
+  (iter (stream-car s) (stream-cdr s)))
+#+end_src
