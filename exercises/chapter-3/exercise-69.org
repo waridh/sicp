@@ -1,0 +1,74 @@
+#+title: Exercise 69
+* Prompt
+Write a procedure ~triples~ that takes three infinite streams, S, T, and U, and produce the stream of triples $(S_i, T_j, U_k)$ such that $i\leq j \leq k$. Use ~triples~ to generate the stream of all Pythagorean triples of positive integers, i.e., the triples $(i, j, k)$ such that $i\leq j$ and $i^2 + j^2 = k^2$.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-69.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-generator.rkt"
+           "modules/stream-combinator.rkt")
+#+end_src
+
+Well, it looks like we are now working with a three dimensional stream.
+
+#+begin_src racket :exports code
+(define (triples-aux si tj+1 uk+1)
+  (cons-stream (list (stream-car si) (stream-car tj+1) (stream-car uk+1))
+               (interleave (stream-map (lambda (x) (list (stream-car si) (stream-car tj+1) x))
+                                       (stream-cdr uk+1))
+                           (triples-aux si (stream-cdr tj+1) (stream-cdr uk+1)))))
+(define (triples s t u)
+  (cons-stream (list (stream-car s) (stream-car t) (stream-car u))
+               (interleave (interleave (triples-aux s (stream-cdr t) (stream-cdr u))
+                                       (stream-map (lambda (x) (list (stream-car s) (stream-car t) x))
+                                                   (stream-cdr u)))
+                           (triples (stream-cdr s) (stream-cdr t) (stream-cdr u)))))
+#+end_src
+
+So what happened here is that we are adding one more axis to the computation.
+
+I would like to just make sure that our first 21 elements are correct, so I will do a little printing.
+
+#+begin_src racket :exports code
+(newline)
+(display "first 21 elements of (triples integers integers)")
+(newline)
+(display (display-stream-range 0 20 (triples integers integers integers)))
+#+end_src
+
+Neat, we have our expected values, none of the output is breaking the invariant of the stream. Now, we shall generate the stream of all Pythagorian triples of positive integers.
+
+#+begin_src racket :exports code
+(define (pythagorian-predicate i j k)
+  (= (expt k 2) (+ (expt i 2) (expt j 2))))
+
+(define pythagorian-triples
+  (stream-filter (lambda (x) (pythagorian-predicate (car x) (cadr x) (caddr x)))
+                 (triples integers integers integers)))
+#+end_src
+
+And now, we shall have a look at the first 8 elements of the ~pythagorian-triples~ stream.
+
+#+begin_src racket :exports code
+(newline)
+(display "8 pythagorian triples")
+(newline)
+(display (display-stream-range 0 7 pythagorian-triples))
+#+end_src
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-69.rkt
+#+end_src
+
+#+RESULTS:
+:
+: first 21 elements of (triples integers integers)
+: ( (1 1 1) (1 2 2) (2 2 2) (1 1 2) (2 3 3) (1 2 3) (3 3 3) (1 1 3) (2 2 3) (1 3 3) (3 4 4) (1 1 4) (2 3 4) (1 2 4) (4 4 4) (1 1 5) (2 2 4) (1 3 4) (3 3 4) (1 1 6) (2 4 4))#<void>
+: 8 pythagorian triples
+: ( (3 4 5) (6 8 10) (5 12 13) (9 12 15) (8 15 17) (12 16 20) (15 20 25) (20 21 29))#<void>
+
+Finding the Pythagorian triples is actually an expensive calculation. I wonder if there is something we could do to improve that performance. Still, this concludes our exercise.
