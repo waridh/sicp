@@ -1,0 +1,143 @@
+#+title: Exercise 72
+* Prompt
+In a similar way to exercise 3.71 generate a stream of all numbers that can be written as the sum of two squares in three different ways (showing how they can be so written).
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-72.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+The difference with this exercise is that now, we want to match the three elements of the streams that creates the sum of two squares.
+
+Once more, we will require the ~pairs-weighted~ procedure.
+
+#+begin_src racket :exports code
+(define (pairs-weighted weight s t)
+  (cons-stream (list (stream-car s) (stream-car t))
+               (merge-weighted weight
+                               (stream-map (lambda (x) (list (stream-car s) x)) (stream-cdr t))
+                               (pairs-weighted weight (stream-cdr s) (stream-cdr t)))))
+#+end_src
+
+Here are the steps that we will take to construct the streams of three pairs of integers that square sums to the same value. In this case, we will build for an if and only if relationship.
+
+1. Construct the weighted merged pairs
+2. Feed the stream into a special transformer that will try to construct a triple of pairs that constructs the same weight.
+
+#+begin_src racket :exports code
+(define (weight-function a b)
+  (+ (expt a 2) (expt b 2)))
+
+(define (weight-function-of-list l)
+  (weight-function (car l) (cadr l)))
+
+(define (target-transformer s)
+  (define (iter acc tail)
+    (if (null? acc)
+        (iter (list (stream-car tail)) (stream-cdr tail))
+        (let ([acc-weight (weight-function-of-list (car acc))]
+              [next-weight (weight-function-of-list (stream-car tail))])
+          (cond
+            [(and (>= (length acc) 3) (not (= acc-weight next-weight)))
+             (cons-stream acc (iter '() (stream-cdr tail)))]
+            [(>= (length acc) 3) (iter '() (stream-cdr tail))]
+            [(= acc-weight next-weight) (iter (cons (stream-car tail) acc) (stream-cdr tail))]
+            [else (iter '() (stream-cdr tail))]))))
+  (iter '() s))
+
+(define square-sum-triples
+  (target-transformer (pairs-weighted weight-function-of-list integers integers)))
+#+end_src
+
+Now, let's see the resulting streams
+
+#+begin_src racket :exports code
+(newline)
+(display "showing some triples")
+(newline)
+(display-stream-range 0 5 square-sum-triples)
+#+end_src
+
+Okay, this is good, but I would like to see what the actual value is, so we are adding one more stream transformation, and then displaying that.
+
+#+begin_src racket :exports code
+(define (get-square-sums s)
+  (cons-stream (cons (weight-function-of-list (car (stream-car s))) (stream-car s))
+               (get-square-sums (stream-cdr s))))
+#+end_src
+
+
+#+begin_src racket :exports code
+(newline)
+(display "triples with sum")
+(newline)
+(display-stream-range 0 5 (get-square-sums square-sum-triples))
+#+end_src
+
+This should be done. Let's write a validator, and then iterate a few times on it.
+
+
+#+begin_src racket :exports code
+(define (validate-system num-tests)
+  (define (check-invariant-aux acc tail)
+    (cond [(null? tail) true]
+          [(not (= acc (weight-function-of-list (car tail)))) false]
+          [else (check-invariant-aux acc (cdr tail))]))
+  (define (check-invariant curr)
+    (check-invariant-aux (weight-function-of-list (car curr)) (cdr curr)))
+  (define (iter curr-inc tail-stream)
+    (if (>= curr-inc num-tests)
+        'done
+        (begin
+          (assert (check-invariant (stream-car tail-stream))
+                  (stream-car tail-stream))
+          (iter (+ curr-inc 1) (stream-cdr tail-stream)))))
+  (iter 0 square-sum-triples))
+#+end_src
+
+#+begin_src racket :exports code
+(validate-system 20)
+#+end_src
+
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-72.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+showing some triples
+( ((10 15) (6 17) (1 18)) ((13 16) (8 19) (5 20)) ((17 19) (11 23) (5 25)) ((15 25) (11 27) (3 29)) ((23 24) (12 31) (9 32)) ((25 25) (17 31) (5 35)))
+triples with sum
+( (325 (10 15) (6 17) (1 18)) (425 (13 16) (8 19) (5 20)) (650 (17 19) (11 23) (5 25)) (850 (15 25) (11 27) (3 29)) (1105 (23 24) (12 31) (9 32)) (1250 (25 25) (17 31) (5 35)))
+pass: ((10 15) (6 17) (1 18))
+pass: ((13 16) (8 19) (5 20))
+pass: ((17 19) (11 23) (5 25))
+pass: ((15 25) (11 27) (3 29))
+pass: ((23 24) (12 31) (9 32))
+pass: ((25 25) (17 31) (5 35))
+pass: ((22 29) (13 34) (10 35))
+pass: ((19 33) (15 35) (9 37))
+pass: ((26 32) (16 38) (10 40))
+pass: ((31 33) (23 39) (5 45))
+pass: ((25 40) (17 44) (4 47))
+pass: ((24 43) (20 45) (11 48))
+pass: ((28 41) (23 44) (16 47))
+pass: ((36 37) (27 44) (19 48))
+pass: ((31 42) (18 49) (15 50))
+pass: ((35 40) (11 52) (4 53))
+pass: ((37 39) (17 51) (9 53))
+pass: ((38 44) (26 52) (4 58))
+pass: ((30 50) (22 54) (6 58))
+pass: ((32 49) (20 55) (17 56))done
+#+end_example
+
+Yep, I am now satisfied with the answer.

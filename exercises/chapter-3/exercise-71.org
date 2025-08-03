@@ -62,3 +62,5 @@ racket ./src/exercise-71.rkt
 :
 : first 6 ramanujans are:
 : ( 1729 4104 13832 20683 32832 39312)
+
+I shall now quickly talk about the limitations of my implementation. We are currently not handling the case where there are more than two cubic sums for a value, so those cases will print out twice. For the requirement set out by this exercise, this is enough.
