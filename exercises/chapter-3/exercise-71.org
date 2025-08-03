@@ -1,0 +1,64 @@
+#+title: Exercise 71
+* Prompt
+Numbers that can be expressed as the sum of two cubes in more than one ways are sometimes called /Ramanujan numbers/, in honor of the mathematician Srinivasa Ramanujan. Ordered streams of pairs provide an elegant solution to the problem of computing these numbers. To find a number tha can be written as the sum of two cubes in two ways, we need only generate the stream of pairs of integers $(i,j)$ weighted according to the sum $i^3 + j^3$ (see exercise 3.70), then search the stream for two consecutive pairs with the same weight. Write a procedure to generate the Ramanujan numbers. The first such numbers is 1,729. What are the next five?
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-71.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt")
+#+end_src
+
+For this, we are going to need to use the ~pairs-weighted~ procedure from the previous exercise.
+
+#+begin_src racket :exports code
+(define (pairs-weighted weight s t)
+  (cons-stream (list (stream-car s) (stream-car t))
+               (merge-weighted weight
+                               (stream-map (lambda (x) (list (stream-car s) x)) (stream-cdr t))
+                               (pairs-weighted weight (stream-cdr s) (stream-cdr t)))))
+#+end_src
+
+Okay, we are doing the following stages:
+
+1. Generate the pairs of integers, weighted by $i^3 + j^3$
+2. Pass the resulting stream into a search transformer that will do a lookahead to determine if the Ramanujan number has been found.
+
+#+begin_src racket :exports code
+(define (ramanujan-weight i j)
+  (+ (expt i 3) (expt j 3)))
+
+(define (ramanujan-weight-of-list l)
+  (ramanujan-weight (car l) (cadr l)))
+
+(define (ramanujan-searcher s)
+  (cond
+    [(stream-null? s) the-empty-stream]
+    [(= (ramanujan-weight-of-list (stream-car s))
+        (ramanujan-weight-of-list (stream-car (stream-cdr s))))
+     (cons-stream (ramanujan-weight-of-list (stream-car s)) (ramanujan-searcher (stream-cdr s)))]
+    [else (ramanujan-searcher (stream-cdr s))]))
+
+(define ramanujan-numbers
+  (ramanujan-searcher (pairs-weighted (lambda (x) (ramanujan-weight-of-list x)) integers integers)))
+#+end_src
+
+#+begin_src racket :exports code
+(newline)
+(display "first 6 ramanujans are:")
+(newline)
+(display-stream-range 0 5 ramanujan-numbers)
+#+end_src
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-71.rkt
+#+end_src
+
+#+RESULTS:
+:
+: first 6 ramanujans are:
+: ( 1729 4104 13832 20683 32832 39312)
