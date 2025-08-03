@@ -37,7 +37,7 @@ I would like to just make sure that our first 21 elements are correct, so I will
 (newline)
 (display "first 21 elements of (triples integers integers)")
 (newline)
-(display (display-stream-range 0 20 (triples integers integers integers)))
+(display-stream-range 0 20 (triples integers integers integers))
 #+end_src
 
 Neat, we have our expected values, none of the output is breaking the invariant of the stream. Now, we shall generate the stream of all Pythagorian triples of positive integers.
@@ -57,7 +57,7 @@ And now, we shall have a look at the first 8 elements of the ~pythagorian-triple
 (newline)
 (display "8 pythagorian triples")
 (newline)
-(display (display-stream-range 0 7 pythagorian-triples))
+(display-stream-range 0 7 pythagorian-triples)
 #+end_src
 
 #+begin_src bash :exports both :results output
@@ -67,8 +67,8 @@ racket ./src/exercise-69.rkt
 #+RESULTS:
 :
 : first 21 elements of (triples integers integers)
-: ( (1 1 1) (1 2 2) (2 2 2) (1 1 2) (2 3 3) (1 2 3) (3 3 3) (1 1 3) (2 2 3) (1 3 3) (3 4 4) (1 1 4) (2 3 4) (1 2 4) (4 4 4) (1 1 5) (2 2 4) (1 3 4) (3 3 4) (1 1 6) (2 4 4))#<void>
+: ( (1 1 1) (1 2 2) (2 2 2) (1 1 2) (2 3 3) (1 2 3) (3 3 3) (1 1 3) (2 2 3) (1 3 3) (3 4 4) (1 1 4) (2 3 4) (1 2 4) (4 4 4) (1 1 5) (2 2 4) (1 3 4) (3 3 4) (1 1 6) (2 4 4))
 : 8 pythagorian triples
-: ( (3 4 5) (6 8 10) (5 12 13) (9 12 15) (8 15 17) (12 16 20) (15 20 25) (20 21 29))#<void>
+: ( (3 4 5) (6 8 10) (5 12 13) (9 12 15) (8 15 17) (12 16 20) (15 20 25) (20 21 29))
 
 Finding the Pythagorian triples is actually an expensive calculation. I wonder if there is something we could do to improve that performance. Still, this concludes our exercise.

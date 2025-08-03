@@ -1,0 +1,139 @@
+#+title: Exercise 70
+* Prompt
+It would be nice to be able to generate streams in which the pairs appear in some useful order, rather than in the order that results from an /ad hoc/ interleaving process. We can use a technique similar to the ~merge~ procedure of exercise [[file:exercise-56.org][3.56]], if we define a way to say that one pair of integers is "less than" another. One way to do this is to define a "weighting function" $W(i,j)$ and stipulate that $(i_1, j_1)$ is less than $(i_2, j_2)$ if $W(i_1, j_1) \lt W(i_2, j_2)$. Write a procedure ~merge-weighted~ that is like ~merge~, except that ~merge-weighted~ takes an additional argument ~weight~, which is a procedure that computes the weight of a pair, and is used to determine the order in which elements should appear in the resulting merged stream. Using this, generalize ~pairs~ to a procedure ~weighted-pairs~ that takes two streams, together with a procedure that computes a weighting function, and generates the stream of pairs, ordered according to weight. Use your procedure to generate
+
+a. the stream of all pairs of positive integers $(i,j)$ with $i\le j$ ordered according to the sum $i + j$
+
+b. the stream of all pairs of positive integers $(i,j)$ with $i\leq j$, where neither $i$ nor $j$ is divisible by 2, 3, or 5, and the pairs are ordered according to the sum $2 i + 3 j + 5 i j$.
+
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-70.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-generator.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+Think that we could just implement this. I will deviate a little from the spec. Instead of the weighting function taking in two parameters to compute the value, the weighted function will take in the element, and therefore, should unwrap the content of the data passed in.
+
+Since we shall be reusing this procedure, we will move the implementation to our [[file:stream-combinator.org][stream-combinator]] module.
+
+** Part A
+We are just rewriting the ~pairs~ procedure, but this time, it shall be ordered.
+
+#+begin_src racket :exports code
+(define (pairs-weighted weight s t)
+  (cons-stream (list (stream-car s) (stream-car t))
+               (merge-weighted weight
+                               (stream-map (lambda (x) (list (stream-car s) x)) (stream-cdr t))
+                               (pairs-weighted weight (stream-cdr s) (stream-cdr t)))))
+
+(define part-a-stream (pairs-weighted (lambda (x) (+ (car x) (cadr x))) integers integers))
+#+end_src
+
+Let's look at the first 21 elements.
+
+#+begin_src racket :exports code
+(newline)
+(display "first 21 elements of the sorted pairs (i, j), where i <= j")
+(newline)
+(display-stream-range 0 20 part-a-stream)
+#+end_src
+
+This is working as we expected it to.
+** Part B
+The stream of all positive integers $(i,j)$ where $i\leq j$, neither $i$ nor $j$ is divisible by 2, 3, or 5, and the pair are ordered according to the sum $2 i + 3 j + 5 i j$.
+
+We are going to leverage the ~pairs-weighted~ procedure written for this exercise. We just need to construct a filtered stream that filters out 2s, 3s, and 5s. Passing this into ~pairs-weighted~ procedure with a different merge condition.
+
+#+begin_src racket :exports code
+(define (divisible a b)
+  (= (remainder a b) 0))
+(define part-b-stream
+  (let ([filtered-stream (stream-filter (lambda (x)
+                                          (not (or (divisible x 2) (divisible x 3) (divisible x 5))))
+                                        integers)])
+    (pairs-weighted (lambda (x) (+ (* 2 (car x)) (* 3 (cadr x)) (* 5 (car x) (cadr x))))
+                    filtered-stream
+                    filtered-stream)))
+#+end_src
+
+Now we are going to look at the first 21 elements to ensure correctness of the value.
+
+#+begin_src racket :exports code
+(newline)
+(display "part b, first 21 elements")
+(newline)
+(display-stream-range 0 20 part-b-stream)
+#+end_src
+
+Just for practice, let me build a validator for this stream.
+
+#+begin_src racket :exports code
+(define (validate-part-b num-tests)
+  (define (check-invariant-aux single-pair)
+    (define (divisibility-check n)
+      (not (or (divisible n 2) (divisible n 3) (divisible n 5))))
+    (and (<= (car single-pair) (cadr single-pair))
+         (divisibility-check (car single-pair))
+         (divisibility-check (cadr single-pair))))
+  (define (sorting-weight single-pair)
+    (let ([i (car single-pair)]
+          [j (cadr single-pair)])
+      (+ (* 2 i) (* 3 j) (* 5 i j))))
+  (define (check-invariant curr next)
+    (and (check-invariant-aux curr)
+         (check-invariant-aux next)
+         (<= (sorting-weight curr) (sorting-weight next))))
+  (define (iter curr-inc tail-stream)
+    (if (>= curr-inc num-tests)
+        'done
+        (begin
+          (assert (check-invariant (stream-car tail-stream) (stream-car (stream-cdr tail-stream)))
+                  (list (stream-car tail-stream) (stream-car (stream-cdr tail-stream))))
+          (iter (+ curr-inc 1) (stream-cdr tail-stream)))))
+  (iter 0 part-b-stream))
+#+end_src
+
+#+begin_src racket :exports code
+(validate-part-b 20)
+#+end_src
+
+** Results
+#+begin_src bash :exports both :results output
+racket ./src/exercise-70.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+first 21 elements of the sorted pairs (i, j), where i <= j
+( (1 1) (1 2) (1 3) (2 2) (1 4) (2 3) (1 5) (2 4) (3 3) (1 6) (2 5) (3 4) (1 7) (2 6) (3 5) (4 4) (1 8) (2 7) (3 6) (4 5) (1 9))#<void>
+part b, first 21 elements
+( (1 1) (1 7) (1 11) (1 13) (1 17) (1 19) (1 23) (1 29) (1 31) (7 7) (1 37) (1 41) (1 43) (1 47) (1 49) (1 53) (7 11) (1 59) (1 61) (7 13) (1 67))
+pass: ((1 1) (1 7))
+pass: ((1 7) (1 11))
+pass: ((1 11) (1 13))
+pass: ((1 13) (1 17))
+pass: ((1 17) (1 19))
+pass: ((1 19) (1 23))
+pass: ((1 23) (1 29))
+pass: ((1 29) (1 31))
+pass: ((1 31) (7 7))
+pass: ((7 7) (1 37))
+pass: ((1 37) (1 41))
+pass: ((1 41) (1 43))
+pass: ((1 43) (1 47))
+pass: ((1 47) (1 49))
+pass: ((1 49) (1 53))
+pass: ((1 53) (7 11))
+pass: ((7 11) (1 59))
+pass: ((1 59) (1 61))
+pass: ((1 61) (7 13))
+pass: ((7 13) (1 67))done
+#+end_example

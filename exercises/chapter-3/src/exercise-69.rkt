@@ -23,7 +23,7 @@
 (newline)
 (display "first 21 elements of (triples integers integers)")
 (newline)
-(display (display-stream-range 0 20 (triples integers integers integers)))
+(display-stream-range 0 20 (triples integers integers integers))
 ;; Solution:3 ends here
 
 ;; [[file:../exercise-69.org::*Solution][Solution:4]]
@@ -39,5 +39,5 @@
 (newline)
 (display "8 pythagorian triples")
 (newline)
-(display (display-stream-range 0 7 pythagorian-triples))
+(display-stream-range 0 7 pythagorian-triples)
 ;; Solution:5 ends here

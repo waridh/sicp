@@ -52,7 +52,7 @@ We should display both to see what the heck is going on.
 (newline)
 (display "old output, 0 to 20")
 (newline)
-(display (display-stream-range 0 20 (pairs-old integers integers)))
+(display-stream-range 0 20 (pairs-old integers integers))
 #+end_src
 
 Now for the new output.

@@ -8,7 +8,13 @@ Literate programming for the stream combinators
 #+begin_src racket
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream partial-sums interleave)
+(#%provide add-streams
+           mul-streams
+           combine-streams
+           scale-stream
+           partial-sums
+           interleave
+           merge-weighted)
 #+end_src
 ** Generic Combinator
 #+begin_src racket :exports code
@@ -52,4 +58,15 @@ This procedure will take in two streams, and interleave them.
       (cons-stream
        (stream-car s1)
        (interleave s2 (stream-cdr s1)))))
+#+end_src
+** Weighted Merge
+
+#+begin_src racket :exports code
+(define (merge-weighted weight s t)
+  (if (stream-null? s)
+      t
+      (cond
+        [(<= (weight (stream-car s)) (weight (stream-car t)))
+         (cons-stream (stream-car s) (merge-weighted weight (stream-cdr s) t))]
+        [else (cons-stream (stream-car t) (merge-weighted weight s (stream-cdr t)))])))
 #+end_src

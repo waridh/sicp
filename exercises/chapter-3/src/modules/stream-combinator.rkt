@@ -1,7 +1,13 @@
 ;; [[file:../../stream-combinator.org::*Source][Source:1]]
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream partial-sums interleave)
+(#%provide add-streams
+           mul-streams
+           combine-streams
+           scale-stream
+           partial-sums
+           interleave
+           merge-weighted)
 ;; Source:1 ends here
 
 ;; [[file:../../stream-combinator.org::*Generic Combinator][Generic Combinator:1]]
@@ -42,3 +48,13 @@
        (stream-car s1)
        (interleave s2 (stream-cdr s1)))))
 ;; Iterleave:1 ends here
+
+;; [[file:../../stream-combinator.org::*Weighted Merge][Weighted Merge:1]]
+(define (merge-weighted weight s t)
+  (if (stream-null? s)
+      t
+      (cond
+        [(<= (weight (stream-car s)) (weight (stream-car t)))
+         (cons-stream (stream-car s) (merge-weighted weight (stream-cdr s) t))]
+        [else (cons-stream (stream-car t) (merge-weighted weight s (stream-cdr t)))])))
+;; Weighted Merge:1 ends here
