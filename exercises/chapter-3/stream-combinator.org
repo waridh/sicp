@@ -8,7 +8,7 @@ Literate programming for the stream combinators
 #+begin_src racket
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream partial-sums)
+(#%provide add-streams mul-streams combine-streams scale-stream partial-sums interleave)
 #+end_src
 ** Generic Combinator
 #+begin_src racket :exports code
@@ -41,4 +41,15 @@ Literate programming for the stream combinators
     (cons-stream (stream-car s)
                  (add-streams result (stream-cdr s))))
   result)
+#+end_src
+** Iterleave
+This procedure will take in two streams, and interleave them.
+
+#+begin_src racket :exports code
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+      s2
+      (cons-stream
+       (stream-car s1)
+       (interleave s2 (stream-cdr s1)))))
 #+end_src

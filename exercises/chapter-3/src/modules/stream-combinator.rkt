@@ -1,7 +1,7 @@
 ;; [[file:../../stream-combinator.org::*Source][Source:1]]
 #lang sicp
 (#%require "stream-base.rkt")
-(#%provide add-streams mul-streams combine-streams scale-stream partial-sums)
+(#%provide add-streams mul-streams combine-streams scale-stream partial-sums interleave)
 ;; Source:1 ends here
 
 ;; [[file:../../stream-combinator.org::*Generic Combinator][Generic Combinator:1]]
@@ -33,3 +33,12 @@
                  (add-streams result (stream-cdr s))))
   result)
 ;; Partial Sums:1 ends here
+
+;; [[file:../../stream-combinator.org::*Iterleave][Iterleave:1]]
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+      s2
+      (cons-stream
+       (stream-car s1)
+       (interleave s2 (stream-cdr s1)))))
+;; Iterleave:1 ends here
