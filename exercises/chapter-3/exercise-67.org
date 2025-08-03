@@ -1,0 +1,42 @@
+#+title: Exercise 67
+* Prompt
+Modify the ~pairs~ procedure so that ~(pairs integers integers)~ will produce the stream of /all/ pairs of integers $(i, j)$ (without the condition $i \le j$). Hint: You will need to mix in an additional stream.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-67.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt")
+#+end_src
+
+The existing implementation used the following two sub-streams when generating the stream. A diagonal movement constructed with ~(pairs (stream-cdr s) (stream-cdr t))~, and a row-wise stream constructed with ~(stream-map (lambda (x) (list (stream-car s) x)) (stream-cdr t))~.
+
+What we have to do now is add a column-wise stream that looks like ~(stream-map (lambda (x) (list x (stream-car t))) (stream-cdr s))~.
+
+#+begin_src racket :exports code
+(define (pairs s t)
+  (cons-stream (list (stream-car s) (stream-car t))
+               (interleave (interleave (stream-map (lambda (x) (list (stream-car s) x))
+                                                   (stream-cdr t))
+                                       (pairs (stream-cdr s) (stream-cdr t)))
+                           (stream-map (lambda (x) (list x (stream-car t))) (stream-cdr s)))))
+#+end_src
+
+And here is our little test for this:
+
+#+begin_src racket :exports code
+(display-stream-range 0 100 (pairs integers integers))
+#+end_src
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-67.rkt
+#+end_src
+
+#+RESULTS:
+: ( (1 1) (1 2) (2 1) (2 2) (3 1) (1 3) (4 1) (2 3) (5 1) (1 4) (6 1) (3 2) (7 1) (1 5) (8 1) (3 3) (9 1) (1 6) (10 1) (4 2) (11 1) (1 7) (12 1) (2 4) (13 1) (1 8) (14 1) (5 2) (15 1) (1 9) (16 1) (3 4) (17 1) (1 10) (18 1) (6 2) (19 1) (1 11) (20 1) (2 5) (21 1) (1 12) (22 1) (7 2) (23 1) (1 13) (24 1) (4 3) (25 1) (1 14) (26 1) (8 2) (27 1) (1 15) (28 1) (2 6) (29 1) (1 16) (30 1) (9 2) (31 1) (1 17) (32 1) (4 4) (33 1) (1 18) (34 1) (10 2) (35 1) (1 19) (36 1) (2 7) (37 1) (1 20) (38 1) (11 2) (39 1) (1 21) (40 1) (5 3) (41 1) (1 22) (42 1) (12 2) (43 1) (1 23) (44 1) (2 8) (45 1) (1 24) (46 1) (13 2) (47 1) (1 25) (48 1) (3 5) (49 1) (1 26) (50 1) (14 2) (51 1))
+
+This is the result we are hoping for.
