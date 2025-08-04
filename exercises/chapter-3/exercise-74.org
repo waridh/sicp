@@ -1,0 +1,170 @@
+#+title: Exercise 74
+* Prompt
+Alyssa P. Hacker is designing a system to process signals coming from physical sensors. One important feature she wishes to produce is a signal that describes the /zero crossings/ of the input signal. That is, the resulting signal should be $+ 1$ whenever the input signal changes from negative to positive, $- 1$ whenever the input signal changes from positive to negative, and 0 otherwise. (Assume that the sign of a 0 input is positive.) For example, a typical input signal with its associated zero-crossing signal would be
+
+~... 1 2 1.5 1 0.5 -0.1 -2 -3 -2 -0.5 0.2 3 4 ...~
+
+~... 0 0 0 0 0 -1 0 0 0 0 1 0 0 ...~
+
+In Alyssa's system, the signal from the sensor is represented as a stream ~sense-data~ and the stream ~zero-crossings~ is the corresponding stream of zero crossings. Alyssa first writes a procedure ~sign-change-detector~ that takes two values as arguments and compares the signs of the values to procedure an appropriate ~0~, ~1~, or ~-1~. She then constructs her zero-crossing stream as follows:
+
+#+begin_src racket :exports code
+(define (make-zero-crossings input-stream last-value)
+  (cons-stream
+   (sign-change-detector
+    (stream-car input-stream)
+    last-value)
+   (make-zero-crossings
+    (stream-cdr input-stream)
+    (stream-car input-stream))))
+(define zero-crossings
+  (make-zero-crossings sense-data 0))
+#+end_src
+
+Alyssa's boss, Eva Lu Ator, walks by and suggests that this program is approximately equivalent to the following one, which uses the generalized version of ~stream-map~ from [[file:exercise-50.org][Exercise 3.50]]:
+
+#+begin_src racket :exports code
+(define zero-crossings
+  (stream-map sign-change-detector
+              sense-data
+              <expression>))
+#+end_src
+
+Complete the program by supplying the indicated ~<expression>~.
+
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-74.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+We could already tell that the value of the expression should be ~(cons-stream 0 sense-data)~.
+
+We would like to test our systems, so what we could do is write down the implementations, and run tests on them.
+
+Here, we are adding the test data to the system.
+
+#+begin_src racket :exports code
+(define (stream-from-list l)
+  (if (null? l)
+      the-empty-stream
+      (cons-stream (car l)
+                   (stream-from-list (cdr l)))))
+(define input-sequence (list 1 2 1.5 1 0.5 -0.1 -2 -3 -2 -0.5 0.2 3 4))
+(define expected-sequence (list 0 0 0 0 0 -1 0 0 0 0 1 0 0))
+(define sense-data (stream-from-list input-sequence))
+(define expected-data (stream-from-list expected-sequence))
+#+end_src
+
+SICP did not provide us with the implementation of the ~sign-change-detector~ procedure, so we will implement it ourselves.
+
+#+begin_src racket :exports code
+(define (sign-change-detector new-val prev-val)
+  (cond [(and (> new-val 0) (< prev-val 0)) 1]
+        [(and (< new-val 0) (> prev-val 0)) -1]
+        [else 0]))
+#+end_src
+
+Here, we are going to place Alyssa's implementation here as well.
+
+#+begin_src racket :exports code
+(define (make-zero-crossings input-stream last-value)
+  (if (stream-null? input-stream)
+      the-empty-stream
+      (cons-stream (sign-change-detector (stream-car input-stream) last-value)
+                   (make-zero-crossings (stream-cdr input-stream) (stream-car input-stream)))))
+(define alyssa-zero-crossings (make-zero-crossings sense-data 0))
+#+end_src
+
+Finally, we shall finish Eva Lu Ator's implementation.
+
+#+begin_src racket :exports code
+(define zero-crossings
+  (stream-map sign-change-detector
+              sense-data
+              (cons-stream 0 sense-data)))
+#+end_src
+
+** Testing
+We shall first implement the test first, then apply it.
+
+#+begin_src racket :exports code
+(define (test-stream s)
+  (define (iter exp-tail res-tail)
+    (cond [(and (stream-null? exp-tail) (stream-null? res-tail)) 'done]
+          [(stream-null? exp-tail) (begin
+                                     (assert false "expected the streams to end at the same time")
+                                     'done)]
+          [(stream-null? res-tail) (begin
+                                      (assert false "input stream ended before expected")
+                                      'done)]
+          [else (begin (assert (= (stream-car exp-tail)
+                                  (stream-car res-tail)) (list '= (stream-car exp-tail)
+                                                               (stream-car res-tail)))
+                       (iter (stream-cdr exp-tail)
+                             (stream-cdr res-tail)))]))
+  (iter expected-data s))
+#+end_src
+
+Testing Alyssa's implementation:
+
+#+begin_src racket :exports code
+(newline)
+(display "Alyssa's implementation")
+(test-stream alyssa-zero-crossings)
+#+end_src
+
+Testing our implementation:
+
+#+begin_src racket :exports code
+(newline)
+(display "Our implementation")
+(test-stream zero-crossings)
+#+end_src
+
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-74.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+Alyssa's implementation
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= -1 -1)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 1 1)
+pass: (= 0 0)
+pass: (= 0 0)done
+
+Our implementation
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= -1 -1)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 1 1)
+pass: (= 0 0)
+pass: (= 0 0)done
+#+end_example
