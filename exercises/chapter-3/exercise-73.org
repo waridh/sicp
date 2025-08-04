@@ -1,0 +1,57 @@
+#+title: Exercise 73
+* Prompt
+We can model electrical circuits using streams to represent the values of currents or voltages at a sequence of times. For instance, suppose we have an /RC circuit/ consisting of a resistor of resistance /R/ and a capacitor of capacitance $C$ in series. The voltage response $v$ of the circuit to an injected current $i$ is determined by the formula in the given figure, whose structure is shown by the accompanying signal-flow diagram.
+
+$$
+v = v_0 + \frac{1}{C} \int_0^t i dt + Ri
+$$
+
+
+Write a procedure ~RC~ that models this circuit. ~RC~ should take as inputs the values of $R$, $C$, and $dt$ and should return a procedure that takes as inputs a stream representing the current $i$ and an initial value for the capacitor voltage $v_0$ and produces as output the stream of voltage $v$. For example, you should be able to use ~RC~ to model an RC circuit with $R=5\Omega$, $C=1$ farad, and a 0.5 second time step by evaluating ~(define RC1 (RC 5 1 0.5))~. This defines ~RC1~ as a procedure that takes a stream representing the time of sequence of currents and an initial capacitor voltage and produces the output stream of voltages.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-73.rkt :comments yes
+:end:
+
+Here, we needed to use the ~integral~ procedure provided by sicp.
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/stream-signal.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+(define (RC R C dt)
+  (lambda (i v_0)
+    (define v
+      (add-streams
+       (scale-stream (integral i v_0 dt) (/ 1 C))
+       (scale-stream i R)))
+    v))
+#+end_src
+
+With the definition ready, we should test the value.
+
+#+begin_src racket :exports code
+(define RC1 (RC 5 1 0.5))
+
+(newline)
+(display "showing RC1 with input of just 1")
+(newline)
+(display-stream-range 0 100 (RC1 ones 0))
+#+end_src
+
+#+RESULTS:
+
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-73.rkt
+#+end_src
+
+#+RESULTS:
+:
+: showing RC1 with input of just 1
+: ( 5 5.5 6.0 6.5 7.0 7.5 8.0 8.5 9.0 9.5 10.0 10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0 14.5 15.0 15.5 16.0 16.5 17.0 17.5 18.0 18.5 19.0 19.5 20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5 24.0 24.5 25.0 25.5 26.0 26.5 27.0 27.5 28.0 28.5 29.0 29.5 30.0 30.5 31.0 31.5 32.0 32.5 33.0 33.5 34.0 34.5 35.0 35.5 36.0 36.5 37.0 37.5 38.0 38.5 39.0 39.5 40.0 40.5 41.0 41.5 42.0 42.5 43.0 43.5 44.0 44.5 45.0 45.5 46.0 46.5 47.0 47.5 48.0 48.5 49.0 49.5 50.0 50.5 51.0 51.5 52.0 52.5 53.0 53.5 54.0 54.5 55.0)

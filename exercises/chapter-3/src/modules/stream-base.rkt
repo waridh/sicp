@@ -13,6 +13,7 @@
            stream-enumerate-interval
            stream-filter
            stream-map
+           stream-show
            make-tableau
            accelerated-sequence)
 ;; Module base:2 ends here
@@ -43,6 +44,15 @@
 (define (display-ele x)
   (display " ")
   (display x))
+
+(define (stream-show x)
+  (if (stream-null? x)
+      x
+      (cons-stream (begin
+                     (newline)
+                     (display (stream-car x))
+                     (stream-car x))
+                   (stream-show (stream-cdr x)))))
 ;; Stream Utilities:1 ends here
 
 ;; [[file:../../stream-base.org::*Stream Utilities][Stream Utilities:2]]

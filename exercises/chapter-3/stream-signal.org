@@ -1,0 +1,21 @@
+#+title: Stream Signal
+* Source
+:properties:
+:header-args:racket: :tangle ./src/modules/stream-signal.rkt :comments yes
+:end:
+
+#+begin_src racket :exports code
+#lang sicp
+(#%require "stream-base.rkt"
+           "stream-combinator.rkt")
+(#%provide integral)
+#+end_src
+** Integral
+#+begin_src racket :exports code
+(define (integral integrand initial-value dt)
+  (define int
+    (cons-stream  initial-value
+                  (add-streams (scale-stream integrand dt)
+                               int)))
+  int)
+#+end_src

@@ -23,9 +23,13 @@ This org file contains the basic implementation of the stream interface, as the 
            stream-enumerate-interval
            stream-filter
            stream-map
+           stream-show
            make-tableau
            accelerated-sequence)
 #+end_src
+
+#+RESULTS:
+
 ** Stream basic selectors
 
 #+begin_src racket
@@ -55,6 +59,15 @@ This org file contains the basic implementation of the stream interface, as the 
 (define (display-ele x)
   (display " ")
   (display x))
+
+(define (stream-show x)
+  (if (stream-null? x)
+      x
+      (cons-stream (begin
+                     (newline)
+                     (display (stream-car x))
+                     (stream-car x))
+                   (stream-show (stream-cdr x)))))
 #+end_src
 
 #+begin_src racket :exports code
