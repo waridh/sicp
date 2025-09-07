@@ -1,0 +1,65 @@
+#+title: Exercise 82
+* Prompt
+Redo [[file:exercise-5.org][Exercise 3.5]] on Monte Carlo integration in terms of streams. The stream version of ~estimate-integral~ will not have an argument telling how many trials to performance. Instead, it will produce a stream of estimates based on successively more trials.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-82.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "./modules/stream-base.rkt"
+           "./modules/stream-combinator.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+;; This is the random-in-range procedure that will provide a random number in provided range
+(define (random-in-range low high)
+  (let ((range (- high low)))
+    (+ low (random range))))
+#+end_src
+
+#+begin_src racket :exports code
+(define (monte-carlo experiment)
+  (define (plus-one x)
+    (+ x 1))
+  (define (make-monte-carlo-stream trials-passed trial-number)
+    (if (experiment)
+        (cons-stream (/ (plus-one trials-passed) trial-number)
+                     (make-monte-carlo-stream (plus-one trials-passed) (plus-one trial-number)))
+        (cons-stream (/ trials-passed trial-number)
+                     (make-monte-carlo-stream trials-passed (plus-one trial-number)))))
+  (make-monte-carlo-stream 0 1))
+(define (estimate-integral P x1 x2 y1 y2)
+  (let ([total-area (abs (* (- x2 x1) (- y2 y1)))]
+        [experi (lambda () (let ([x (random-in-range x1 x2)]
+                                 [y (random-in-range y1 y2)])
+                             (P x y)))])
+    (scale-stream (monte-carlo experi) total-area)))
+;; This procedure creates a predicate that checks if the given point is in the circle
+(define (make-circle-predicate radius)
+  (define (square x)
+    (* x x))
+  (lambda (x y)
+    (<= (+ (square x) (square y)) radius)))
+
+(define (estimate-pi)
+  (let ([radius 1.0])
+    (scale-stream (estimate-integral (make-circle-predicate radius) 0.0 radius 0.0 radius) 4.0)))
+#+end_src
+
+** Testing
+
+#+begin_src racket
+(stream-ref (estimate-pi) 10000000)
+#+end_src
+** Result
+
+#+begin_src sh :exports both :results output
+racket ./src/exercise-82.rkt
+#+end_src
+
+#+RESULTS:
+: 3.1423708857629116
+
+Well, I think that the result speaks for itself. This was a successful conversion of the object oriented method of design to a stream based one.

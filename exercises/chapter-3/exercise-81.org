@@ -1,0 +1,62 @@
+#+title: Exercise 81
+* Prompt
+[[file:exercise-6.org][Exercise 3.6]] discussed generalizing the random number generator to allow one to reset the random-number sequence so as to produce repeatable sequences of "random" numbers. Produce a stream formulation of this same generator that operates on an input stream of requests to ~generate~ a new random number or to ~reset~ the sequence to a specified value and that produces the desired stream of random numbers. Don't use assignment in your solution.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-81.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "./modules/stream-base.rkt")
+#+end_src
+
+#+begin_src racket :exports code
+;; Using a simple implementation of rand-update for time sake
+(define (rand-update x)
+  (display "rand-update sees: ")
+  (display x)
+  (newline)
+  (random 100.0))
+
+(define (list->stream l)
+  (if (null? l)
+      the-empty-stream
+      (cons-stream (car l) (list->stream (cdr l)))))
+
+(define (rand-stream s)
+  (define (make-rand-stream the-stream last-value)
+    (if (stream-null? the-stream)
+        the-empty-stream
+        (let ([head (stream-car the-stream)])
+          (cond
+            [(and (symbol? head) (eq? head 'generate))
+             (let ([ret-value (rand-update last-value)])
+               (cons-stream ret-value (make-rand-stream (stream-cdr the-stream) ret-value)))]
+            [(and (pair? head) (eq? (car head) 'reset))
+             (let ([new-value (rand-update (cadr head))])
+               (cons-stream new-value (make-rand-stream (stream-cdr the-stream) new-value)))]
+            [else (error "invalid command: RAND " head)]))))
+  (make-rand-stream s 0))
+#+end_src
+** Testing
+
+#+begin_src racket
+(define input-stream (list->stream '(generate generate (reset 8) generate)))
+(define out-stream (rand-stream input-stream))
+(display-stream out-stream)
+#+end_src
+** Result
+
+#+begin_src sh :exports both :results output
+racket ./src/exercise-81.rkt
+#+end_src
+
+#+RESULTS:
+: rand-update sees: 0
+: ( 54.492348114589326rand-update sees: 54.492348114589326
+:  39.92311768327106rand-update sees: 8
+:  84.7781263836311rand-update sees: 84.7781263836311
+:  3.243430954086045)
+
+From here, we see that we have constructed a stream processor that converts a series of commands into work. Looks like these are some of the strategies that are used by larger scale software firms to handle large amount of customers.
