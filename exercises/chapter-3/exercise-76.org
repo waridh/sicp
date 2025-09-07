@@ -1,0 +1,136 @@
+#+title: Exercise 76
+* Prompt
+Eva Lu Ator has criticism of Louis's approach in [[file:exercise-75.org][Exercise 3.75]]. The program he wrote is not modular, because it intermixes the operation of smoothing with the zero-crossing extraction. For example, the extractor should not have to be changed if Alyssa finds a better way to condition her input signal. Help Louis by writing a procedure ~smooth~ that takes a stream as input and produces a stream in which each element is the ~average~ of two successive input stream elements. Then use ~smooth~ as a component to implement the zero-crossing detector in a more modular style.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-76.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+#+begin_src racket :exports none
+;; This is the unit sign change procedure
+(define (sign-change-detector new-val prev-val)
+  (cond [(and (> new-val 0) (< prev-val 0)) 1]
+        [(and (< new-val 0) (> prev-val 0)) -1]
+        [else 0]))
+#+end_src
+
+We shall implement the ~smooth~ procedure, test it, and re-implement ~make-zero-crossings~.
+
+#+begin_src racket :exports code
+(define (average . x)
+  (/ (apply + x) (length x)))
+;; The smooth procedure. Allows the user to define what the initial value is
+(define (smooth stre init-value)
+  (define smoothed-stream (stream-map average stre (cons-stream init-value stre)))
+  smoothed-stream)
+#+end_src
+
+Here, we are going to use some of our own programming style to efficiently compute the zero crossing values.
+
+#+begin_src racket :exports code
+(define (make-zero-crossings input-stream init-value)
+  (let ([smoothed-stream (smooth input-stream init-value)])
+    (stream-map sign-change-detector smoothed-stream (cons-stream init-value smoothed-stream))))
+#+end_src
+
+#+begin_src racket :exports code
+;; helper procedure that converts list to stream
+(define (list->stream l)
+  (if (null? l)
+      the-empty-stream
+      (cons-stream (car l) (list->stream (cdr l)))))
+#+end_src
+
+** Testing
+Here, we define a procedure to test two streams to see if they are equal.
+
+#+begin_src racket :exports code
+(define (test-stream expected-data s)
+  (define (iter exp-tail res-tail)
+    (cond [(and (stream-null? exp-tail) (stream-null? res-tail)) 'done]
+          [(stream-null? exp-tail) (begin
+                                     (assert false "expected the streams to end at the same time")
+                                     'done)]
+          [(stream-null? res-tail) (begin
+                                      (assert false "input stream ended before expected")
+                                      'done)]
+          [else (begin (assert (= (stream-car exp-tail)
+                                  (stream-car res-tail)) (list '= (stream-car exp-tail)
+                                                               (stream-car res-tail)))
+                       (iter (stream-cdr exp-tail)
+                             (stream-cdr res-tail)))]))
+  (iter expected-data s))
+#+end_src
+
+Additionally, we now have to construct a simple hard-coded stream that defines what we expect from the input.
+
+#+begin_src racket :exports code
+(define input-sequence1 (list 1 2 1.5 1 0.5 -0.1 -2 -3 -2 -0.5 0.2 3 4))
+(define smoothed-sequence1 (list 0.5 1.5 1.75 1.25 0.75 0.2 -1.05 -2.5 -2.5 -1.25 -0.15 1.6 3.5))
+(define expected-sequence1 (list 0 0 0 0 0 0 -1 0 0 0 0 1 0))
+#+end_src
+
+Here, we not only have to assert against the zero crossing values, but also the smoothed output. Luckily, we are able to use the same procedure to do both.
+
+#+begin_src racket :exports code
+(newline)
+(display "Smoothed stream test")
+(test-stream (list->stream smoothed-sequence1) (smooth (list->stream input-sequence1) 0))
+#+end_src
+
+#+begin_src racket :exports code
+(newline)
+(display "Zero crossing procedure test")
+(test-stream (list->stream expected-sequence1) (make-zero-crossings (list->stream input-sequence1) 0))
+#+end_src
+
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-76.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+Alyssa's implementation
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= -1 -1)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 1 1)
+pass: (= 0 0)done
+
+Smoothed stream output
+pass: (= 0.5 1/2)
+pass: (= 1.5 3/2)
+pass: (= 1.75 1.75)
+pass: (= 1.25 1.25)
+pass: (= 0.75 0.75)
+pass: (= 0.2 0.2)
+pass: (= -1.05 -1.05)
+pass: (= -2.5 -5/2)
+pass: (= -2.5 -5/2)
+pass: (= -1.25 -1.25)
+pass: (= -0.15 -0.15)
+pass: (= 1.6 1.6)
+pass: (= 3.5 7/2)done
+#+end_example
+
+
+And with this, we have fixed the bug that can out of Louis.
