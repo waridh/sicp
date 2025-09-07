@@ -15,3 +15,107 @@ Unfortunately, Alyssa's zero-crossing detector in [[file:exercise-74.org][exerci
 
 This does not correctly implement Alyssa's plan. Find the bug that Louis has installed and fix it without changing the structure of the program. (Hint: You will need to increase the number of arguments to ~make-zero-crossings~.)
 * Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-75.rkt :comments yes
+:end:
+
+#+begin_src racket :exports none
+#lang sicp
+(#%require "modules/stream-base.rkt"
+           "modules/stream-combinator.rkt"
+           "modules/stream-generator.rkt"
+           "modules/assert-tool.rkt")
+#+end_src
+
+#+begin_src racket :exports none
+;; This is the unit sign change procedure
+(define (sign-change-detector new-val prev-val)
+  (cond [(and (> new-val 0) (< prev-val 0)) 1]
+        [(and (< new-val 0) (> prev-val 0)) -1]
+        [else 0]))
+#+end_src
+
+After some code reading and analysis, it seems like the implementation given is taking the average of the current sensor value with the previous average value, instead of previous sensor value. We could fix this by passing over the previous sensor value as well, so that a clean average value could be computed.
+
+#+begin_src racket :exports code
+(define (make-zero-crossings input-stream last-value last-av)
+  (if (stream-null? input-stream)
+      the-empty-stream
+      (let ([avpt (/ (+ (stream-car input-stream) last-value) 2)])
+        (cons-stream
+         (sign-change-detector avpt last-av)
+         (make-zero-crossings (stream-cdr input-stream) (stream-car input-stream) avpt)))))
+#+end_src
+
+Now, we are computing the difference of the running average stream, but this time, the elements of the stream are the average of the current value and the previous value.
+
+#+begin_src racket :exports code
+;; helper procedure that converts list to stream
+(define (list->stream l)
+  (if (null? l)
+      the-empty-stream
+      (cons-stream (car l) (list->stream (cdr l)))))
+#+end_src
+
+** Testing
+Here, we define a procedure to test two streams to see if they are equal.
+
+#+begin_src racket :exports code
+(define (test-stream expected-data s)
+  (define (iter exp-tail res-tail)
+    (cond [(and (stream-null? exp-tail) (stream-null? res-tail)) 'done]
+          [(stream-null? exp-tail) (begin
+                                     (assert false "expected the streams to end at the same time")
+                                     'done)]
+          [(stream-null? res-tail) (begin
+                                      (assert false "input stream ended before expected")
+                                      'done)]
+          [else (begin (assert (= (stream-car exp-tail)
+                                  (stream-car res-tail)) (list '= (stream-car exp-tail)
+                                                               (stream-car res-tail)))
+                       (iter (stream-cdr exp-tail)
+                             (stream-cdr res-tail)))]))
+  (iter expected-data s))
+#+end_src
+
+Additionally, we now have to construct a simple hard-coded stream that defines what we expect from the input.
+
+#+begin_src racket :exports code
+(define input-sequence1 (list 1 2 1.5 1 0.5 -0.1 -2 -3 -2 -0.5 0.2 3 4))
+(define average-of-last-value (list 0.5 1.5 1.75 1.25 0.75 0.2 -1.05 -2.5 -2.5 -1.25 -0.15 1.6 3.5))
+(define expected-sequence1 (list 0 0 0 0 0 0 -1 0 0 0 0 1 0))
+#+end_src
+
+#+begin_src racket :exports code
+(newline)
+(display "Alyssa's implementation")
+(test-stream (list->stream expected-sequence1) (make-zero-crossings (list->stream input-sequence1) 0 0))
+#+end_src
+
+** Results
+
+#+begin_src bash :exports both :results output
+racket ./src/exercise-75.rkt
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+Alyssa's implementation
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= -1 -1)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 0 0)
+pass: (= 1 1)
+pass: (= 0 0)done
+#+end_example
+
+
+And with this, we have fixed the bug that can out of Louis.
