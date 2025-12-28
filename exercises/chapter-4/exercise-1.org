@@ -1,0 +1,43 @@
+#+title: Exercise 1
+* Prompt
+Notice that we cannot tell whether the metacircular evaluator evaluates operands from left to right or from right to left. Its evaluation order is inherited from the underlying Lisp: if the arguments to cons in ~list-of-values~ are evaluated from left to right, then ~list-of-values~ will evaluate operands from left to right; and if the arguments to ~cons~ are evaluated from right to left, then ~list-of-values~ will evaluate operands from right to left.
+
+Write a version of ~list-of-values~ that evaluates operands from left to right regardless of the order of evaluation in the underlying Lisp. Also write a version of ~list-of-values~ that evaluates operands from right to left.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-1.rkt :comments yes
+:end:
+
+The original implementation of ~list-of-value~ is as follows.
+
+#+begin_src racket :exports code :tangle no
+(define (list-of-values exps env)
+  (if (no-operand? exps)
+      '()
+      (cons (eval (first-operand exps) env)
+            (list-of-values (rest-operand exps) env))))
+#+end_src
+
+#+begin_src racket :exports none
+#lang sicp
+#+end_src
+
+The approach we took is making an aux version of the function that takes in a constructor procedure that will control the order in which the operands for the procedure will execute. This procedure will be passed in two lambdas that will either evaluate the current operand, or the recursive case. With this, the constructor procedure could either choose to evaluate the current element first, or the rest of the elements first. Then, for the left to right version, we just compute the head first and assign it to a local variable, and then cons them together. The right to left version has the right operand be computed first and then assigned to a let. After this, the values are ~cons~ together.
+
+#+begin_src racket :exports code
+(define (list-of-values-aux constructor exps env)
+  (if (no-operand? exps)
+      '()
+      (constructor (lambda () (eval (first-operand exps) env))
+                   (lambda () (list-of-values-aux (rest-operand exps) env)))))
+
+(define (list-of-values-left exps env)
+  (list-of-values-aux (lambda (lhead lrest) (let ((ehead (lhead)))
+                                              (cons ehead (lrest))))
+                      exps env))
+
+(define (list-of-values-right exps env)
+  (list-of-values-aux (lambda (lhead lrest) (let ((erest (lrest)))
+                                              (cons (lhead) erest)))
+                      exps env))
+#+end_src
