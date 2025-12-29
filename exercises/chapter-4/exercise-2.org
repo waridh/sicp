@@ -1,0 +1,75 @@
+#+title: Exercise 2
+* Prompt
+Louise Reasoner plans to reorder the ~cond~ clauses in ~eval~ so that the  clause for procedure applications appears before the clause for assignments. He argues that this will make the interpreter more efficient: Since programs usually contains more applications than assignments, definitions, and so on, his modified ~eval~ will usually check fewer clauses than the original ~eval~ before identifying the type of an expression.
+
+a. What is wrong with Louis's plan? (Hint: What will Louis's evaluator do with the expression ~(define x 3)~?)
+b. Louise is upset that his plan didn't work. He is willing to go to any lengths to make his evaluator recognize procedure applications before it checks for most other kinds of expressions. Help him by changing the syntax of the evaluated language so that procedure applications start with ~call~. For example, instead of ~(factorial 3)~ we will now have to write ~(call factorial 3)~ and instead of ~(+ 1 2)~ we will have to write ~(call + 1 2)~.
+* Solution
+:properties:
+:header-args:racket: :tangle ./src/exercise-1.rkt :comments yes
+:end:
+
+The original implementation of ~eval~ is as follows.
+
+#+begin_src racket :exports code :tangle no
+(define (eval exp env)
+  (cond
+    [(self-evaluating? exp) exp]
+    [(variable? exp) (lookup-variable-value exp env)]
+    [(quoted? exp) (text-of-quotation exp)]
+    [(assignment? exp) (eval-assignment exp env)]
+    [(definition? exp) (eval-definition exp env)]
+    [(if? exp) (eval-if exp env)]
+    [(lambda? exp) (make-procedure (lambda-parameters exp) (lambda-body exp) env)]
+    [(begin? exp) (eval-sequence (begin-actions exp) env)]
+    [(cond? exp) (eval (cond->if exp) env)]
+    [(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))]
+    [else (error "Unknown expression type: EVAL" exp)]))
+#+end_src
+
+a. Starting with what Louis would like to have happen, we would have the following implementation of the ~eval~ procedure.
+
+   #+begin_src racket :exports code :tangle no
+(define (eval exp env)
+  (cond
+    [(self-evaluating? exp) exp]
+    [(variable? exp) (lookup-variable-value exp env)]
+    [(quoted? exp) (text-of-quotation exp)]
+    [(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))]
+    [(assignment? exp) (eval-assignment exp env)]
+    [(definition? exp) (eval-definition exp env)]
+    [(if? exp) (eval-if exp env)]
+    [(lambda? exp) (make-procedure (lambda-parameters exp) (lambda-body exp) env)]
+    [(begin? exp) (eval-sequence (begin-actions exp) env)]
+    [(cond? exp) (eval (cond->if exp) env)]
+    [else (error "Unknown expression type: EVAL" exp)]))
+  #+end_src
+
+  The issue with doing this is that the application clause is now checked before the special forms like ~if~, ~define~, ~lambda~, ~begin~, and ~cond~, and due to the structure of the special forms, when there is a special form, it would match with the application clause before triggering its intended clause. This means that those special forms will no longer be treated as primitive functions, and they will be applied like a regular combination which in turn prevent users of the system from accessing those functionalities.
+
+b. We could fix Louis's program by changing the syntax of our language to use the ~call~ symbol at the front of the list to apply a procedure.
+
+   We would do this by changing the data abstraction of our system to match for an application differently, this time looking for the ~call~ symbol.
+
+   #+begin_src racket :exports code :tangle no
+(define (application? exp) (tagged-list? exp 'call))
+(define (operator exp) (cadr exp))
+(define (operands exp) (cdr exp))
+(define (no-operands? ops) (null? ops))
+(define (first-operand ops) (car ops))
+(define (rest-operand ops) (cdr ops))
+
+(define (eval exp env)
+  (cond
+    [(self-evaluating? exp) exp]
+    [(variable? exp) (lookup-variable-value exp env)]
+    [(quoted? exp) (text-of-quotation exp)]
+    [(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))]
+    [(assignment? exp) (eval-assignment exp env)]
+    [(definition? exp) (eval-definition exp env)]
+    [(if? exp) (eval-if exp env)]
+    [(lambda? exp) (make-procedure (lambda-parameters exp) (lambda-body exp) env)]
+    [(begin? exp) (eval-sequence (begin-actions exp) env)]
+    [(cond? exp) (eval (cond->if exp) env)]
+    [else (error "Unknown expression type: EVAL" exp)]))
+  #+end_src
