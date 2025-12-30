@@ -4,5 +4,5 @@
 Repository for structure and interpretation of computer programs exercises. Exercises are explored through literate programming using Org-mode and Racket in ~#lang sicp~. Evaluation is accomplished through ~org-babel~, and the relevant results are stored.
 * Links
 - [[file:exercises/chapter-1.org][Chapter 1]]
-- [[file:exercises/chapter-2.org][Chapter 2]]
+- [[file:exercises/chapter-2/chapter-2.org][Chapter 2]]
 - [[file:exercises/chapter-3/index.org][Chapter 3]]
