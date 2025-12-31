@@ -33,6 +33,7 @@
            first-operand
            rest-operand
            text-of-quotation
+           list-tag
            cond?
            cond-clauses
            cond-else-clause?
@@ -44,6 +45,11 @@
   (if (pair? exp)
       (eq? (car exp) tag)
       false))
+
+(define (list-tag exp)
+  (if (pair? exp)
+      (car exp)
+      exp))
 
 (define (self-evaluating? exp)
   (cond
