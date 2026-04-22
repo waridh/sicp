@@ -23,3 +23,5 @@ The original implementation of ~eval~ is as follows.
     [(application? exp) (apply (eval (operator exp) env) (list-of-values (operands exp) env))]
     [else (error "Unknown expression type: EVAL" exp)]))
 #+end_src
+
+The solution to this problem available [[file:src/exercise-3.rkt][here]].
